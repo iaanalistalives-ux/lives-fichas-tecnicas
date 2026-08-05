@@ -42,6 +42,11 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 .auto .autoBar{height:5px;background:#fff;border-radius:4px;overflow:hidden;}
 .auto .autoBar i{display:block;height:100%;width:0;background:var(--sage);transition:width .25s;}
 .pend .est2.rev{background:#FEF2F2;color:#991B1B;border:1px solid var(--rose);}
+.tabsel{display:flex;gap:8px;flex-wrap:wrap;}
+.tabsel button{background:#fff;border:1.5px solid var(--warm);border-radius:8px;padding:10px 14px;font-family:inherit;font-size:13px;font-weight:700;color:#333;cursor:pointer;text-align:left;}
+.tabsel button.on{border-color:var(--sage);background:var(--warm-light);color:var(--sage);}
+.tabsel button i{display:block;font-style:normal;font-size:11px;font-weight:600;color:var(--stone);margin-top:2px;}
+.tabsel button.on i{color:var(--sage);}
 .pend{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--warm-light);cursor:pointer;}
 .pend:last-child{border-bottom:none;}
 .pend .est{font-size:15px;font-weight:800;min-width:60px;}
@@ -293,7 +298,7 @@ function leerPagina(page){
     var orden = TALLAS.filter(function(t){ return t in cols; });
     if('TOL' in cols) orden.push('TOL');
 
-    var reCod = /^([A-T]|[A-Z]\d{1,2})$/;
+    var reCod = /^([A-Z]|[A-Z]\d{1,2})$/;
     var filas=[];
     renglones(pal, 3).forEach(function(r){
       if(!r.length || r[0].y >= yCab-2) return;   // solo debajo del encabezado
@@ -333,6 +338,16 @@ function leerPagina(page){
 }
 
 /* --- cabecera: identificar la ficha --- */
+function tituloTabla(texto){
+  var t=(texto||'').replace(/\u00A0/g,' ');
+  var m=t.match(/COMBO\s*:?\s*([^\n\r]{2,90})/i);
+  var combo = m ? m[1].replace(/THY-?\d+|PAK-?\d+/gi,'').replace(/\s+/g,' ').trim() : '';
+  var etapa = /EN\s+PRENDA\s+TERMINADA/i.test(t) ? 'Prenda terminada (después de vapor)'
+            : /EN\s+COSTURA/i.test(t)             ? 'En costura (antes de vapor)'
+            : /CONTROL\s+DE\s+MEDIDAS\s*:?\s*CORTE/i.test(t) ? 'Corte'
+            : 'Medidas';
+  return { etapa:etapa, combo:combo };
+}
 function cabecera(texto){
   var t=(texto||'').replace(/\u00A0/g,' ');
   var o={};
@@ -340,10 +355,12 @@ function cabecera(texto){
          : /EN\s+PRENDA\s+TERMINADA/i.test(t) ? 'PRENDA TERMINADA' : '—';
   var m;
   if((m=t.match(/\b([A-Z]{2,5})\s*[–—-]\s*(\d{2,4})\b/)))  o.grupo=m[1].toUpperCase()+'-'+m[2];
-  if((m=t.match(/ESTILO\s*[-–]?\s*VERSI[ÓO]N\s*:?\s*([0-9]{4,6}\s*-\s*[0-9A-Za-z]{1,3})/i)))
-      o.estilo=m[1].replace(/\s+/g,'');
-  else if((m=t.match(/ESTILO\s*:?\s*([0-9]{4,6}\s*-\s*[0-9A-Za-z]{1,3})/i)))
-      o.estilo=m[1].replace(/\s+/g,'');
+  var reEst=/([0-9]{4,6})\s*[-–—]\s*([0-9A-Za-z]{1,3})\b/;
+  if((m=t.match(/ESTILO\s*[-–—]?\s*VERSI[ÓO]N\s*:?\s*([\s\S]{0,40})/i)) && reEst.test(m[1]))
+      o.estilo=m[1].match(reEst).slice(1,3).join('-');
+  else if((m=t.match(/ESTILO\s*:?\s*([\s\S]{0,40})/i)) && reEst.test(m[1]))
+      o.estilo=m[1].match(reEst).slice(1,3).join('-');
+  else if((m=t.match(reEst))) o.estilo=m[1]+'-'+m[2];
   if((m=t.match(/CLIENTE\s*:?\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ0-9 .&\/]{1,25})/i)))
       o.cliente=m[1].split(/[–—-]/)[0].replace(/\s+/g,' ').trim().toUpperCase();
   if((m=t.match(/COLOR\s*:?\s*([^\n\r]{2,60})/i)))
@@ -634,8 +651,16 @@ function extraerDe(arr, cb){
     Promise.all(tareas).then(function(res){
       var c=res.filter(function(r){ return r.tabla; });
       if(!c.length){ cb(null); return; }
-      c.sort(function(a,b){ return b.tabla.filas.length-a.tabla.filas.length; });
-      cb({ tabla:c[0].tabla, cab:cabecera(textos[c[0].n-1]), pagina:c[0].n, total:doc.numPages });
+      var todas=c.map(function(x){
+        return { tabla:x.tabla, cab:cabecera(textos[x.n-1]),
+                 titulo:tituloTabla(textos[x.n-1]), pagina:x.n };
+      });
+      // por defecto, la de prenda terminada; si no hay, la de más filas
+      var pref=todas.filter(function(x){ return /Prenda terminada/.test(x.titulo.etapa); });
+      var elegida = pref.length ? pref[0]
+        : todas.slice().sort(function(a,b){ return b.tabla.filas.length-a.tabla.filas.length; })[0];
+      cb({ tabla:elegida.tabla, cab:elegida.cab, titulo:elegida.titulo,
+           pagina:elegida.pagina, total:doc.numPages, todas:todas });
     }).catch(function(){ cb(null); });
   }).catch(function(){ cb(null); });
 }
@@ -656,42 +681,29 @@ function guardarTabla(tabla, cab, fileId, archivo, quien, cb){
          confirmadoPor:quien }, cb);
 }
 
+var TODAS=[], IDX=0;
+
 function leerArrayBuffer(arr, nombre){
   document.getElementById('salida').innerHTML='<div class="cargando">Leyendo el PDF…</div>';
-  (function(){
-    pdfjsLib.getDocument({data:arr}).promise.then(function(doc){
-      drop.style.display='none';
-      document.getElementById('bar').style.display='flex';
-      var textos=[], tareas=[];
-      for(var i=1;i<=doc.numPages;i++){
-        (function(n){
-          tareas.push(doc.getPage(n).then(function(pg){
-            return pg.getTextContent().then(function(tc){
-              textos[n-1]=tc.items.map(function(x){return x.str;}).join(' ');
-              return leerPagina(pg).then(function(tb){ return {n:n, tabla:tb}; });
-            });
-          }));
-        })(i);
-      }
-      Promise.all(tareas).then(function(res){
-        var cands=res.filter(function(r){ return r.tabla; });
-        if(!cands.length){
-          document.getElementById('salida').innerHTML='';
-          error('No se encontró una hoja de medidas en este PDF.');
-          return;
-        }
-        // la mejor es la de más filas
-        cands.sort(function(a,b){ return b.tabla.filas.length-a.tabla.filas.length; });
-        var elegida=cands[0];
-        TABLA=elegida.tabla;
-        CAB=cabecera(textos[elegida.n-1]);
-        pintar(elegida.n, doc.numPages);
-      });
-    }).catch(function(){
+  extraerDe(arr, function(res){
+    if(!res){
       document.getElementById('salida').innerHTML='';
-      error('No se pudo abrir el PDF.');
-    });
-  })();
+      error('No se encontró una hoja de medidas en este PDF.');
+      return;
+    }
+    drop.style.display='none';
+    document.getElementById('bar').style.display='flex';
+    TODAS=res.todas||[]; 
+    IDX=0;
+    TODAS.forEach(function(x,i){ if(x.pagina===res.pagina) IDX=i; });
+    usarTabla(IDX, res.total);
+  });
+}
+function usarTabla(i, total){
+  IDX=i;
+  var x=TODAS[i];
+  TABLA=x.tabla; CAB=x.cab; CAB.titulo=x.titulo;
+  pintar(x.pagina, total||0);
 }
 
 function pintar(pag, total){
@@ -707,9 +719,19 @@ function pintar(pag, total){
      '<div class="kpi"><div class="v">'+pag+'</div><div class="l">Página</div><div class="s">de '+total+'</div></div>'+
      '</div>';
 
+  if(TODAS.length>1){
+    h+='<div class="panel"><div class="pt">Esta ficha tiene '+TODAS.length+' tablas de medidas</div>'+
+       '<div class="ph">Elige la que deben usar las auditoras. Se guarda solo la seleccionada.</div>'+
+       '<div class="tabsel">'+TODAS.map(function(x,i){
+         return '<button class="'+(i===IDX?'on':'')+'" onclick="usarTabla('+i+','+total+')">'+
+                x.titulo.etapa+(x.titulo.combo?'<i>'+x.titulo.combo+'</i>':'')+
+                '<i>pág. '+x.pagina+' · '+x.tabla.filas.length+' puntos</i></button>';
+       }).join('')+'</div></div>';
+  }
   h+='<div class="panel"><div class="pt">Ficha identificada</div>'+
      '<div class="ph">Datos leídos del encabezado de esa página</div><div class="datos">'+
-     dato('Tipo',CAB.tipo)+dato('Estilo',CAB.estilo)+dato('Grupo',CAB.grupo)+
+     dato('Tabla',(CAB.titulo?CAB.titulo.etapa:'')+(CAB.titulo&&CAB.titulo.combo?' · '+CAB.titulo.combo:''))+
+     dato('Estilo',CAB.estilo)+dato('Grupo',CAB.grupo)+
      dato('Cliente',CAB.cliente)+dato('Color',CAB.color)+dato('O. Corte',CAB.ocorte)+
      '</div></div>';
 
@@ -739,7 +761,7 @@ function pintar(pag, total){
   var yaEsta = estiloBase && yaConfirmada(estiloBase, CAB.tipo==='CORTE'?'CORTE':'TECNICA');
   h+='<div class="confirmar" style="margin-top:16px;">'+
      '<button class="btn big" onclick="confirmar()"'+(estiloBase?'':' disabled')+'>'+
-     (yaEsta?'Volver a guardar':'La tabla es correcta')+'</button>'+
+     (TODAS.length>1 ? 'Guardar las '+TODAS.length+' tablas' : (yaEsta?'Volver a guardar':'La tabla es correcta'))+'</button>'+
      '<span style="font-size:12px;color:var(--stone);">'+
      (estiloBase ? (yaEsta?'Esta tabla ya estaba verificada; se reemplazará.'
                          :'Al confirmar quedará disponible para las auditoras.')
