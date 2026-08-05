@@ -100,8 +100,8 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 #visor .vtop button,#visor .vtop a{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3);color:#fff;font-family:inherit;font-size:12.5px;font-weight:700;border-radius:6px;padding:7px 13px;cursor:pointer;text-decoration:none;white-space:nowrap;}
 #visor .vtop button.cerrar{background:#fff;color:var(--petrol);border-color:#fff;}
 #visor .vbody{flex:1;position:relative;background:#2b3532;}
-#visor .paginas{position:absolute;inset:0;overflow:auto;-webkit-overflow-scrolling:touch;padding:10px 0 30px;text-align:center;}
-#visor .paginas canvas{display:block;margin:0 auto 12px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.4);max-width:100%;}
+#visor .paginas{position:absolute;inset:0;overflow:auto;-webkit-overflow-scrolling:touch;padding:10px 8px 30px;text-align:center;}
+#visor .paginas canvas{display:block;margin:0 auto 12px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.4);}
 #visor .pnum{color:#9FB3AD;font-size:11px;margin-bottom:14px;}
 #visor .vmsg{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#F1F6F4;font-size:14px;text-align:center;padding:26px;gap:14px;}
 #visor .vmsg .barra{width:200px;height:4px;background:rgba(255,255,255,.2);border-radius:4px;overflow:hidden;}
@@ -505,6 +505,7 @@ function tg(i){
    VISOR  (PDF.js — se dibuja dentro de la página)
    ============================================================ */
 var PDFDOC=null, ZOOM=1, PDFJS_OK=false;
+var NITIDEZ=2.2;   // cuánto más fino se dibuja respecto a la pantalla
 
 function cargarPdfJs(cb){
   if(PDFJS_OK) return cb(true);
@@ -597,10 +598,16 @@ function render(){
         var v1=page.getViewport({scale:1});
         var esc=(ancho/v1.width)*ZOOM;
         var vp=page.getViewport({scale:esc});
+        // Se dibuja a más resolución de la que se muestra, para que el
+        // acercamiento con los dedos no se vea borroso.
         var dpr=Math.min(window.devicePixelRatio||1, 2);
+        var q=dpr*NITIDEZ;
+        var maxLado=5200;
+        if(vp.width*q>maxLado)  q=maxLado/vp.width;
+        if(vp.height*q>maxLado) q=Math.min(q, maxLado/vp.height);
         var cv=document.createElement('canvas');
-        cv.width=Math.floor(vp.width*dpr);
-        cv.height=Math.floor(vp.height*dpr);
+        cv.width=Math.floor(vp.width*q);
+        cv.height=Math.floor(vp.height*q);
         cv.style.width=Math.floor(vp.width)+'px';
         cv.style.height=Math.floor(vp.height)+'px';
         cv.dataset.pg=pg;
@@ -613,7 +620,7 @@ function render(){
         });
         caja.insertBefore(cv, ref); caja.insertBefore(et, ref);
         var ctx=cv.getContext('2d');
-        ctx.scale(dpr,dpr);
+        ctx.scale(q,q);
         page.render({canvasContext:ctx, viewport:vp});
         hechas++;
       });
