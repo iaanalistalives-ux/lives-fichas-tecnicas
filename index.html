@@ -751,6 +751,7 @@ function render(){
   document.getElementById('vmenos').style.display='inline-block';
   document.getElementById('vmas').style.display='inline-block';
   var ancho=(caja.clientWidth||360)-16;
+  lienzo.style.width=(caja.clientWidth||360)+'px';   // ancho real desde el primer momento
   ESC=1; OX=0; OY=0; aplicar();
   gestos(caja);
 
@@ -778,6 +779,7 @@ function render(){
         lienzo.insertBefore(cv,ref); lienzo.insertBefore(et,ref);
         var ctx=cv.getContext('2d'); ctx.scale(q,q);
         page.render({canvasContext:ctx, viewport:vp});
+        aplicar();   // recolocar: el alto del lienzo cambia con cada página
       });
     })(i);
   }
