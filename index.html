@@ -28,7 +28,8 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 .panel .pt{font-size:15px;font-weight:700;color:#333;}
 .panel .ph{font-size:11.5px;color:var(--stone);margin-top:2px;margin-bottom:10px;}
 
-.modesel{display:inline-flex;border:1.5px solid var(--sage);border-radius:6px;overflow:hidden;margin-bottom:12px;}
+.modesel{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
+.modesel .mbtn{border:1.5px solid var(--sage)!important;border-radius:6px;}
 .modesel .mbtn{background:#fff;color:var(--sage);border:none;padding:7px 16px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;}
 .modesel .mbtn.active{background:var(--sage);color:#fff;}
 
@@ -63,11 +64,15 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 
 .card{background:#fff;border:1px solid var(--warm);border-radius:8px;padding:14px 16px;margin-bottom:12px;border-left:4px solid var(--sage);overflow:hidden;overflow:hidden;}
 .card.acab{border-left-color:var(--slate);}
+.card.corte{border-left-color:var(--taupe,#B45309);}
+.card.rm{border-left-color:var(--tan);}
 .chead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;}
 .ctit{font-size:19px;font-weight:700;color:#333;line-height:1.15;min-width:0;overflow-wrap:anywhere;min-width:0;overflow-wrap:anywhere;}
 .ctit small{font-size:12px;font-weight:600;color:var(--stone);display:block;margin-top:2px;}
 .tag{display:inline-block;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;padding:3px 9px;border-radius:20px;color:#fff;background:var(--sage);white-space:nowrap;}
 .tag.acab{background:var(--slate);}
+.tag.corte{background:#B45309;}
+.tag.rm{background:var(--tan);color:#3A2408;}
 .tag.vig{background:var(--emer);}
 .tag.rev{background:var(--tan);}
 .meta{display:grid;grid-template-columns:repeat(2,1fr);gap:4px 14px;margin:10px 0 0;font-size:12.5px;min-width:0;}
@@ -183,6 +188,8 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
       <button class="mbtn active" data-tipo="" onclick="setTipo(this)">Todas</button>
       <button class="mbtn" data-tipo="TECNICA" onclick="setTipo(this)">Técnica</button>
       <button class="mbtn" data-tipo="ACABADOS" onclick="setTipo(this)">Acabados</button>
+      <button class="mbtn" data-tipo="CORTE" onclick="setTipo(this)">Corte</button>
+      <button class="mbtn" data-tipo="RM" onclick="setTipo(this)">RM</button>
     </div>
 
     <div class="filtros">
@@ -469,13 +476,15 @@ function buscar(){
   });
   out.innerHTML=html;
 }
+var TIPOS={ACABADOS:{c:'acab',t:'ACABADOS'},CORTE:{c:'corte',t:'CORTE'},
+           RM:{c:'rm',t:'RM'},TECNICA:{c:'',t:'TÉCNICA'}};
 function tarjeta(lista,i){
-  var d=lista[0], acab=d.tipo==='ACABADOS';
-  var h='<div class="card'+(acab?' acab':'')+'">';
+  var d=lista[0], ti=TIPOS[d.tipo]||TIPOS.TECNICA;
+  var h='<div class="card'+(ti.c?' '+ti.c:'')+'">';
   h+='<div class="chead"><div class="ctit">'+(d.estilo||'—')+
      (d.version?'<span style="font-size:14px;color:#5F726C;"> · v'+d.version+'</span>':'')+
      '<small>'+(d.grupo||'—')+' · '+(d.cliente||'—')+'</small></div><div style="text-align:right;">'+
-     '<span class="tag'+(acab?' acab':'')+'">'+(acab?'ACABADOS':'TÉCNICA')+'</span>';
+     '<span class="tag'+(ti.c?' '+ti.c:'')+'">'+ti.t+'</span>';
   if(lista.length>1) h+=' <span class="tag vig">VIGENTE</span>';
   if(d.estado==='REVISAR') h+=' <span class="tag rev">REVISAR</span>';
   h+='</div></div>';
