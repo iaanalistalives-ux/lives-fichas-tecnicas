@@ -20,7 +20,7 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 .hsub{color:#F1F6F4;font-size:11.5px;}
 .wrap{max-width:100%;margin:0;padding:18px;}
 
-#acceso{position:fixed;inset:0;background:var(--warm-light);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px;}
+#acceso{position:fixed;inset:0;background:var(--warm-light);z-index:100;display:none;align-items:center;justify-content:center;padding:20px;}
 #acceso .cajaAcc{background:#fff;border:1px solid var(--warm);border-radius:12px;padding:24px;max-width:400px;width:100%;}
 #acceso h2{font-size:18px;margin:0 0 4px;}
 #acceso .sub{font-size:12.5px;color:var(--stone);margin:0 0 16px;}
@@ -113,6 +113,7 @@ td.falta{color:var(--rose);font-weight:700;}
     <label class="lb">Clave de acceso</label>
     <input class="txt" id="aClave" type="password" placeholder="••••••" autocomplete="off">
     <button class="btn full" style="margin-top:16px;" onclick="entrar()">Entrar</button>
+    <button class="btn ghost full" style="margin-top:9px;" onclick="volverBuscador()">Volver al buscador</button>
   </div>
 </div>
 
@@ -132,6 +133,7 @@ td.falta{color:var(--rose);font-weight:700;}
   <div class="bar" id="bar">
     <div class="fname">Archivo: <b id="fname"></b></div>
     <button class="btn ghost" onclick="reiniciar()">Abrir otro PDF</button>
+    <button class="btn ghost" onclick="volverBuscador()">Volver al buscador</button>
   </div>
 
   <div class="drop" id="drop">
@@ -365,6 +367,23 @@ function aerr(m){
   var e=document.getElementById('aerr');
   e.style.display=m?'block':'none'; e.textContent=m||'';
 }
+function arrancarConSesion(){
+  var s=null;
+  try{ s=JSON.parse(localStorage.getItem('lives_fichas')||'null'); }catch(e){ s=null; }
+  var ROLES=['SUPERVISORA TOP SAMPLE','DIGITADORA'];
+  if(!s || !s.clave || ROLES.indexOf(String(s.rol||'').toUpperCase())<0) return false;
+  SES={nombre:s.auditora, clave:s.clave};
+  jsonp('accion=datos&clave='+encodeURIComponent(s.clave), function(r){
+    if(!r || !r.ok){ document.getElementById('acceso').style.display='flex'; return; }
+    INDICE=r.datos||[];
+    document.getElementById('acceso').style.display='none';
+    document.getElementById('app').style.display='block';
+    cargarEspecs();
+  });
+  return true;
+}
+function volverBuscador(){ location.href='index.html'; }
+
 function entrar(){
   var n=document.getElementById('aNombre').value.trim();
   var c=document.getElementById('aClave').value.trim();
@@ -708,6 +727,10 @@ function confirmar(){
       window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'});
     });
 }
+
+(function(){
+  if(!arrancarConSesion()) document.getElementById('acceso').style.display='flex';
+})();
 </script>
 </body>
 </html>
