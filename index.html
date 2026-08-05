@@ -115,12 +115,15 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 .cargando{text-align:center;padding:34px;color:var(--stone);font-size:13.5px;}
 
 /* ---- Pantalla de acceso ---- */
-#acceso{position:fixed;inset:0;background:var(--warm-light);z-index:200;overflow-y:auto;display:none;}
-#acceso .box{max-width:430px;margin:0 auto;padding:26px 18px 40px;}
-#acceso .logo{text-align:center;background:var(--petrol);border-bottom:3px solid var(--emer);padding:22px 0;margin:-26px -18px 22px;}
-#acceso .logo img{height:40px;}
-#acceso h2{font-size:18px;color:#333;margin:0 0 4px;}
-#acceso p.sub{font-size:12.5px;color:var(--stone);margin:0 0 18px;}
+#acceso{position:fixed;inset:0;background:var(--warm-light);z-index:200;overflow-y:auto;display:none;
+        align-items:center;justify-content:center;padding:20px;}
+#acceso .box{max-width:430px;width:100%;margin:auto;background:#fff;border:1px solid var(--warm);
+             border-radius:12px;padding:26px;box-shadow:0 2px 12px rgba(14,59,54,.07);}
+#acceso .logo{text-align:center;background:var(--petrol);border-bottom:3px solid var(--emer);
+              padding:20px 0;margin:-26px -26px 20px;border-radius:12px 12px 0 0;}
+#acceso .logo img{height:36px;}
+#acceso h2{font-size:19px;color:#333;margin:0 0 3px;}
+#acceso p.sub{font-size:12.5px;color:var(--stone);margin:0 0 16px;}
 #acceso .fld{margin-bottom:14px;}
 #acceso .aerr{display:none;background:#FBE9E9;border:1px solid var(--rose);border-radius:6px;padding:10px 12px;color:#DC2626;font-size:12.5px;margin-bottom:12px;}
 #acceso .btn{width:100%;padding:13px;font-size:15px;}
@@ -296,7 +299,7 @@ function ident(){
    ACCESO
    ============================================================ */
 function mostrarAcceso(){
-  document.getElementById('acceso').style.display='block';
+  document.getElementById('acceso').style.display='flex';
   cargarListas();
 }
 function cargarListas(){
