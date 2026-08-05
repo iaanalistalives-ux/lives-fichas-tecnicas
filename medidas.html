@@ -19,6 +19,13 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 .htitle{color:#fff;font-size:14.5px;font-weight:700;}
 .hsub{color:#F1F6F4;font-size:11px;}
 .wrap{padding:14px 14px 90px;}
+.hrow{display:flex;gap:10px;align-items:center;padding:9px 4px;border-bottom:1px solid var(--warm-light);font-size:12.5px;}
+.hrow:last-child{border-bottom:none;}
+.hrow .hres{font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:20px;white-space:nowrap;margin-left:auto;}
+.hrow .hres.ap{background:#ECFDF5;color:#065F46;border:1px solid var(--emer);}
+.hrow .hres.re{background:#FEF2F2;color:#991B1B;border:1px solid var(--rose);}
+.hrow .hinf{min-width:0;overflow-wrap:anywhere;color:var(--stone);}
+.hrow .hinf b{color:#333;}
 .volver{margin-left:auto;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.35);color:#fff;font-family:inherit;font-size:12.5px;font-weight:700;border-radius:6px;padding:8px 14px;cursor:pointer;}
 .err{background:#FBE9E9;border:1px solid var(--rose);border-radius:8px;padding:12px 16px;color:#DC2626;font-size:13px;margin:14px;}
 .ok{background:#ECFDF5;border:1px solid var(--emer);border-radius:8px;padding:14px 16px;color:#065F46;font-size:14px;font-weight:700;margin-bottom:12px;}
@@ -134,6 +141,13 @@ input.txt:focus{outline:none;border-color:var(--sage);}
   <div class="panel" id="pFicha2">
     <div class="pt" id="fichaTit">Cargando…</div>
     <div class="ph" id="fichaInfo"></div>
+  </div>
+
+  <div class="panel" id="pHist" style="display:none;">
+    <div class="pt" id="histTit">Mediciones anteriores</div>
+    <div class="ph">Este estilo ya fue medido antes.</div>
+    <div id="histLista"></div>
+    <button class="btn ghost full" style="margin-top:10px;" onclick="verHistorial()">Ver todas las hojas medidas</button>
   </div>
 
   <div class="panel">
@@ -284,6 +298,28 @@ function arrancar(){
     }
     VARIANTES=r.variantes;
     pintarEtapas();
+  });
+  cargarHistorial();
+}
+
+function verHistorial(){
+  location.href='historial.html?estilo='+encodeURIComponent(PAR.estilo);
+}
+function cargarHistorial(){
+  jsonp('accion=mediciones&clave='+encodeURIComponent(SES.clave)+
+        '&estilo='+encodeURIComponent(PAR.estilo), function(r){
+    if(!r || !r.ok) return;
+    var ms=r.mediciones||[];
+    if(!ms.length) return;
+    document.getElementById('pHist').style.display='block';
+    var rech=ms.filter(function(m){ return m.resultado==='RECHAZADO'; }).length;
+    txt('histTit','Medido '+ms.length+' vez/veces antes'+(rech? ' · '+rech+' rechazada(s)':''));
+    document.getElementById('histLista').innerHTML = ms.slice(0,6).map(function(m){
+      return '<div class="hrow"><div class="hinf"><b>'+(m.auditora||'—')+'</b> · '+(m.taller||'—')+
+             '<br>'+String(m.fecha).slice(0,16)+' · '+(m.color||'—')+
+             ' · '+m.nMedidas+' medidas'+(m.nFuera>0? ' · <b style="color:var(--rose);">'+m.nFuera+' fuera</b>':'')+
+             '</div><div class="hres '+(m.resultado==='RECHAZADO'?'re':'ap')+'">'+(m.resultado||'—')+'</div></div>';
+    }).join('') + (ms.length>6 ? '<div style="font-size:11.5px;color:var(--stone);margin-top:8px;">y '+(ms.length-6)+' más…</div>' : '');
   });
 }
 
