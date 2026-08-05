@@ -37,6 +37,7 @@ input.txt{width:100%;font-family:inherit;font-size:16px;padding:11px;border:1.5p
 input.txt:focus{outline:none;border-color:var(--sage);}
 
 .pills{display:flex;gap:8px;flex-wrap:wrap;}
+.avisoCombo{font-size:11.5px;color:var(--tan);font-weight:700;margin-top:6px;}
 .pill{background:#fff;border:1.5px solid var(--warm);color:#333;font-family:inherit;font-size:14px;font-weight:700;border-radius:20px;padding:9px 16px;cursor:pointer;}
 .pill.on{background:var(--sage);border-color:var(--sage);color:#fff;}
 .num{display:flex;align-items:center;gap:12px;}
@@ -139,7 +140,17 @@ input.txt:focus{outline:none;border-color:var(--sage);}
     <div class="pt">Datos de la auditoría</div>
     <div class="ph" id="quienInfo"></div>
 
-    <span class="lbl">Color</span>
+    <div id="selEtapa" style="display:none;">
+      <span class="lbl">¿Qué estás midiendo?</span>
+      <div class="pills" id="pEtapa"></div>
+    </div>
+    <div id="selCombo" style="display:none;">
+      <span class="lbl">Combo de la ficha</span>
+      <div class="pills" id="pCombo"></div>
+      <div class="avisoCombo" id="avisoCombo"></div>
+    </div>
+
+    <span class="lbl">Color de la prenda</span>
     <input class="txt" id="colorOtro" placeholder="Escribe el color">
 
     <button class="btn full" style="margin-top:18px;" onclick="empezar()">Empezar a medir</button>
@@ -264,13 +275,65 @@ function arrancar(){
     return;
   }
   txt('hsub', PAR.estilo+' · '+(PAR.grupo||''));
-  jsonp('accion=espec&clave='+encodeURIComponent(SES.clave)+
+  jsonp('accion=variantes&clave='+encodeURIComponent(SES.clave)+
         '&estilo='+encodeURIComponent(PAR.estilo)+'&tipo='+encodeURIComponent(PAR.tipo), function(r){
-    if(!r || !r.ok || !r.espec){
+    if(!r || !r.ok || !(r.variantes||[]).length){
       error('Todavía no hay tabla de medidas para este estilo.');
       txt('fichaTit','Sin tabla de medidas');
       return;
     }
+    VARIANTES=r.variantes;
+    pintarEtapas();
+  });
+}
+
+var VARIANTES=[], ETAPA='', COMBO='';
+var NOM_ETAPA={ TERMINADA:'Prenda terminada', ANTES_VAPOR:'Antes de vapor', CORTE:'Corte' };
+
+function pintarEtapas(){
+  var etapas=[];
+  VARIANTES.forEach(function(v){ if(etapas.indexOf(v.etapa)<0) etapas.push(v.etapa); });
+  // solo se fija el valor por defecto la primera vez
+  if(!ETAPA || etapas.indexOf(ETAPA)<0)
+    ETAPA = etapas.indexOf('TERMINADA')>=0 ? 'TERMINADA' : etapas[0];
+  if(etapas.length>1){
+    document.getElementById('selEtapa').style.display='block';
+    document.getElementById('pEtapa').innerHTML = etapas.map(function(e){
+      return '<button class="pill'+(e===ETAPA?' on':'')+'" onclick="elegirEtapa(\''+e+'\')">'+
+             (NOM_ETAPA[e]||e)+'</button>';
+    }).join('');
+  }
+  pintarCombos();
+}
+function elegirEtapa(e){ ETAPA=e; COMBO=''; pintarEtapas(); }
+
+function pintarCombos(){
+  var combos=VARIANTES.filter(function(v){ return v.etapa===ETAPA; })
+                      .map(function(v){ return v.combo||''; });
+  combos=combos.filter(function(v,i,s){ return s.indexOf(v)===i; });
+  if(!COMBO || combos.indexOf(COMBO)<0) COMBO = combos[0]||'';
+  if(combos.length>1 && combos.some(function(c){ return c; })){
+    document.getElementById('selCombo').style.display='block';
+    document.getElementById('pCombo').innerHTML = combos.map(function(c){
+      return '<button class="pill'+(c===COMBO?' on':'')+'" onclick="elegirCombo(\''+
+             String(c).replace(/'/g,"\\'")+'\')">'+(c||'Todos los colores')+'</button>';
+    }).join('');
+    document.getElementById('avisoCombo').textContent =
+      'Las medidas cambian según el combo. Elige el que corresponde a la prenda.';
+  }else{
+    document.getElementById('selCombo').style.display='none';
+  }
+  cargarEspec();
+}
+function elegirCombo(c){ COMBO=c; pintarCombos(); }
+
+function cargarEspec(){
+  txt('fichaTit','Cargando tabla…');
+  jsonp('accion=espec&clave='+encodeURIComponent(SES.clave)+
+        '&estilo='+encodeURIComponent(PAR.estilo)+'&tipo='+encodeURIComponent(PAR.tipo)+
+        '&etapa='+encodeURIComponent(ETAPA)+'&combo='+encodeURIComponent(COMBO), function(r){
+    if(!r || !r.ok || !r.espec){ error('No se pudo cargar la tabla.'); return; }
+    error('');
     ESPEC=r.espec;
     F={ nombre:(PAR.grupo||'')+' · '+PAR.estilo,
         tipo: ESPEC.tipo==='CORTE' ? 'HOJA DE CORTE' : 'PRENDA TERMINADA',
@@ -281,8 +344,8 @@ function arrancar(){
         }) };
     txt('fichaTit', F.nombre);
     txt('fichaInfo',
-      F.tipo+' · '+F.puntos.length+' puntos · tallas '+F.tallas.join(', ')+
-      (ESPEC.confirmadoPor ? '  ·  tabla '+(ESPEC.confirmadoPor==='(automático)'?'leída del PDF':'verificada por '+ESPEC.confirmadoPor) : ''));
+      (NOM_ETAPA[ESPEC.etapa]||F.tipo)+(ESPEC.combo?' · '+ESPEC.combo:'')+
+      ' · '+F.puntos.length+' puntos · tallas '+F.tallas.join(', '));
   });
 }
 
@@ -596,6 +659,7 @@ function decidir(r){
 
   post({ accion:'guardarMedicion',
          cab:{ estilo:PAR.estilo, grupo:PAR.grupo||ESPEC.grupo||'', tipo:ESPEC.tipo,
+               etapa:ESPEC.etapa||ETAPA, combo:ESPEC.combo||COMBO,
                cliente:PAR.cliente||'', color:COLOR, taller:SES.taller, auditora:SES.auditora,
                fileId:ESPEC.fileId||'', archivo:ESPEC.archivo||'',
                tallas:Object.keys(prendas), prendas:prendas, resultado:r, obs:'' },
