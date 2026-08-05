@@ -367,6 +367,7 @@ function cargar(forzar, primera){
       document.getElementById('acceso').style.display='none';
       pintarQuien();
     }
+    document.getElementById('panelTodo').style.display = esDigitadora() ? 'block' : 'none';
     error('');
     DATOS=r.datos||[];
     var msg='Actualizado '+new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});
@@ -380,12 +381,14 @@ function cargar(forzar, primera){
       ESPECS=(e&&e.ok)?(e.especs||[]):[];
       if(document.getElementById('salida').querySelector('.card')) buscar();
     });
-    document.getElementById('panelTodo').style.display='block';
+    document.getElementById('panelTodo').style.display = esDigitadora() ? 'block' : 'none';
     pintarKpis(); buscar();
-    if(document.getElementById('todoBody').style.display==='block') pintarTodo();
-    else{
-      var n={}; DATOS.forEach(function(d){ n[d.id]=1; });
-      document.getElementById('todoSub').textContent=Object.keys(n).length+' archivo(s) cargados';
+    if(esDigitadora()){
+      if(document.getElementById('todoBody').style.display==='block') pintarTodo();
+      else{
+        var n={}; DATOS.forEach(function(d){ n[d.id]=1; });
+        document.getElementById('todoSub').textContent=Object.keys(n).length+' archivo(s) cargados';
+      }
     }
   });
 }
