@@ -12,16 +12,16 @@
 }
 *{box-sizing:border-box;}
 html,body{max-width:100%;overflow-x:hidden;}
-#visor .paginas{overscroll-behavior:contain;}
 body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,sans-serif;font-size:14px;line-height:1.4;}
-.header{background:var(--petrol);border-bottom:3px solid var(--emer);min-height:70px;display:flex;align-items:center;padding:0 16px;gap:12px;flex-wrap:wrap;}
+.header{background:var(--petrol);border-bottom:3px solid var(--emer);min-height:76px;display:flex;align-items:center;padding:14px 16px;gap:12px;flex-wrap:wrap;}
 .header img{height:36px;display:block;}
 .divider{width:1px;height:32px;background:rgba(255,255,255,.35);}
 .htitle{color:#fff;font-size:15.5px;font-weight:700;letter-spacing:.3px;}
 .hsub{color:#F1F6F4;font-size:11.5px;}
-.quien{margin-left:auto;text-align:right;color:#F1F6F4;font-size:11.5px;max-width:46%;overflow-wrap:anywhere;}
-.quien b{color:#fff;display:block;font-size:13px;}
-.quien button{margin-top:3px;background:transparent;border:1px solid rgba(255,255,255,.45);color:#fff;font-family:inherit;font-size:11px;border-radius:5px;padding:3px 9px;cursor:pointer;}
+.quien{margin-left:auto;display:flex;align-items:center;gap:10px;color:#F1F6F4;font-size:11.5px;text-align:right;max-width:56%;overflow-wrap:anywhere;}
+.quien b{color:#fff;display:block;font-size:13px;line-height:1.2;}
+.quien button{background:var(--emer);border:none;color:#04231F;font-family:inherit;font-size:12.5px;font-weight:800;border-radius:6px;padding:9px 15px;cursor:pointer;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.25);}
+.quien button:active{background:#0BA36F;}
 .wrap{max-width:100%;margin:0;padding:16px;}
 
 .panel{background:#fff;border:1px solid var(--warm);border-radius:8px;padding:14px 16px;margin-bottom:16px;}
@@ -106,9 +106,10 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 #visor .vtop button,#visor .vtop a{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3);color:#fff;font-family:inherit;font-size:12.5px;font-weight:700;border-radius:6px;padding:7px 13px;cursor:pointer;text-decoration:none;white-space:nowrap;}
 #visor .vtop button.cerrar{background:#fff;color:var(--petrol);border-color:#fff;}
 #visor .vbody{flex:1;position:relative;background:#2b3532;}
-#visor .paginas{position:absolute;inset:0;overflow:auto;-webkit-overflow-scrolling:touch;padding:10px 8px 30px;text-align:center;}
-#visor .paginas canvas{display:block;margin:0 auto 12px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.4);}
-#visor .pnum{color:#9FB3AD;font-size:11px;margin-bottom:14px;}
+#visor .paginas{position:absolute;inset:0;overflow:hidden;touch-action:none;text-align:center;}
+#visor #lienzo{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform;padding:8px 0 24px;}
+#visor #lienzo canvas{display:block;margin:0 auto 12px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.4);}
+#visor #lienzo .pnum{color:#9FB3AD;font-size:11px;margin-bottom:14px;}
 #visor .vmsg{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#F1F6F4;font-size:14px;text-align:center;padding:26px;gap:14px;}
 #visor .vmsg .barra{width:200px;height:4px;background:rgba(255,255,255,.2);border-radius:4px;overflow:hidden;}
 #visor .vmsg .barra i{display:block;height:100%;width:38%;background:var(--emer);animation:mv 1.1s ease-in-out infinite;}
@@ -276,7 +277,8 @@ function salir(){
 }
 function pintarQuien(){
   document.getElementById('quien').innerHTML =
-    '<b>'+SES.auditora+'</b>'+SES.taller+'<br><button onclick="salir()">Cambiar</button>';
+    '<div><b>'+SES.auditora+'</b>'+SES.taller+'</div>'+
+    '<button onclick="salir()">Cambiar</button>';
 }
 
 /* ============================================================
@@ -511,7 +513,7 @@ function tg(i){
    VISOR  (PDF.js — se dibuja dentro de la página)
    ============================================================ */
 var PDFDOC=null, ZOOM=1, PDFJS_OK=false;
-var NITIDEZ=2.2;   // cuánto más fino se dibuja respecto a la pantalla
+var NITIDEZ=2.6;   // cuánto más fino se dibuja respecto a la pantalla
 
 function cargarPdfJs(cb){
   if(PDFJS_OK) return cb(true);
@@ -591,52 +593,129 @@ function abrir(id,archivo,tipo,grupo,estilo){
 function render(){
   if(!PDFDOC) return;
   var cont=document.getElementById('vbody');
-  cont.innerHTML='<div class="paginas" id="paginas"></div>';
+  cont.innerHTML='<div class="paginas" id="paginas"><div id="lienzo"></div></div>';
   var caja=document.getElementById('paginas');
+  var lienzo=document.getElementById('lienzo');
   document.getElementById('vmenos').style.display='inline-block';
   document.getElementById('vmas').style.display='inline-block';
   var ancho=(caja.clientWidth||360)-16;
+  ESC=1; OX=0; OY=0; aplicar();
+  gestos(caja);
 
-  var n=PDFDOC.numPages, hechas=0;
+  var n=PDFDOC.numPages;
   for(var i=1;i<=n;i++){
     (function(pg){
       PDFDOC.getPage(pg).then(function(page){
         var v1=page.getViewport({scale:1});
-        var esc=(ancho/v1.width)*ZOOM;
-        var vp=page.getViewport({scale:esc});
-        // Se dibuja a más resolución de la que se muestra, para que el
-        // acercamiento con los dedos no se vea borroso.
-        var dpr=Math.min(window.devicePixelRatio||1, 2);
-        var q=dpr*NITIDEZ;
-        var maxLado=5200;
+        var vp=page.getViewport({scale:ancho/v1.width});
+        var dpr=Math.min(window.devicePixelRatio||1,2);
+        var q=dpr*NITIDEZ, maxLado=5200;
         if(vp.width*q>maxLado)  q=maxLado/vp.width;
-        if(vp.height*q>maxLado) q=Math.min(q, maxLado/vp.height);
+        if(vp.height*q>maxLado) q=Math.min(q,maxLado/vp.height);
         var cv=document.createElement('canvas');
-        cv.width=Math.floor(vp.width*q);
-        cv.height=Math.floor(vp.height*q);
+        cv.width=Math.floor(vp.width*q); cv.height=Math.floor(vp.height*q);
         cv.style.width=Math.floor(vp.width)+'px';
         cv.style.height=Math.floor(vp.height)+'px';
         cv.dataset.pg=pg;
         var et=document.createElement('div');
         et.className='pnum'; et.textContent='Página '+pg+' de '+n; et.dataset.pg=pg;
-        // insertar en orden
         var ref=null;
-        Array.prototype.forEach.call(caja.children,function(c){
+        Array.prototype.forEach.call(lienzo.children,function(c){
           if(!ref && c.dataset.pg && parseInt(c.dataset.pg,10)>pg) ref=c;
         });
-        caja.insertBefore(cv, ref); caja.insertBefore(et, ref);
-        var ctx=cv.getContext('2d');
-        ctx.scale(q,q);
+        lienzo.insertBefore(cv,ref); lienzo.insertBefore(et,ref);
+        var ctx=cv.getContext('2d'); ctx.scale(q,q);
         page.render({canvasContext:ctx, viewport:vp});
-        hechas++;
       });
     })(i);
   }
 }
 
+/* ---- zoom y arrastre con los dedos ---- */
+var ESC=1, OX=0, OY=0;
+function aplicar(){
+  var l=document.getElementById('lienzo'); if(!l) return;
+  var c=document.getElementById('paginas'); if(!c) return;
+  var aw=l.offsetWidth*ESC, ah=l.offsetHeight*ESC;
+  if(aw<=c.clientWidth) OX=(c.clientWidth-aw)/2;
+  else OX=Math.min(0, Math.max(c.clientWidth-aw, OX));
+  if(ah<=c.clientHeight) OY=Math.min(0,Math.max(0,OY));
+  else OY=Math.min(0, Math.max(c.clientHeight-ah, OY));
+  l.style.transform='translate('+OX+'px,'+OY+'px) scale('+ESC+')';
+}
 function zoom(d){
-  ZOOM=Math.min(3, Math.max(0.6, ZOOM + d*0.25));
-  render();
+  var c=document.getElementById('paginas'); if(!c) return;
+  zoomEn(c.clientWidth/2, c.clientHeight/2, ESC+d*0.35);
+}
+function zoomEn(px,py,nuevo){
+  nuevo=Math.min(5, Math.max(1, nuevo));
+  var k=nuevo/ESC;
+  OX = px - (px-OX)*k;
+  OY = py - (py-OY)*k;
+  ESC = nuevo;
+  aplicar();
+}
+function gestos(caja){
+  var t0=null, d0=0, e0=1, x0=0, y0=0, ox0=0, oy0=0, ult=0;
+  function dist(t){
+    var dx=t[0].clientX-t[1].clientX, dy=t[0].clientY-t[1].clientY;
+    return Math.sqrt(dx*dx+dy*dy);
+  }
+  function rel(cx,cy){
+    var r=caja.getBoundingClientRect();
+    return [cx-r.left, cy-r.top];
+  }
+  caja.addEventListener('touchstart',function(e){
+    if(e.touches.length===2){
+      d0=dist(e.touches); e0=ESC;
+      var m=rel((e.touches[0].clientX+e.touches[1].clientX)/2,
+                (e.touches[0].clientY+e.touches[1].clientY)/2);
+      x0=m[0]; y0=m[1]; ox0=OX; oy0=OY; t0='z';
+    }else if(e.touches.length===1){
+      x0=e.touches[0].clientX; y0=e.touches[0].clientY;
+      ox0=OX; oy0=OY; t0='p';
+      var ahora=Date.now();
+      if(ahora-ult<300){
+        var r=rel(e.touches[0].clientX, e.touches[0].clientY);
+        zoomEn(r[0],r[1], ESC>1.4?1:2.6);
+        t0=null;
+      }
+      ult=ahora;
+    }
+  },{passive:true});
+
+  caja.addEventListener('touchmove',function(e){
+    if(t0==='z' && e.touches.length===2){
+      e.preventDefault();
+      var k=dist(e.touches)/(d0||1);
+      var nuevo=Math.min(5, Math.max(1, e0*k));
+      var f=nuevo/e0;
+      OX = x0 - (x0-ox0)*f;
+      OY = y0 - (y0-oy0)*f;
+      ESC = nuevo; aplicar();
+    }else if(t0==='p' && e.touches.length===1){
+      e.preventDefault();
+      OX = ox0 + (e.touches[0].clientX-x0);
+      OY = oy0 + (e.touches[0].clientY-y0);
+      aplicar();
+    }
+  },{passive:false});
+
+  caja.addEventListener('touchend',function(e){
+    if(e.touches.length===0) t0=null;
+    else if(e.touches.length===1){
+      x0=e.touches[0].clientX; y0=e.touches[0].clientY;
+      ox0=OX; oy0=OY; t0='p';
+    }
+  },{passive:true});
+
+  // rueda del mouse en computadora
+  caja.addEventListener('wheel',function(e){
+    e.preventDefault();
+    var r=caja.getBoundingClientRect();
+    if(e.ctrlKey) zoomEn(e.clientX-r.left, e.clientY-r.top, ESC*(e.deltaY<0?1.12:0.89));
+    else { OY -= e.deltaY; aplicar(); }
+  },{passive:false});
 }
 
 function liberar(){
