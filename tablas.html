@@ -29,6 +29,11 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 .txt{width:100%;font-family:inherit;font-size:16px;padding:11px;border:1.5px solid var(--warm);border-radius:6px;}
 .txt:focus{outline:none;border-color:var(--sage);}
 .btn.full{width:100%;font-size:15px;padding:12px;}
+.auto{background:var(--warm-light);border-radius:8px;padding:11px 13px;margin-bottom:12px;}
+.auto .autoTxt{font-size:12.5px;color:var(--stone);font-weight:600;margin-bottom:7px;}
+.auto .autoBar{height:5px;background:#fff;border-radius:4px;overflow:hidden;}
+.auto .autoBar i{display:block;height:100%;width:0;background:var(--sage);transition:width .25s;}
+.pend .est2.rev{background:#FEF2F2;color:#991B1B;border:1px solid var(--rose);}
 .pend{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--warm-light);cursor:pointer;}
 .pend:last-child{border-bottom:none;}
 .pend .est{font-size:15px;font-weight:800;min-width:60px;}
@@ -116,7 +121,11 @@ td.falta{color:var(--rose);font-weight:700;}
 
   <div class="panel" id="pendientes" style="display:none;">
     <div class="pt">Fichas con hoja de medidas</div>
-    <div class="ph">Las que aún no están verificadas aparecen primero.</div>
+    <div class="ph" id="pendSub">—</div>
+    <div class="auto" id="auto" style="display:none;">
+      <div class="autoTxt" id="autoTxt">Procesando…</div>
+      <div class="autoBar"><i id="autoBar"></i></div>
+    </div>
     <div id="listaPend"></div>
   </div>
 
@@ -371,41 +380,121 @@ function entrar(){
     cargarEspecs();
   });
 }
+var PRIMERA=true;
 function cargarEspecs(){
   jsonp('accion=especs&clave='+encodeURIComponent(SES.clave), function(r){
     ESPECS = (r && r.ok) ? (r.especs||[]) : [];
     pintarPendientes();
+    if(PRIMERA){ PRIMERA=false; setTimeout(procesarPendientes, 400); }
   });
 }
 function yaConfirmada(estilo, tipo){
   return ESPECS.some(function(e){ return String(e.estilo)===String(estilo) && e.tipo===tipo; });
 }
-function pintarPendientes(){
-  // solo los tipos que tienen hoja de medidas
+function estadoDe(estilo, tipo){
+  var e = ESPECS.filter(function(x){ return String(x.estilo)===String(estilo) && x.tipo===tipo; })[0];
+  if(!e) return 'pendiente';
+  return e.confirmadoPor==='(automático)' ? 'automatica' : 'verificada';
+}
+function marcadaRevisar(id){ return REVISAR.indexOf(id)>=0; }
+var REVISAR=[];
+
+function archivosConMedidas(){
   var con = INDICE.filter(function(d){ return d.tipo==='TECNICA' || d.tipo==='CORTE'; });
   var porArch={};
   con.forEach(function(d){
     if(!porArch[d.id]) porArch[d.id]={d:d, estilos:[]};
     if(d.estilo) porArch[d.id].estilos.push(d.estilo);
   });
-  var lista=Object.keys(porArch).map(function(k){ return porArch[k]; });
+  return Object.keys(porArch).map(function(k){
+    var a=porArch[k];
+    a.estilos = a.estilos.filter(function(v,i,s){ return s.indexOf(v)===i; });
+    a.base = a.estilos.length ? String(a.estilos[0]).split('-')[0] : '';
+    a.tipo = a.d.tipo==='CORTE' ? 'CORTE' : 'TECNICA';
+    a.estado = a.base ? estadoDe(a.base, a.tipo) : 'pendiente';
+    return a;
+  });
+}
+
+function pintarPendientes(){
+  var lista = archivosConMedidas();
   if(!lista.length){ document.getElementById('pendientes').style.display='none'; return; }
 
-  lista.forEach(function(a){
-    a.ok = a.estilos.length ? yaConfirmada(a.estilos[0], a.d.tipo) : false;
+  var orden={pendiente:0, automatica:1, verificada:2};
+  lista.sort(function(x,y){
+    var a=marcadaRevisar(x.d.id)?-1:orden[x.estado], b=marcadaRevisar(y.d.id)?-1:orden[y.estado];
+    return a-b;
   });
-  lista.sort(function(x,y){ return (x.ok?1:0)-(y.ok?1:0); });
+
+  var pend=lista.filter(function(a){ return a.estado==='pendiente'; }).length;
+  var rev =lista.filter(function(a){ return marcadaRevisar(a.d.id); }).length;
+  document.getElementById('pendSub').innerHTML = rev
+    ? '<b style="color:var(--rose);">'+rev+' ficha(s) necesitan tu revisión</b> — el resto se leyó sola.'
+    : (pend ? pend+' sin procesar todavía.' : 'Todas las tablas están listas. No hay nada que hacer.');
 
   document.getElementById('listaPend').innerHTML = lista.map(function(a){
-    var d=a.d, ests=a.estilos.filter(function(v,i,s){return s.indexOf(v)===i;}).join(', ');
+    var d=a.d, ests=a.estilos.join(', ');
+    var cls, txt;
+    if(marcadaRevisar(d.id)){ cls='rev'; txt='revisar'; }
+    else if(a.estado==='verificada'){ cls='si'; txt='verificada'; }
+    else if(a.estado==='automatica'){ cls='si'; txt='lista'; }
+    else { cls='no'; txt='sin procesar'; }
     return '<div class="pend" onclick="abrirDeDrive(\''+d.id+'\',\''+
       String(d.archivo).replace(/'/g,"\\'")+'\')">'+
       '<div class="est">'+(ests||'—')+'</div>'+
       '<div class="inf"><b>'+(d.tipo==='CORTE'?'CORTE':'TÉCNICA')+'</b> · '+(d.grupo||'—')+' · '+(d.cliente||'—')+
       '<br>'+d.archivo+'</div>'+
-      '<div class="est2 '+(a.ok?'si':'no')+'">'+(a.ok?'verificada':'pendiente')+'</div></div>';
+      '<div class="est2 '+cls+'">'+txt+'</div></div>';
   }).join('');
   document.getElementById('pendientes').style.display='block';
+}
+
+/* ---------- proceso automático en lote ----------
+   Lee las fichas sin tabla y guarda sola las que salen completas.
+   Solo aparta para revisión las que quedan dudosas.                */
+function procesarPendientes(){
+  var faltan = archivosConMedidas().filter(function(a){
+    return a.base && a.estado==='pendiente' && !marcadaRevisar(a.d.id);
+  });
+  if(!faltan.length){ document.getElementById('auto').style.display='none'; return; }
+
+  var caja=document.getElementById('auto');
+  caja.style.display='block';
+  var i=0, ok=0, dudosas=0;
+
+  function paso(){
+    if(i>=faltan.length){
+      document.getElementById('autoTxt').textContent =
+        ok+' tabla(s) leídas y guardadas'+(dudosas?' · '+dudosas+' necesitan revisión':'  ·  nada pendiente');
+      document.getElementById('autoBar').style.width='100%';
+      setTimeout(function(){ if(!dudosas) caja.style.display='none'; }, 3500);
+      cargarEspecs();
+      return;
+    }
+    var a=faltan[i];
+    document.getElementById('autoTxt').textContent =
+      'Leyendo '+(i+1)+' de '+faltan.length+': '+a.d.archivo;
+    document.getElementById('autoBar').style.width=Math.round(i/faltan.length*100)+'%';
+
+    jsonp('accion=archivo&clave='+encodeURIComponent(SES.clave)+'&id='+encodeURIComponent(a.d.id)+
+          '&auditora='+encodeURIComponent(SES.nombre)+'&taller=AUTOMATICO', function(r){
+      if(!r || !r.ok){ REVISAR.push(a.d.id); dudosas++; i++; pintarPendientes(); paso(); return; }
+      var bin=atob(r.b64), n=bin.length, arr=new Uint8Array(n);
+      for(var k=0;k<n;k++) arr[k]=bin.charCodeAt(k);
+      extraerDe(arr, function(res){
+        if(!res){ REVISAR.push(a.d.id); dudosas++; i++; pintarPendientes(); paso(); return; }
+        var dudas = res.tabla.filas.filter(function(f){ return f.vacias>0 || f.ilegibles>0; }).length;
+        if(dudas>0 || !res.cab.estilo){
+          REVISAR.push(a.d.id); dudosas++; i++; pintarPendientes(); paso(); return;
+        }
+        guardarTabla(res.tabla, res.cab, a.d.id, a.d.archivo, '(automático)', function(g){
+          if(g && g.ok) ok++; else { REVISAR.push(a.d.id); dudosas++; }
+          i++; pintarPendientes(); paso();
+        });
+      });
+    });
+  }
+  paso();
 }
 
 function abrirDeDrive(id, nombre){
@@ -461,6 +550,45 @@ function procesar(file){
   var fr=new FileReader();
   fr.onload=function(){ leerArrayBuffer(new Uint8Array(fr.result), file.name); };
   fr.readAsArrayBuffer(file);
+}
+
+/* Extrae tabla y cabecera de un PDF ya en memoria. Devuelve null si no hay tabla. */
+function extraerDe(arr, cb){
+  pdfjsLib.getDocument({data:arr}).promise.then(function(doc){
+    var textos=[], tareas=[];
+    for(var i=1;i<=doc.numPages;i++){
+      (function(n){
+        tareas.push(doc.getPage(n).then(function(pg){
+          return pg.getTextContent().then(function(tc){
+            textos[n-1]=tc.items.map(function(x){return x.str;}).join(' ');
+            return leerPagina(pg).then(function(tb){ return {n:n, tabla:tb}; });
+          });
+        }));
+      })(i);
+    }
+    Promise.all(tareas).then(function(res){
+      var c=res.filter(function(r){ return r.tabla; });
+      if(!c.length){ cb(null); return; }
+      c.sort(function(a,b){ return b.tabla.filas.length-a.tabla.filas.length; });
+      cb({ tabla:c[0].tabla, cab:cabecera(textos[c[0].n-1]), pagina:c[0].n, total:doc.numPages });
+    }).catch(function(){ cb(null); });
+  }).catch(function(){ cb(null); });
+}
+
+/* Guarda una tabla ya extraída. */
+function guardarTabla(tabla, cab, fileId, archivo, quien, cb){
+  if(!cab.estilo){ cb({ok:false, error:'Sin estilo'}); return; }
+  var estiloBase=String(cab.estilo).split('-')[0];
+  var tipo = cab.tipo==='CORTE' ? 'CORTE' : 'TECNICA';
+  var tallas = tabla.orden.filter(function(c){ return c!=='TOL'; });
+  var puntos = tabla.filas.map(function(f){
+    var vals={};
+    tallas.forEach(function(t){ vals[t]= f.vals[t] ? f.vals[t].dec : null; });
+    return { cod:f.cod, desc:f.desc||'', vals:vals, tol: f.vals['TOL'] ? f.vals['TOL'].dec : null };
+  });
+  post({ accion:'guardarEspec', estilo:estiloBase, grupo:cab.grupo||'', tipo:tipo,
+         fileId:fileId||'', archivo:archivo||'', tallas:tallas, puntos:puntos,
+         confirmadoPor:quien }, cb);
 }
 
 function leerArrayBuffer(arr, nombre){
@@ -567,25 +695,12 @@ function confirmar(){
   }
   var btn=document.querySelector('.confirmar .btn');
   btn.disabled=true; btn.textContent='Guardando…';
-
-  // estilo base, sin la versión: así empata con el RM y con la búsqueda
-  var estiloBase = String(CAB.estilo).split('-')[0];
-  var tipo = CAB.tipo==='CORTE' ? 'CORTE' : 'TECNICA';
-  var tallas = TABLA.orden.filter(function(c){ return c!=='TOL'; });
-
-  var puntos = TABLA.filas.map(function(f){
-    var vals = {};
-    tallas.forEach(function(t){ vals[t] = f.vals[t] ? f.vals[t].dec : null; });
-    var tol = f.vals['TOL'] ? f.vals['TOL'].dec : null;
-    return { cod:f.cod, desc:f.desc||'', vals:vals, tol:tol };
-  });
-
-  post({ accion:'guardarEspec', estilo:estiloBase, grupo:CAB.grupo||'', tipo:tipo,
-         fileId:(ARCH?ARCH.id:''), archivo:(ARCH?ARCH.nombre:document.getElementById('fname').textContent),
-         tallas:tallas, puntos:puntos, confirmadoPor:SES.nombre },
-    function(r){
+  guardarTabla(TABLA, CAB, ARCH?ARCH.id:'',
+    ARCH?ARCH.nombre:document.getElementById('fname').textContent,
+    SES.nombre, function(r){
       btn.disabled=false; btn.textContent='La tabla es correcta';
       if(!r || !r.ok){ error((r&&r.error)||'No se pudo guardar.'); return; }
+      var k=REVISAR.indexOf(ARCH?ARCH.id:''); if(k>=0) REVISAR.splice(k,1);
       var ok=document.getElementById('ok');
       ok.textContent='Tabla guardada. Ya está disponible para las auditoras.';
       ok.style.display='block';
