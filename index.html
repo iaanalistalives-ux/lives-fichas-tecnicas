@@ -58,6 +58,22 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 .kpi .l{font-size:12px;color:#333;margin-top:3px;font-weight:600;}
 .kpi .s{font-size:11px;color:var(--stone);margin-top:2px;}
 
+.todoHd{display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;}
+.todoHd .flecha{margin-left:auto;font-size:18px;color:var(--sage);transition:.15s;}
+.todoHd.abierto .flecha{transform:rotate(90deg);}
+.todoBody{display:none;padding:0 16px 16px;border-top:1px solid var(--warm-light);}
+.fechas{display:flex;gap:7px;flex-wrap:wrap;margin-top:14px;}
+.fechas button{background:#fff;border:1.5px solid var(--warm);color:#333;font-family:inherit;font-size:13px;font-weight:700;border-radius:18px;padding:8px 14px;cursor:pointer;}
+.fechas button.on{background:var(--sage);border-color:var(--sage);color:#fff;}
+.fechaExacta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px;}
+.fechaExacta label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--stone);}
+.fechaExacta input{font-family:inherit;font-size:14px;padding:8px 10px;border:1.5px solid var(--warm);border-radius:6px;}
+.grupoDia{font-size:12px;font-weight:800;color:var(--sage-dark);text-transform:uppercase;letter-spacing:.4px;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--warm);}
+.fila{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--warm-light);cursor:pointer;}
+.fila:last-child{border-bottom:none;}
+.fila .est{font-size:15px;font-weight:800;color:#333;min-width:56px;}
+.fila .med{flex:1;min-width:0;font-size:12px;color:var(--stone);overflow-wrap:anywhere;}
+.fila .med b{color:#333;}
 .sectitle{font-size:16px;font-weight:700;color:var(--sage-dark);margin:20px 0 12px;padding-bottom:6px;border-bottom:2px solid var(--warm-light);}
 .note{background:#fff;border:1px solid var(--warm);border-left:4px solid var(--tan);border-radius:6px;padding:10px 14px;font-size:11.5px;color:var(--stone);margin-bottom:16px;line-height:1.5;}
 .err{display:none;background:#FBE9E9;border:1px solid var(--rose);border-radius:8px;padding:12px 16px;color:#DC2626;font-size:13px;margin-bottom:16px;}
@@ -209,6 +225,26 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
     </div>
   </div>
 
+  <div class="panel" id="panelTodo" style="display:none;padding:0;overflow:hidden;">
+    <div class="todoHd" onclick="toggleTodo()">
+      <div>
+        <div class="pt">Ver todo lo cargado</div>
+        <div class="ph" style="margin:0;" id="todoSub">—</div>
+      </div>
+      <div class="flecha" id="todoFlecha">▸</div>
+    </div>
+    <div class="todoBody" id="todoBody">
+      <div class="fechas" id="fechaBtns"></div>
+      <div class="fechaExacta">
+        <label>Día exacto</label>
+        <input type="date" id="fechaDia" onchange="setDia()">
+        <button class="btn ghost" onclick="limpiarFecha()">Quitar</button>
+      </div>
+      <div class="kpis" id="kpisTodo" style="margin:14px 0 12px;"></div>
+      <div id="listaTodo"></div>
+    </div>
+  </div>
+
   <div class="kpis" id="kpis" style="display:none;"></div>
   <div id="salida"><div class="cargando">Cargando…</div></div>
 
@@ -316,7 +352,13 @@ function cargar(forzar, primera){
       if(r.refresco.pendientes) msg+=' · quedan '+r.refresco.pendientes+', toca de nuevo';
     }
     document.getElementById('sync').textContent=msg;
+    document.getElementById('panelTodo').style.display='block';
     pintarKpis(); buscar();
+    if(document.getElementById('todoBody').style.display==='block') pintarTodo();
+    else{
+      var n={}; DATOS.forEach(function(d){ n[d.id]=1; });
+      document.getElementById('todoSub').textContent=Object.keys(n).length+' archivo(s) cargados';
+    }
   });
 }
 function refrescar(){ cargar(true,false); }
@@ -416,6 +458,7 @@ function montarSug(inputId,sugId,campo){
 function setTipo(b){
   document.querySelectorAll('.modesel .mbtn').forEach(function(x){x.classList.remove('active');});
   b.classList.add('active'); TIPO=b.dataset.tipo; buscar();
+  if(document.getElementById('todoBody').style.display==='block') pintarTodo();
 }
 function limpiar(){
   ['fCliente','fGrupo','fEstilo'].forEach(function(id){document.getElementById(id).value='';});
@@ -516,6 +559,106 @@ function tg(i){
   el.style.display=open?'none':'block';
   var t=el.previousElementSibling;
   t.textContent=(open?'▸ ':'▾ ')+t.textContent.slice(2);
+}
+
+/* ============================================================
+   PANEL "VER TODO LO CARGADO"
+   ============================================================ */
+var FILTRO_FECHA='todo', DIA='';
+
+function toggleTodo(){
+  var b=document.getElementById('todoBody'), hd=document.querySelector('.todoHd');
+  var abierto = b.style.display==='block';
+  b.style.display = abierto?'none':'block';
+  hd.classList.toggle('abierto', !abierto);
+  if(!abierto) pintarTodo();
+}
+function setFecha(f){ FILTRO_FECHA=f; DIA=''; document.getElementById('fechaDia').value=''; pintarTodo(); }
+function setDia(){ DIA=document.getElementById('fechaDia').value; FILTRO_FECHA='dia'; pintarTodo(); }
+function limpiarFecha(){ setFecha('todo'); }
+
+function diaDe(d){ return (d.fechaSubida||'').slice(0,10); }
+function haceDias(n){
+  var f=new Date(); f.setDate(f.getDate()-n);
+  return f.toISOString().slice(0,10);
+}
+function pasaFecha(d){
+  var dia=diaDe(d);
+  if(!dia) return FILTRO_FECHA==='todo';
+  if(FILTRO_FECHA==='todo') return true;
+  if(FILTRO_FECHA==='dia')  return DIA ? dia===DIA : true;
+  if(FILTRO_FECHA==='hoy')  return dia===new Date().toISOString().slice(0,10);
+  if(FILTRO_FECHA==='7')    return dia>=haceDias(7);
+  if(FILTRO_FECHA==='30')   return dia>=haceDias(30);
+  return true;
+}
+function fechaLarga(iso){
+  if(!iso) return 'Sin fecha';
+  var p=iso.split('-');
+  var m=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  var hoy=new Date().toISOString().slice(0,10);
+  return (iso===hoy?'Hoy · ':'')+p[2]+' '+m[+p[1]-1]+' '+p[0];
+}
+
+function pintarTodo(){
+  // botones de fecha
+  document.getElementById('fechaBtns').innerHTML=
+    [['todo','Todo'],['hoy','Hoy'],['7','Últimos 7 días'],['30','Últimos 30 días']]
+    .map(function(f){
+      return '<button class="'+(FILTRO_FECHA===f[0]?'on':'')+'" onclick="setFecha(\''+f[0]+'\')">'+f[1]+'</button>';
+    }).join('');
+
+  var base = baseTipo().filter(pasaFecha);
+
+  // un renglón por archivo, no por estilo
+  var porArch={};
+  base.forEach(function(d){
+    if(!porArch[d.id]) porArch[d.id]={d:d, estilos:[]};
+    if(d.estilo) porArch[d.id].estilos.push(d.estilo);
+  });
+  var archivos=Object.keys(porArch).map(function(k){ return porArch[k]; });
+
+  // contadores
+  var c={TECNICA:0,ACABADOS:0,CORTE:0,RM:0};
+  archivos.forEach(function(a){ if(c[a.d.tipo]!==undefined) c[a.d.tipo]++; });
+  document.getElementById('kpisTodo').innerHTML=
+    '<div class="kpi"><div class="v">'+archivos.length+'</div><div class="l">Archivos</div><div class="s">en el período</div></div>'+
+    '<div class="kpi"><div class="v">'+c.TECNICA+'</div><div class="l">Técnica</div></div>'+
+    '<div class="kpi"><div class="v">'+c.ACABADOS+'</div><div class="l">Acabados</div></div>'+
+    '<div class="kpi"><div class="v">'+c.CORTE+'</div><div class="l">Corte</div></div>'+
+    '<div class="kpi"><div class="v">'+c.RM+'</div><div class="l">RM</div></div>';
+
+  document.getElementById('todoSub').textContent =
+    archivos.length+' archivo(s)'+(FILTRO_FECHA==='todo'?' cargados':' en el período elegido');
+
+  if(!archivos.length){
+    document.getElementById('listaTodo').innerHTML=
+      '<div class="vacio" style="margin-top:10px;">No hay archivos con ese filtro.</div>';
+    return;
+  }
+
+  // agrupar por día de subida
+  var dias={};
+  archivos.forEach(function(a){ (dias[diaDe(a.d)]=dias[diaDe(a.d)]||[]).push(a); });
+  var claves=Object.keys(dias).sort().reverse();
+
+  var out='';
+  claves.forEach(function(k){
+    out+='<div class="grupoDia">'+fechaLarga(k)+' — '+dias[k].length+' archivo(s)</div>';
+    dias[k].sort(function(x,y){ return (x.d.grupo||'').localeCompare(y.d.grupo||'','es'); });
+    dias[k].forEach(function(a){
+      var d=a.d, ti=TIPOS[d.tipo]||TIPOS.TECNICA;
+      var ests=a.estilos.filter(function(v,i,s){ return s.indexOf(v)===i; }).join(', ');
+      out+='<div class="fila" onclick="abrir(\''+d.id+'\',\''+esc(d.archivo)+'\',\''+
+           esc(d.tipo)+'\',\''+esc(d.grupo)+'\',\''+esc(ests)+'\')">'+
+           '<span class="tag'+(ti.c?' '+ti.c:'')+'">'+ti.t+'</span>'+
+           '<div class="est">'+(ests||'—')+'</div>'+
+           '<div class="med"><b>'+(d.grupo||'—')+'</b> · '+(d.cliente||'—')+
+           (d.descripcion?'<br>'+d.descripcion:'')+'</div>'+
+           '</div>';
+    });
+  });
+  document.getElementById('listaTodo').innerHTML=out;
 }
 
 /* ============================================================
