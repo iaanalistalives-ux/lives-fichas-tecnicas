@@ -98,6 +98,8 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 .meta div span{color:var(--stone);}
 .meta div b{color:#333;font-weight:700;}
 .cbtns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+.cbtns .medir{background:#B45309;}
+.cbtns .medir:hover{background:#92400E;}
 .viejas{margin-top:10px;padding-top:10px;border-top:1px dashed var(--warm);}
 .viejas .tg{font-size:12px;color:var(--stone);cursor:pointer;font-weight:700;}
 .viejas .lista{display:none;margin-top:8px;}
@@ -260,7 +262,7 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
    ============================================================ */
 var APP_URL = "https://script.google.com/macros/s/AKfycby_r6c04rh7Iuxu9qIlpjIsh4pcHLNoXMhqURzLbIK9WrK1LYu3cxITPL6K4BdnaRwo3w/exec";
 
-var DATOS=[], TIPO="", TALLERES=[], AUDITORAS=[], SES=null, BLOBURL=null;
+var DATOS=[], TIPO="", TALLERES=[], AUDITORAS=[], SES=null, BLOBURL=null, ESPECS=[];
 
 /* ---------- almacenamiento local ---------- */
 function guardarSes(s){ try{ localStorage.setItem('lives_fichas', JSON.stringify(s)); }catch(e){} }
@@ -352,6 +354,10 @@ function cargar(forzar, primera){
       if(r.refresco.pendientes) msg+=' · quedan '+r.refresco.pendientes+', toca de nuevo';
     }
     document.getElementById('sync').textContent=msg;
+    jsonp('accion=especs&'+ident(), function(e){
+      ESPECS=(e&&e.ok)?(e.especs||[]):[];
+      if(document.getElementById('salida').querySelector('.card')) buscar();
+    });
     document.getElementById('panelTodo').style.display='block';
     pintarKpis(); buscar();
     if(document.getElementById('todoBody').style.display==='block') pintarTodo();
@@ -541,7 +547,16 @@ function tarjeta(lista,i){
        (d.kb?' · '+(d.kb>1024?(d.kb/1024).toFixed(1)+' MB':d.kb+' KB'):'')+'</div>'+
      '</div>';
   h+='<div class="cbtns"><button class="btn" onclick="abrir(\''+d.id+'\',\''+esc(d.archivo)+'\',\''+
-     esc(d.tipo)+'\',\''+esc(d.grupo)+'\',\''+esc(d.estilo)+'\')">Ver ficha</button></div>';
+     esc(d.tipo)+'\',\''+esc(d.grupo)+'\',\''+esc(d.estilo)+'\')">Ver ficha</button>';
+  if(d.tipo==='TECNICA' || d.tipo==='CORTE'){
+    var base=String(d.estilo||'').split('-')[0];
+    var lista=ESPECS.some(function(e){ return String(e.estilo)===base && e.tipo===d.tipo; });
+    h+= lista
+      ? '<button class="btn medir" onclick="medir(\''+esc(base)+'\',\''+esc(d.tipo)+'\',\''+
+        esc(d.grupo)+'\',\''+esc(d.cliente)+'\')">Medir</button>'
+      : '<button class="btn ghost" disabled title="Tabla de medidas aún no disponible">Medir</button>';
+  }
+  h+='</div>';
   if(lista.length>1){
     h+='<div class="viejas"><div class="tg" onclick="tg('+i+')">▸ '+(lista.length-1)+' versión(es) anterior(es)</div><div class="lista" id="v'+i+'">';
     lista.slice(1).forEach(function(v){
@@ -559,6 +574,12 @@ function tg(i){
   el.style.display=open?'none':'block';
   var t=el.previousElementSibling;
   t.textContent=(open?'▸ ':'▾ ')+t.textContent.slice(2);
+}
+
+function medir(estilo, tipo, grupo, cliente){
+  var q='?estilo='+encodeURIComponent(estilo)+'&tipo='+encodeURIComponent(tipo)+
+        '&grupo='+encodeURIComponent(grupo||'')+'&cliente='+encodeURIComponent(cliente||'');
+  location.href='medidas.html'+q;
 }
 
 /* ============================================================
