@@ -29,6 +29,14 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 .txt{width:100%;font-family:inherit;font-size:16px;padding:11px;border:1.5px solid var(--warm);border-radius:6px;}
 .txt:focus{outline:none;border-color:var(--sage);}
 .btn.full{width:100%;font-size:15px;padding:12px;}
+.accBar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:12px 0;}
+.accHint{font-size:11.5px;color:var(--stone);}
+.alerta{background:#FEF2F2;border:1px solid var(--rose);border-left:4px solid var(--rose);border-radius:8px;padding:12px 14px;margin-bottom:14px;}
+.alerta .aTit{font-size:13.5px;font-weight:800;color:#991B1B;margin-bottom:4px;}
+.alerta .aSub{font-size:12px;color:var(--stone);margin-bottom:8px;}
+.alerta .aItem{background:#fff;border:1px solid var(--warm);border-radius:6px;padding:9px 11px;margin-bottom:6px;font-size:12.5px;cursor:pointer;display:flex;gap:8px;align-items:center;}
+.alerta .aItem b{color:#333;}
+.alerta .aItem span{margin-left:auto;color:var(--rose);font-weight:800;font-size:11.5px;white-space:nowrap;}
 .auto{background:var(--warm-light);border-radius:8px;padding:11px 13px;margin-bottom:12px;}
 .auto .autoTxt{font-size:12.5px;color:var(--stone);font-weight:600;margin-bottom:7px;}
 .auto .autoBar{height:5px;background:#fff;border-radius:4px;overflow:hidden;}
@@ -127,6 +135,11 @@ td.falta{color:var(--rose);font-weight:700;}
       <div class="autoTxt" id="autoTxt">Procesando…</div>
       <div class="autoBar"><i id="autoBar"></i></div>
     </div>
+    <div class="accBar">
+      <button class="btn" id="btnMasivo" onclick="procesarPendientes(true)">Procesar todas</button>
+      <span class="accHint" id="accHint"></span>
+    </div>
+    <div class="alerta" id="alertaRev" style="display:none;"></div>
     <div id="listaPend"></div>
   </div>
 
@@ -451,6 +464,7 @@ function pintarPendientes(){
     ? '<b style="color:var(--rose);">'+rev+' ficha(s) necesitan tu revisión</b> — el resto se leyó sola.'
     : (pend ? pend+' sin procesar todavía.' : 'Todas las tablas están listas. No hay nada que hacer.');
 
+  pintarAlerta();
   document.getElementById('listaPend').innerHTML = lista.map(function(a){
     var d=a.d, ests=a.estilos.join(', ');
     var cls, txt;
@@ -468,14 +482,45 @@ function pintarPendientes(){
   document.getElementById('pendientes').style.display='block';
 }
 
+function pintarAlerta(){
+  var caja=document.getElementById('alertaRev');
+  if(!caja) return;
+  var malas = archivosConMedidas().filter(function(a){ return marcadaRevisar(a.d.id); });
+  var hint=document.getElementById('accHint');
+  var sinProc = archivosConMedidas().filter(function(a){
+    return a.base && a.estado==='pendiente' && !marcadaRevisar(a.d.id); }).length;
+  if(hint) hint.textContent = sinProc
+    ? sinProc+' ficha(s) sin procesar'
+    : 'Todo procesado. Púlsalo si quieres volver a leerlas.';
+
+  if(!malas.length){ caja.style.display='none'; return; }
+  caja.style.display='block';
+  caja.innerHTML='<div class="aTit">'+malas.length+' ficha(s) no se pudieron leer completas</div>'+
+    '<div class="aSub">El sistema no las guardó para no dar medidas equivocadas. '+
+    'Ábrelas y revisa las filas marcadas en amarillo.</div>'+
+    malas.map(function(a){
+      return '<div class="aItem" onclick="abrirDeDrive(\''+a.d.id+'\',\''+
+        String(a.d.archivo).replace(/'/g,"\\'")+'\')">'+
+        '<b>'+(a.estilos.join(', ')||'—')+'</b> · '+(a.d.grupo||'—')+' · '+(a.d.cliente||'—')+
+        '<span>revisar →</span></div>';
+    }).join('');
+}
+
 /* ---------- proceso automático en lote ----------
    Lee las fichas sin tabla y guarda sola las que salen completas.
    Solo aparta para revisión las que quedan dudosas.                */
-function procesarPendientes(){
+function procesarPendientes(forzar){
+  if(forzar) REVISAR=[];
   var faltan = archivosConMedidas().filter(function(a){
-    return a.base && a.estado==='pendiente' && !marcadaRevisar(a.d.id);
+    return a.base && a.estado==='pendiente' && (forzar || !marcadaRevisar(a.d.id));
   });
-  if(!faltan.length){ document.getElementById('auto').style.display='none'; return; }
+  document.getElementById('btnMasivo').disabled=true;
+  if(!faltan.length){
+    document.getElementById('auto').style.display='none';
+    document.getElementById('btnMasivo').disabled=false;
+    pintarAlerta();
+    return;
+  }
 
   var caja=document.getElementById('auto');
   caja.style.display='block';
@@ -486,6 +531,7 @@ function procesarPendientes(){
       document.getElementById('autoTxt').textContent =
         ok+' tabla(s) leídas y guardadas'+(dudosas?' · '+dudosas+' necesitan revisión':'  ·  nada pendiente');
       document.getElementById('autoBar').style.width='100%';
+      document.getElementById('btnMasivo').disabled=false;
       setTimeout(function(){ if(!dudosas) caja.style.display='none'; }, 3500);
       cargarEspecs();
       return;
