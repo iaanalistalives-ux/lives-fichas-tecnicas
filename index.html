@@ -68,6 +68,11 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 .fechaExacta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px;}
 .fechaExacta label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--stone);}
 .fechaExacta input{font-family:inherit;font-size:14px;padding:8px 10px;border:1.5px solid var(--warm);border-radius:6px;}
+.verifBox{background:#ECFDF5;border:1px solid var(--emer);border-radius:8px;padding:13px 15px;margin-bottom:14px;}
+.verifBox.pend{background:#FFFBEB;border-color:#FCD34D;}
+.verifBox .vTit{font-size:14px;font-weight:800;color:#065F46;}
+.verifBox.pend .vTit{color:#92400E;}
+.verifBox .vSub{font-size:12px;color:var(--stone);margin:4px 0 10px;}
 .grupoDia{font-size:12px;font-weight:800;color:var(--sage-dark);text-transform:uppercase;letter-spacing:.4px;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--warm);}
 .fila{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--warm-light);cursor:pointer;}
 .fila:last-child{border-bottom:none;}
@@ -243,6 +248,7 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
         <button class="btn ghost" onclick="limpiarFecha()">Quitar</button>
       </div>
       <div class="kpis" id="kpisTodo" style="margin:14px 0 12px;"></div>
+      <div id="verif" style="display:none;"></div>
       <div id="listaTodo"></div>
     </div>
   </div>
@@ -297,10 +303,20 @@ function cargarListas(){
     if(!r || !r.ok) return aerr('No se pudo conectar con el sistema.');
     TALLERES = (r.talleres||[]).map(function(t){ return t.nombre + (t.proceso? ' · '+t.proceso : ''); });
     TALL_RAW = (r.talleres||[]);
-    AUDITORAS = r.auditoras||[];
+    AUD_RAW  = r.auditoras||[];
+    AUDITORAS = AUD_RAW.map(function(a){ return typeof a==='string' ? a : a.nombre; });
   });
 }
-var TALL_RAW=[];
+var TALL_RAW=[], AUD_RAW=[];
+function rolDe(nombre){
+  var a=AUD_RAW.filter(function(x){
+    return (typeof x==='string'? x : x.nombre).toUpperCase()===String(nombre||'').trim().toUpperCase();
+  })[0];
+  return (a && a.rol) ? a.rol : '';
+}
+var ROLES_VERIFICAN = ['SUPERVISORA TOP SAMPLE','DIGITADORA'];
+function puedeVerificar(rol){ return ROLES_VERIFICAN.indexOf(String(rol||'').toUpperCase())>=0; }
+function esDigitadora(){ return SES && puedeVerificar(SES.rol); }
 function aerr(m){
   var e=document.getElementById('aerr');
   e.style.display = m?'block':'none'; e.textContent = m||'';
@@ -309,11 +325,13 @@ function entrar(){
   var t=document.getElementById('aTaller').value.trim();
   var a=document.getElementById('aAud').value.trim();
   var c=document.getElementById('aClave').value.trim();
-  if(!t) return aerr('Selecciona el taller donde estás.');
   if(!a) return aerr('Selecciona tu nombre.');
+  var rol=rolDe(a);
+  if(!puedeVerificar(rol) && !t) return aerr('Selecciona el taller donde estás.');
   if(!c) return aerr('Escribe la clave de acceso.');
   aerr('');
-  SES={taller:t.split(' · ')[0], auditora:a, clave:c};
+  SES={ taller: puedeVerificar(rol) ? 'OFICINA' : t.split(' · ')[0],
+        auditora:a, clave:c, rol:rol };
   cargar(false, true);
 }
 function salir(){
@@ -322,7 +340,7 @@ function salir(){
 }
 function pintarQuien(){
   document.getElementById('quien').innerHTML =
-    '<div><b>'+SES.auditora+'</b>'+SES.taller+'</div>'+
+    '<div><b>'+SES.auditora+'</b>'+(SES.rol ? SES.rol : SES.taller)+'</div>'+
     '<button onclick="salir()">Cambiar</button>';
 }
 
@@ -652,6 +670,8 @@ function pintarTodo(){
   document.getElementById('todoSub').textContent =
     archivos.length+' archivo(s)'+(FILTRO_FECHA==='todo'?' cargados':' en el período elegido');
 
+  pintarVerificacion(archivos);
+
   if(!archivos.length){
     document.getElementById('listaTodo').innerHTML=
       '<div class="vacio" style="margin-top:10px;">No hay archivos con ese filtro.</div>';
@@ -681,6 +701,35 @@ function pintarTodo(){
   });
   document.getElementById('listaTodo').innerHTML=out;
 }
+
+/* --- verificación de tablas: solo para la digitadora --- */
+function pintarVerificacion(archivos){
+  var caja=document.getElementById('verif');
+  if(!esDigitadora()){ caja.style.display='none'; return; }
+
+  var conMedidas = archivos.filter(function(a){
+    return a.d.tipo==='TECNICA' || a.d.tipo==='CORTE';
+  });
+  var faltan = conMedidas.filter(function(a){
+    var base=String(a.d.estilo||'').split('-')[0];
+    return base && !ESPECS.some(function(e){
+      return String(e.estilo)===base && e.tipo===a.d.tipo;
+    });
+  }).length;
+
+  caja.style.display='block';
+  caja.innerHTML =
+    '<div class="verifBox'+(faltan?' pend':'')+'">'+
+    '<div class="vTit">'+(faltan
+      ? faltan+' ficha(s) sin tabla de medidas todavía'
+      : 'Todas las tablas de medidas están listas')+'</div>'+
+    '<div class="vSub">'+(faltan
+      ? 'Ábrelas para que el sistema las lea. Solo tendrás que revisar las que salgan dudosas.'
+      : 'Las auditoras ya pueden medir cualquier estilo cargado.')+'</div>'+
+    '<button class="btn" onclick="irTablas()">'+(faltan?'Procesar ahora':'Revisar tablas')+'</button>'+
+    '</div>';
+}
+function irTablas(){ location.href='tablas.html'; }
 
 /* ============================================================
    VISOR  (PDF.js — se dibuja dentro de la página)
@@ -945,6 +994,14 @@ function cerrarVisor(){
    ============================================================ */
 sugSimple('aTaller','sTaller',function(){ return TALLERES; });
 sugSimple('aAud','sAud',function(){ return AUDITORAS; });
+document.getElementById('aAud').addEventListener('input', ajustarTaller);
+document.getElementById('aAud').addEventListener('change', ajustarTaller);
+document.getElementById('aAud').addEventListener('blur', function(){ setTimeout(ajustarTaller,180); });
+function ajustarTaller(){
+  var esDig = puedeVerificar(rolDe(document.getElementById('aAud').value));
+  var campo = document.getElementById('aTaller').closest('.fld');
+  if(campo) campo.style.display = esDig ? 'none' : 'block';
+}
 montarSug('fCliente','sCliente','cliente');
 montarSug('fGrupo','sGrupo','grupo');
 montarSug('fEstilo','sEstilo','estilo');
