@@ -277,7 +277,23 @@ var DATOS=[], TIPO="", TALLERES=[], AUDITORAS=[], SES=null, BLOBURL=null, ESPECS
 /* ---------- almacenamiento local ---------- */
 function guardarSes(s){ try{ localStorage.setItem('lives_fichas', JSON.stringify(s)); }catch(e){} }
 function leerSes(){ try{ return JSON.parse(localStorage.getItem('lives_fichas')||'null'); }catch(e){ return null; } }
-function borrarSes(){ try{ localStorage.removeItem('lives_fichas'); }catch(e){} }
+function borrarSes(){ try{ localStorage.removeItem('lives_fichas'); localStorage.removeItem('lives_cache'); }catch(e){} }
+
+/* Guarda el índice en el equipo para que la próxima vez abra al instante. */
+function guardarCache(datos, especs){
+  try{
+    localStorage.setItem('lives_cache', JSON.stringify({
+      t:Date.now(), datos:datos||[], especs:especs||[] }));
+  }catch(e){}
+}
+function leerCache(){
+  try{
+    var c=JSON.parse(localStorage.getItem('lives_cache')||'null');
+    if(!c || !c.datos || !c.datos.length) return null;
+    if(Date.now()-c.t > 86400000) return null;   // más de un día: se descarta
+    return c;
+  }catch(e){ return null; }
+}
 
 /* ---------- JSONP ---------- */
 function jsonp(params, cb){
@@ -354,7 +370,9 @@ function pintarQuien(){
 function cargar(forzar, primera){
   var b=document.getElementById('btnSync'); if(b) b.disabled=true;
   if(!primera) document.getElementById('sync').textContent = forzar?'Buscando archivos nuevos…':'Cargando…';
-  jsonp((forzar?'accion=refrescar&':'accion=datos&')+ident(), function(r){
+  // al entrar se pide todo junto: listas, índice y tablas en un solo viaje
+  var accion = primera ? 'accion=inicio&' : (forzar?'accion=refrescar&':'accion=datos&');
+  jsonp(accion+ident(), function(r){
     if(b) b.disabled=false;
     if(!r || !r.ok){
       if(primera){ aerr(r && r.error ? r.error : 'No se pudo conectar.'); return; }
@@ -370,6 +388,16 @@ function cargar(forzar, primera){
     document.getElementById('panelTodo').style.display = esDigitadora() ? 'block' : 'none';
     error('');
     DATOS=r.datos||[];
+    if(r.especs) ESPECS=r.especs;
+    if(r.talleres){
+      TALL_RAW=r.talleres;
+      TALLERES=r.talleres.map(function(t){ return t.nombre+(t.proceso?' · '+t.proceso:''); });
+    }
+    if(r.auditoras){
+      AUD_RAW=r.auditoras;
+      AUDITORAS=AUD_RAW.map(function(a){ return typeof a==='string'? a : a.nombre; });
+    }
+    guardarCache(DATOS, ESPECS);
     var msg='Actualizado '+new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});
     if(r.refresco){
       if(r.refresco.procesados) msg+=' · '+r.refresco.procesados+' ficha(s) nueva(s)';
@@ -377,10 +405,12 @@ function cargar(forzar, primera){
       if(r.refresco.pendientes) msg+=' · quedan '+r.refresco.pendientes+', toca de nuevo';
     }
     document.getElementById('sync').textContent=msg;
-    jsonp('accion=especs&'+ident(), function(e){
-      ESPECS=(e&&e.ok)?(e.especs||[]):[];
-      if(document.getElementById('salida').querySelector('.card')) buscar();
-    });
+    if(!r.especs){
+      jsonp('accion=especs&'+ident(), function(e){
+        ESPECS=(e&&e.ok)?(e.especs||[]):[];
+        if(document.getElementById('salida').querySelector('.card')) buscar();
+      });
+    }
     document.getElementById('panelTodo').style.display = esDigitadora() ? 'block' : 'none';
     pintarKpis(); buscar();
     if(esDigitadora()){
@@ -769,6 +799,8 @@ function cargando(txt){
     '<div style="font-size:12px;opacity:.7;">Las fichas con fotos pueden tardar.</div></div>';
 }
 
+var PDFCACHE={};   // fichas ya descargadas en esta sesión
+
 function abrir(id,archivo,tipo,grupo,estilo){
   var v=document.getElementById('visor');
   document.getElementById('vtit').textContent=archivo;
@@ -777,6 +809,10 @@ function abrir(id,archivo,tipo,grupo,estilo){
   v.style.display='flex';
   liberar(); ZOOM=1;
 
+  if(PDFCACHE[id]){                       // ya se abrió antes: no se vuelve a bajar
+    setTimeout(function(){ mostrarPDF(PDFCACHE[id], archivo); }, 30);
+    return;
+  }
   jsonp('accion=archivo&id='+encodeURIComponent(id)+'&'+ident()+
         '&tipo='+encodeURIComponent(tipo)+'&grupo='+encodeURIComponent(grupo)+
         '&estilo='+encodeURIComponent(estilo), function(r){
@@ -789,32 +825,37 @@ function abrir(id,archivo,tipo,grupo,estilo){
     try{
       var bin=atob(r.b64), n=bin.length; arr=new Uint8Array(n);
       for(var i=0;i<n;i++) arr[i]=bin.charCodeAt(i);
+      if(n < 8000000) PDFCACHE[id]=arr;     // se guarda si no es enorme
     }catch(e){
       msgVisor('El archivo llegó dañado. Intenta de nuevo.',
                '<button class="btn" onclick="cerrarVisor()">Volver</button>');
       return;
     }
-    // botón de descarga (clic real del usuario, no programático)
-    try{
-      BLOBURL=URL.createObjectURL(new Blob([arr],{type:'application/pdf'}));
-      var a=document.getElementById('vdesc');
-      a.href=BLOBURL; a.download=r.nombre||archivo; a.style.display='inline-block';
-    }catch(e){}
+    mostrarPDF(arr, r.nombre||archivo);
+  });
+}
 
-    cargando('Preparando la vista…');
-    cargarPdfJs(function(ok){
-      if(!ok){
-        msgVisor('No se pudo cargar el visor (revisa tu conexión).',
-                 '<button class="btn" onclick="cerrarVisor()">Volver</button>');
-        return;
-      }
-      var lib=window['pdfjs-dist/build/pdf'];
-      lib.getDocument({data:arr}).promise.then(function(doc){
-        PDFDOC=doc; render();
-      }).catch(function(){
-        msgVisor('No se pudo leer el PDF.',
-                 '<button class="btn" onclick="cerrarVisor()">Volver</button>');
-      });
+function mostrarPDF(arr, nombre){
+  // botón de descarga (clic real del usuario, no programático)
+  try{
+    BLOBURL=URL.createObjectURL(new Blob([arr],{type:'application/pdf'}));
+    var a=document.getElementById('vdesc');
+    a.href=BLOBURL; a.download=nombre; a.style.display='inline-block';
+  }catch(e){}
+
+  cargando('Preparando la vista…');
+  cargarPdfJs(function(ok){
+    if(!ok){
+      msgVisor('No se pudo cargar el visor (revisa tu conexión).',
+               '<button class="btn" onclick="cerrarVisor()">Volver</button>');
+      return;
+    }
+    var lib=window['pdfjs-dist/build/pdf'];
+    lib.getDocument({data:arr}).promise.then(function(doc){
+      PDFDOC=doc; render();
+    }).catch(function(){
+      msgVisor('No se pudo leer el PDF.',
+               '<button class="btn" onclick="cerrarVisor()">Volver</button>');
     });
   });
 }
@@ -1016,7 +1057,15 @@ montarSug('fEstilo','sEstilo','estilo');
 (function(){
   var s=leerSes();
   if(s && s.clave && s.taller && s.auditora){
-    SES=s; pintarQuien(); cargar(false,false);
+    SES=s; pintarQuien();
+    // se muestra al instante lo último conocido y se refresca por detrás
+    var c=leerCache();
+    if(c){
+      DATOS=c.datos; ESPECS=c.especs||[];
+      pintarKpis(); buscar();
+      document.getElementById('sync').textContent='Actualizando…';
+    }
+    cargar(false,false);
     jsonp('accion=listas',function(r){
       if(r&&r.ok){ TALL_RAW=r.talleres||[];
         TALLERES=(r.talleres||[]).map(function(t){return t.nombre+(t.proceso?' · '+t.proceso:'');});
