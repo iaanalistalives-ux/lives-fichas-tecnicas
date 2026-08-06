@@ -98,6 +98,11 @@ th{background:var(--warm-light);color:var(--stone);font-size:11px;text-transform
 td.cod{font-weight:800;background:var(--warm-light);color:#333;width:52px;}
 td.desc{text-align:left;font-size:11.5px;color:var(--stone);min-width:210px;}
 td.tol{font-weight:700;color:var(--slate);}
+td.editable{cursor:text;}
+td.editable:hover{background:#F0F9F6;outline:1.5px solid var(--sage);outline-offset:-1.5px;}
+td.corregida{background:#ECFDF5!important;color:#065F46;font-weight:800;}
+td input.cel{width:100%;border:none;outline:none;font-family:inherit;font-size:13px;font-weight:700;
+             text-align:center;color:var(--sage);background:#F0F9F6;padding:2px;}
 tr.duda td.cod{background:#FEF3C7;color:#92400E;}
 tr.duda td{background:#FFFBEB;}
 td.falta{color:var(--rose);font-weight:700;}
@@ -504,6 +509,15 @@ function pintarPendientes(){
   document.getElementById('pendientes').style.display='block';
 }
 
+function avisoAuto(msg, ocultar){
+  document.getElementById('pendientes').style.display='block';  // el aviso debe verse siempre
+  var caja=document.getElementById('auto');
+  caja.style.display='block';
+  document.getElementById('autoTxt').textContent=msg;
+  document.getElementById('autoBar').style.width='100%';
+  document.getElementById('btnMasivo').disabled=false;
+  if(ocultar) setTimeout(function(){ caja.style.display='none'; }, 4000);
+}
 function pintarAlerta(){
   var caja=document.getElementById('alertaRev');
   if(!caja) return;
@@ -532,20 +546,36 @@ function pintarAlerta(){
    Lee las fichas sin tabla y guarda sola las que salen completas.
    Solo aparta para revisión las que quedan dudosas.                */
 function procesarPendientes(forzar){
-  if(forzar) REVISAR=[];
-  var faltan = archivosConMedidas().filter(function(a){
-    return a.base && a.estado==='pendiente' && (forzar || !marcadaRevisar(a.d.id));
-  });
+  var todos = archivosConMedidas().filter(function(a){ return a.base; });
+  var faltan;
+  if(forzar){
+    // el botón relee TODAS las fichas, no solo las que faltan
+    if(!todos.length){
+      avisoAuto('No hay fichas con hoja de medidas cargadas todavía.', true);
+      return;
+    }
+    var yaOk = todos.filter(function(a){ return a.estado!=='pendiente'; }).length;
+    if(yaOk && !confirm('Se volverán a leer las '+todos.length+' fichas y se reemplazarán sus tablas.\n\n¿Continuar?'))
+      return;
+    REVISAR=[]; faltan=todos;
+  }else{
+    faltan = todos.filter(function(a){
+      return a.estado==='pendiente' && !marcadaRevisar(a.d.id);
+    });
+  }
   document.getElementById('btnMasivo').disabled=true;
   if(!faltan.length){
-    document.getElementById('auto').style.display='none';
     document.getElementById('btnMasivo').disabled=false;
+    if(forzar) avisoAuto('No hay nada que procesar.', true);
+    else document.getElementById('auto').style.display='none';
     pintarAlerta();
     return;
   }
 
   var caja=document.getElementById('auto');
   caja.style.display='block';
+  document.getElementById('autoTxt').textContent='Preparando '+faltan.length+' ficha(s)…';
+  document.getElementById('autoBar').style.width='2%';
   var i=0, ok=0, dudosas=0;
 
   function paso(){
@@ -554,11 +584,13 @@ function procesarPendientes(forzar){
         ok+' tabla(s) leídas y guardadas'+(dudosas?' · '+dudosas+' necesitan revisión':'  ·  nada pendiente');
       document.getElementById('autoBar').style.width='100%';
       document.getElementById('btnMasivo').disabled=false;
+      document.getElementById('btnMasivo').textContent='Procesar todas';
       setTimeout(function(){ if(!dudosas) caja.style.display='none'; }, 3500);
       cargarEspecs();
       return;
     }
     var a=faltan[i];
+    document.getElementById('btnMasivo').textContent='Procesando '+(i+1)+' de '+faltan.length+'…';
     document.getElementById('autoTxt').textContent =
       'Leyendo '+(i+1)+' de '+faltan.length+': '+a.d.archivo;
     document.getElementById('autoBar').style.width=Math.round(i/faltan.length*100)+'%';
@@ -686,7 +718,7 @@ function guardarTabla(tabla, cab, fileId, archivo, quien, cb){
          confirmadoPor:quien }, cb);
 }
 
-var TODAS=[], IDX=0;
+var TODAS=[], IDX=0, TOTALPAG=0;
 
 function leerArrayBuffer(arr, nombre){
   document.getElementById('salida').innerHTML='<div class="cargando">Leyendo el PDF…</div>';
@@ -705,7 +737,7 @@ function leerArrayBuffer(arr, nombre){
   });
 }
 function usarTabla(i, total){
-  IDX=i;
+  IDX=i; if(total) TOTALPAG=total;
   var x=TODAS[i];
   TABLA=x.tabla; CAB=x.cab; CAB.titulo=x.titulo;
   pintar(x.pagina, total||0);
@@ -746,22 +778,25 @@ function pintar(pag, total){
      (hayDesc?'<th style="text-align:left;">Descripción</th>':'')+
      o.map(function(c){ return '<th>'+(c==='TOL'?'Tol. ±':c)+'</th>'; }).join('')+
      '</tr></thead><tbody>';
-  f.forEach(function(x){
+  f.forEach(function(x,i){
     var duda = x.vacias>0 || x.ilegibles>0;
     h+='<tr'+(duda?' class="duda"':'')+'><td class="cod">'+x.cod+'</td>';
     if(hayDesc) h+='<td class="desc">'+(x.desc||'—')+'</td>';
     o.forEach(function(c){
       var v=x.vals[c];
-      var cls = c==='TOL' ? 'tol' : '';
-      if(!v) h+='<td class="'+cls+' falta">—</td>';
-      else if(v.dec===null) h+='<td class="'+cls+' falta">'+v.txt+'?</td>';
-      else h+='<td class="'+cls+'">'+v.txt+'</td>';
+      var cls = (c==='TOL' ? 'tol ' : '')+'editable'+(x.corr && x.corr[c] ? ' corregida':'');
+      var attr = ' data-f="'+i+'" data-c="'+c+'" onclick="editar(this)"';
+      if(!v) h+='<td class="'+cls+' falta"'+attr+'>—</td>';
+      else if(v.dec===null) h+='<td class="'+cls+' falta"'+attr+'>'+v.txt+'?</td>';
+      else h+='<td class="'+cls+'"'+attr+'>'+v.txt+'</td>';
     });
     h+='</tr>';
   });
   h+='</tbody></table></div>';
-  h+='<div class="leyenda"><i></i> Fila incompleta o con un valor que no se pudo interpretar. '+
-     'Si en el PDF esa celda está vacía, es correcto; si tiene un número, avísale a Christian.</div>';
+  h+='<div class="leyenda"><i></i> Fila incompleta o con un valor que no se pudo interpretar.<br>'+
+     '<b>Puedes corregir cualquier celda:</b> haz clic sobre ella y escribe el valor tal como está en el PDF '+
+     '(por ejemplo <b>13 7/16</b> o <b>5/8</b>). Deja vacío si en el PDF no hay nada. '+
+     'Enter para aceptar, Esc para cancelar. Lo corregido queda en verde.</div>';
   var estiloBase = CAB.estilo ? String(CAB.estilo).split('-')[0] : '';
   var yaEsta = estiloBase && yaConfirmada(estiloBase, CAB.tipo==='CORTE'?'CORTE':'TECNICA');
   h+='<div class="confirmar" style="margin-top:16px;">'+
@@ -777,6 +812,56 @@ function pintar(pag, total){
      'sin la versión, para que empate con la búsqueda y con el RM.</div>';
 
   document.getElementById('salida').innerHTML=h;
+}
+/* ---------- corrección manual de celdas ---------- */
+function textoADec(txt){
+  txt=(txt||'').trim().replace(/[^\d\/ .]/g,'').replace(/\s+/g,' ');
+  if(!txt) return null;
+  var tot=0, ps=txt.split(' ');
+  for(var i=0;i<ps.length;i++){
+    var p=ps[i];
+    if(/^\d+\/\d+$/.test(p)){ var ab=p.split('/'); if(+ab[1]===0) return null; tot+=(+ab[0])/(+ab[1]); }
+    else if(/^\d+(\.\d+)?$/.test(p)) tot+=parseFloat(p);
+    else return null;
+  }
+  return tot;
+}
+function editar(td){
+  if(td.querySelector('input')) return;
+  var fi=+td.dataset.f, col=td.dataset.c;
+  var actual=TABLA.filas[fi].vals[col];
+  var val = actual ? actual.txt : '';
+  td.innerHTML='<input class="cel" value="'+String(val).replace(/[?"]/g,'')+'">';
+  var inp=td.querySelector('input');
+  inp.focus(); inp.select();
+  function cerrar(guardar){
+    var txt=inp.value.trim();
+    if(guardar){
+      if(!txt){ TABLA.filas[fi].vals[col]=null; }
+      else{
+        var d=textoADec(txt);
+        TABLA.filas[fi].vals[col] = { txt:txt, dec:d };
+        TABLA.filas[fi].corr = TABLA.filas[fi].corr || {};
+        TABLA.filas[fi].corr[col] = true;
+      }
+      recontar(fi);
+    }
+    pintar(TODAS[IDX] ? TODAS[IDX].pagina : 1, TOTALPAG);
+  }
+  inp.addEventListener('keydown',function(e){
+    if(e.key==='Enter'){ e.preventDefault(); cerrar(true); }
+    if(e.key==='Escape'){ e.preventDefault(); cerrar(false); }
+  });
+  inp.addEventListener('blur', function(){ cerrar(true); });
+}
+function recontar(fi){
+  var f=TABLA.filas[fi], vac=0, ile=0;
+  TABLA.orden.forEach(function(c){
+    var v=f.vals[c];
+    if(!v){ if(c!=='TOL') vac++; return; }
+    if(v.dec===null) ile++;
+  });
+  f.vacias=vac; f.ilegibles=ile;
 }
 function dato(l,v){ return '<div><span>'+l+':</span> <b>'+(v||'—')+'</b></div>'; }
 function confirmar(){
