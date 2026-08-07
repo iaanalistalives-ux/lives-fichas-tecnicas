@@ -520,8 +520,9 @@ function verFicha(){
       document.getElementById('vbody').innerHTML='<div class="vmsg">'+((r&&r.error)||'No se pudo abrir.')+'</div>';
       return;
     }
+    var prev = r.preview || ('https://drive.google.com/file/d/'+FICHA.id+'/preview');
     document.getElementById('vbody').innerHTML=
-      '<iframe src="'+r.preview+'" allow="autoplay" referrerpolicy="no-referrer"></iframe>';
+      '<iframe src="'+prev+'" allow="autoplay" referrerpolicy="no-referrer"></iframe>';
   });
 }
 function cerrarVisor(){
