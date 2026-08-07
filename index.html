@@ -797,12 +797,16 @@ function abrir(id,archivo,tipo,grupo,estilo){
                '<button class="btn" onclick="cerrarVisor()">Volver</button>');
       return;
     }
+    // si el script aún no está actualizado, el enlace se arma aquí
+    var prev = r.preview || ('https://drive.google.com/file/d/'+id+'/preview');
+    var ver  = r.ver     || ('https://drive.google.com/file/d/'+id+'/view');
+    var des  = r.descarga|| ('https://drive.google.com/uc?export=download&id='+id);
     var d=document.getElementById('vdesc');
-    if(d){ d.href=r.descarga; d.removeAttribute('download'); d.target='_blank'; d.style.display='inline-block'; }
+    if(d){ d.href=des; d.removeAttribute('download'); d.target='_blank'; d.style.display='inline-block'; }
     var a=document.getElementById('vabrir');
-    if(a){ a.href=r.ver; a.style.display='inline-block'; }
+    if(a){ a.href=ver; a.style.display='inline-block'; }
     document.getElementById('vbody').innerHTML=
-      '<iframe src="'+r.preview+'" allow="autoplay" referrerpolicy="no-referrer"></iframe>';
+      '<iframe src="'+prev+'" allow="autoplay" referrerpolicy="no-referrer"></iframe>';
   });
 }
 function cerrarVisor(){
