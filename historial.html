@@ -88,23 +88,23 @@ input.txt:focus,select.txt:focus{outline:none;border-color:var(--sage);}
   .leyenda{ font-size:9px; }
   .firmas{ display:flex!important; }
   .soloweb{ display:none!important; }
-  #visor,#acceso{ display:none!important; }
+  #acceso{ display:none!important; }
 }
 .firmas{display:none;gap:40px;margin-top:26px;padding-top:6px;}
 .firmas div{flex:1;border-top:1px solid #666;padding-top:5px;font-size:10px;color:#333;text-align:center;}
 
 /* ---- visor de la ficha ---- */
-#visor{position:fixed;inset:0;background:#1c2320;z-index:200;display:none;flex-direction:column;}
-#visor .vtop{background:var(--petrol);color:#fff;padding:9px 14px;display:flex;align-items:center;gap:9px;border-bottom:2px solid var(--emer);}
-#visor .vtit{font-size:13px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-#visor .vtop button{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.35);color:#fff;font-family:inherit;font-size:12.5px;font-weight:700;border-radius:6px;padding:7px 13px;cursor:pointer;}
-#visor .vtop button.cerrar{background:#fff;color:var(--petrol);border-color:#fff;}
-#visor .vbody{flex:1;position:relative;background:#2b3532;overflow:hidden;}
-#visor iframe{width:100%;height:100%;border:none;background:#fff;display:block;}
 
 
 
-#visor .vmsg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#F1F6F4;font-size:14px;text-align:center;padding:24px;}
+
+
+
+
+
+
+
+
 
 /* ---- ficha de detalle ---- */
 #det{position:fixed;inset:0;background:var(--warm-light);z-index:60;display:none;overflow-y:auto;}
@@ -207,12 +207,7 @@ td.nada{color:#C8D3CF;}
   <div class="cuerpo" id="dCuerpo"></div>
 </div>
 
-<div id="visor">
-  <div class="vtop">
-    <div class="vtit" id="vtit">Ficha</div>
-    <button class="cerrar" onclick="cerrarVisor()">Cerrar</button>
-  </div>
-  <div class="vbody" id="vbody"></div>
+
 </div>
 
 <script>
@@ -506,28 +501,14 @@ function pintarDetalle(m){
 }
 function imprimir(){ window.print(); }
 
-/* ---------- visor de la ficha (visor de Drive) ---------- */
+/* ---------- ver ficha: se abre en Drive ---------- */
 var FICHA=null;
 function verFicha(){
   if(!FICHA || !FICHA.id){ alert('Esta medición no tiene la ficha asociada.'); return; }
-  document.getElementById('vtit').textContent=FICHA.nombre||'Ficha';
-  document.getElementById('vbody').innerHTML='<div class="vmsg">Abriendo la ficha…</div>';
-  document.getElementById('visor').style.display='flex';
+  window.open('https://drive.google.com/file/d/'+FICHA.id+'/view', '_blank', 'noopener');
   jsonp('accion=archivo&clave='+encodeURIComponent(SES.clave)+'&id='+encodeURIComponent(FICHA.id)+
         '&auditora='+encodeURIComponent(SES.nombre||'')+'&taller='+encodeURIComponent(SES.area||'CONSULTA')+
-        '&estilo='+encodeURIComponent(FICHA.estilo||''), function(r){
-    if(!r || !r.ok){
-      document.getElementById('vbody').innerHTML='<div class="vmsg">'+((r&&r.error)||'No se pudo abrir.')+'</div>';
-      return;
-    }
-    var prev = r.preview || ('https://drive.google.com/file/d/'+FICHA.id+'/preview');
-    document.getElementById('vbody').innerHTML=
-      '<iframe src="'+prev+'" allow="autoplay" referrerpolicy="no-referrer"></iframe>';
-  });
-}
-function cerrarVisor(){
-  document.getElementById('visor').style.display='none';
-  document.getElementById('vbody').innerHTML='';
+        '&estilo='+encodeURIComponent(FICHA.estilo||''), function(){});
 }
 
 function dato(l,v){ return '<div><span>'+l+':</span> <b>'+(v||'—')+'</b></div>'; }
