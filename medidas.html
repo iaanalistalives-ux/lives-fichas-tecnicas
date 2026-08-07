@@ -73,17 +73,43 @@ input.txt:focus{outline:none;border-color:var(--sage);}
 .pt-item.mal .val{color:var(--rose);}
 .pt-item .val small{display:block;font-size:11px;font-weight:600;color:var(--stone);}
 
+/* ---- despliegue dentro de la fila ---- */
+.pt-item{transition:none;}
+.pt-item.abierto{border-left-color:var(--sage);background:#F7FBFA;}
+.panelPunto{background:#fff;border:1px solid var(--sage);border-top:none;border-radius:0 0 8px 8px;
+            padding:14px;margin:-9px 0 9px;}
+.panelPunto .espLinea{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
+            padding-bottom:10px;margin-bottom:12px;border-bottom:1px solid var(--warm);}
+.panelPunto .espVal{font-size:26px;font-weight:800;color:var(--sage);line-height:1;}
+.panelPunto .espTol{font-size:12.5px;color:var(--stone);}
+.exacto{width:100%;background:var(--emer);color:#04231F;border:none;border-radius:10px;padding:15px;
+        font-family:inherit;font-size:17px;font-weight:800;cursor:pointer;margin-bottom:12px;letter-spacing:.4px;}
+.exacto:active{background:#0BA36F;}
+.signo{display:flex;gap:10px;margin-bottom:9px;}
+.signo button{flex:1;background:#fff;border:2px solid var(--warm);border-radius:10px;padding:12px;
+        font-family:inherit;font-size:16px;font-weight:800;color:var(--stone);cursor:pointer;}
+.signo button.on{border-color:var(--sage);background:var(--sage);color:#fff;}
+.fracs{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:10px;}
+.fracs button{background:#fff;border:1.5px solid var(--warm);border-radius:10px;padding:13px 3px;
+        font-family:inherit;font-size:16px;font-weight:800;color:#333;cursor:pointer;}
+.fracs button.on{border-color:var(--sage);background:var(--sage);color:#fff;}
+.otro{display:flex;gap:8px;align-items:center;margin-bottom:10px;}
+.otro input{flex:1;font-family:inherit;font-size:16px;padding:10px;border:1.5px solid var(--warm);
+        border-radius:8px;text-align:center;}
+.otro input:focus{outline:none;border-color:var(--sage);}
+.otro span{font-size:11px;color:var(--stone);}
+
 /* ---- captura ---- */
-#cap{position:fixed;inset:0;background:var(--warm-light);z-index:60;display:none;flex-direction:column;}
-#cap .top{background:var(--petrol);color:#fff;padding:12px 14px;display:flex;align-items:center;gap:10px;}
-#cap .top .c{font-size:22px;font-weight:800;}
-#cap .top .d{font-size:11.5px;color:#CFE5DE;flex:1;min-width:0;overflow-wrap:anywhere;}
-#cap .top button{background:#fff;color:var(--petrol);border:none;font-family:inherit;font-size:12.5px;font-weight:800;border-radius:6px;padding:8px 14px;cursor:pointer;}
-#cap .cuerpo{flex:1;overflow-y:auto;padding:18px 16px 16px;}
-.esperado{background:#fff;border:1px solid var(--warm);border-radius:10px;padding:16px;text-align:center;margin-bottom:14px;}
-.esperado .e1{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--stone);font-weight:700;}
-.esperado .e2{font-size:34px;font-weight:800;color:var(--sage);line-height:1.1;}
-.esperado .e3{font-size:12.5px;color:var(--stone);margin-top:3px;}
+
+
+
+
+
+
+
+
+
+
 .exacto{width:100%;background:var(--emer);color:#04231F;border:none;border-radius:10px;padding:16px;font-family:inherit;font-size:18px;font-weight:800;cursor:pointer;margin-bottom:14px;letter-spacing:.5px;}
 .exacto:active{background:#0BA36F;}
 .signo{display:flex;gap:10px;margin-bottom:10px;}
@@ -104,8 +130,8 @@ input.txt:focus{outline:none;border-color:var(--sage);}
 .accs .btn{flex:1;}
 
 /* ---- resumen ---- */
-#fin{position:fixed;inset:0;background:var(--warm-light);z-index:70;display:none;overflow-y:auto;}
-#fin .box{padding:16px 16px 40px;}
+
+
 .kpis{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
 .kpi{background:#fff;border:1px solid var(--warm);border-radius:8px;padding:13px 15px;flex:1;min-width:104px;}
 .kpi .v{font-size:26px;font-weight:800;color:var(--sage);line-height:1.1;}
@@ -190,47 +216,13 @@ input.txt:focus{outline:none;border-color:var(--sage);}
   </div>
   <div class="wrap">
     <div id="lista"></div>
-    <div class="pieacc">
-      <button class="btn full" onclick="terminar()">Terminar y ver resumen</button>
+    <div class="pieacc" id="pieacc">
+      <div id="finBox"></div>
     </div>
   </div>
 </div>
 
-<!-- ================= CAPTURA DE UN PUNTO ================= -->
-<div id="cap">
-  <div class="top">
-    <div class="c" id="capCod">A1</div>
-    <div class="d" id="capDesc"></div>
-    <button onclick="cerrarCap()">Cerrar</button>
-  </div>
-  <div class="cuerpo">
-    <div class="esperado">
-      <div class="e1">Medida esperada</div>
-      <div class="e2" id="capEsp">—</div>
-      <div class="e3" id="capTol">—</div>
-    </div>
-    <button class="exacto" onclick="exacto()">SIN DIFERENCIA &nbsp;—</button>
 
-    <div class="signo">
-      <button id="sgMenos" onclick="setSigno(-1)">− Menos</button>
-      <button id="sgMas" class="on" onclick="setSigno(1)">+ Más</button>
-    </div>
-    <div class="fracs" id="fracs"></div>
-    <div class="otro">
-      <input id="capInp" inputmode="numeric" placeholder="otra: 3 32" autocomplete="off">
-      <span>numerador<br>y denominador</span>
-    </div>
-
-    <div class="res neutro" id="capRes">Elige la diferencia</div>
-    <div class="accs">
-      <button class="btn ghost" onclick="cerrarCap()">Cancelar</button>
-      <button class="btn" id="btnGuardar" onclick="guardarPunto()" disabled>Guardar</button>
-    </div>
-  </div>
-</div>
-
-<!-- ================= RESUMEN ================= -->
-<div id="fin"><div class="box" id="finBox"></div></div>
 
 <script>
 /* ==========================================================
@@ -259,7 +251,11 @@ function error(m){
   var e=document.getElementById('err');
   e.style.display=m?'block':'none'; e.textContent=m||'';
 }
-function volverBuscador(){ location.href='index.html'; }
+function volverBuscador(){
+  // si venimos del buscador, volver por el historial es instantáneo
+  if(document.referrer && document.referrer.indexOf('index.html')>=0) history.back();
+  else location.href='index.html';
+}
 function txt(id, v){ var e=document.getElementById(id); if(e) e.textContent=v; }
 
 function params(){
@@ -289,7 +285,8 @@ function arrancar(){
     return;
   }
   txt('hsub', PAR.estilo+' · '+(PAR.grupo||''));
-  jsonp('accion=variantes&clave='+encodeURIComponent(SES.clave)+
+  // un solo viaje: variantes + tabla + historial
+  jsonp('accion=medir&clave='+encodeURIComponent(SES.clave)+
         '&estilo='+encodeURIComponent(PAR.estilo)+'&tipo='+encodeURIComponent(PAR.tipo), function(r){
     if(!r || !r.ok || !(r.variantes||[]).length){
       error('Todavía no hay tabla de medidas para este estilo.');
@@ -297,39 +294,37 @@ function arrancar(){
       return;
     }
     VARIANTES=r.variantes;
+    PRECARGA=r.espec||null;
+    pintarHistorial(r.mediciones||[]);
     pintarEtapas();
   });
-  cargarHistorial();
 }
+var PRECARGA=null;
 
 function verHistorial(){
   location.href='historial.html?estilo='+encodeURIComponent(PAR.estilo);
 }
-function cargarHistorial(){
-  jsonp('accion=mediciones&clave='+encodeURIComponent(SES.clave)+
-        '&estilo='+encodeURIComponent(PAR.estilo), function(r){
-    if(!r || !r.ok) return;
-    var ms=r.mediciones||[];
-    if(!ms.length) return;
-    document.getElementById('pHist').style.display='block';
-    var rech=ms.filter(function(m){ return m.resultado==='RECHAZADO'; }).length;
-    txt('histTit','Medido '+ms.length+' vez/veces antes'+(rech? ' · '+rech+' rechazada(s)':''));
-    document.getElementById('histLista').innerHTML = ms.slice(0,6).map(function(m){
-      return '<div class="hrow"><div class="hinf"><b>'+(m.auditora||'—')+'</b> · '+(m.taller||'—')+
-             '<br>'+String(m.fecha).slice(0,16)+' · '+(m.color||'—')+
-             ' · '+m.nMedidas+' medidas'+(m.nFuera>0? ' · <b style="color:var(--rose);">'+m.nFuera+' fuera</b>':'')+
-             '</div><div class="hres '+(m.resultado==='RECHAZADO'?'re':'ap')+'">'+(m.resultado||'—')+'</div></div>';
-    }).join('') + (ms.length>6 ? '<div style="font-size:11.5px;color:var(--stone);margin-top:8px;">y '+(ms.length-6)+' más…</div>' : '');
-  });
+function pintarHistorial(ms){
+  if(!ms || !ms.length) return;
+  document.getElementById('pHist').style.display='block';
+  var rech=ms.filter(function(m){ return m.resultado==='RECHAZADO'; }).length;
+  txt('histTit','Medido '+ms.length+' vez/veces antes'+(rech? ' · '+rech+' rechazada(s)':''));
+  document.getElementById('histLista').innerHTML = ms.slice(0,6).map(function(m){
+    return '<div class="hrow"><div class="hinf"><b>'+(m.auditora||'—')+'</b> · '+(m.taller||'—')+
+           '<br>'+String(m.fecha).slice(0,16)+' · '+(m.color||'—')+
+           ' · '+m.nMedidas+' medidas'+(m.nFuera>0? ' · <b style="color:var(--rose);">'+m.nFuera+' fuera</b>':'')+
+           '</div><div class="hres '+(m.resultado==='RECHAZADO'?'re':'ap')+'">'+(m.resultado||'—')+'</div></div>';
+  }).join('') + (ms.length>6 ? '<div style="font-size:11.5px;color:var(--stone);margin-top:8px;">y '+(ms.length-6)+' más…</div>' : '');
 }
 
+/* ---------- fracciones ---------- */
+/* ---------- etapa y combo ---------- */
 var VARIANTES=[], ETAPA='', COMBO='';
 var NOM_ETAPA={ TERMINADA:'Prenda terminada', ANTES_VAPOR:'Antes de vapor', CORTE:'Corte' };
 
 function pintarEtapas(){
   var etapas=[];
   VARIANTES.forEach(function(v){ if(etapas.indexOf(v.etapa)<0) etapas.push(v.etapa); });
-  // solo se fija el valor por defecto la primera vez
   if(!ETAPA || etapas.indexOf(ETAPA)<0)
     ETAPA = etapas.indexOf('TERMINADA')>=0 ? 'TERMINADA' : etapas[0];
   if(etapas.length>1){
@@ -364,13 +359,21 @@ function pintarCombos(){
 function elegirCombo(c){ COMBO=c; pintarCombos(); }
 
 function cargarEspec(){
+  if(PRECARGA && PRECARGA.etapa===ETAPA && String(PRECARGA.combo||'')===String(COMBO||'')){
+    var p=PRECARGA; PRECARGA=null;
+    aplicarEspec(p); return;                 // ya venía en la primera respuesta
+  }
   txt('fichaTit','Cargando tabla…');
   jsonp('accion=espec&clave='+encodeURIComponent(SES.clave)+
         '&estilo='+encodeURIComponent(PAR.estilo)+'&tipo='+encodeURIComponent(PAR.tipo)+
         '&etapa='+encodeURIComponent(ETAPA)+'&combo='+encodeURIComponent(COMBO), function(r){
     if(!r || !r.ok || !r.espec){ error('No se pudo cargar la tabla.'); return; }
+    aplicarEspec(r.espec);
+  });
+}
+function aplicarEspec(espec){
     error('');
-    ESPEC=r.espec;
+    ESPEC=espec;
     F={ nombre:(PAR.grupo||'')+' · '+PAR.estilo,
         tipo: ESPEC.tipo==='CORTE' ? 'HOJA DE CORTE' : 'PRENDA TERMINADA',
         desc: ESPEC.archivo||'',
@@ -382,11 +385,7 @@ function cargarEspec(){
     txt('fichaInfo',
       (NOM_ETAPA[ESPEC.etapa]||F.tipo)+(ESPEC.combo?' · '+ESPEC.combo:'')+
       ' · '+F.puntos.length+' puntos · tallas '+F.tallas.join(', '));
-  });
 }
-
-var F=null, COLOR='', PRENDAS={};
-var TACT='', PACT=1, DATOS={}, PUNTO=null;
 
 /* ---------- fracciones ---------- */
 function aFrac(dec){
@@ -498,26 +497,78 @@ function pintarLista(){
     var d=DATOS[clave(t,PACT,p[0])];
     var esp=p[2][col], tol=p[3];
     var cls = d ? (d.ok?'ok':'mal') : '';
-    h+='<div class="pt-item '+cls+'" onclick="abrirPunto('+i+')">'+
+    if(i===PUNTO) cls+=' abierto';
+    h+='<div class="pt-item '+cls+'" onclick="tocarPunto('+i+')">'+
        '<div class="cod">'+p[0]+'</div><div class="info">'+
        (p[1]?'<div class="desc">'+p[1]+'</div>':'')+
        '<div class="esp">Esp. '+aFrac(esp)+' &nbsp;±'+aFrac(tol)+'</div></div>'+
        '<div class="val">'+(d? d.txtDif+'<small>'+aFrac(d.val)+'</small>' : '<small>medir</small>')+'</div>'+
        '</div>';
+    if(i===PUNTO) h+=panelPunto(i, esp, tol);
   });
   document.getElementById('lista').innerHTML=h;
+  if(PUNTO!==null) pintarFracs();
+  pintarResumen();
 }
 
-/* ---------- captura de un punto (se registra la DIFERENCIA) ---------- */
+/* ---------- panel que se despliega dentro de la lista ---------- */
+function panelPunto(i, esp, tol){
+  return '<div class="panelPunto" onclick="event.stopPropagation();">'+
+    '<div class="espLinea"><span class="espVal">'+aFrac(esp)+'</span>'+
+    '<span class="espTol">tolerancia ± '+aFrac(tol)+'</span></div>'+
+    '<button class="exacto" onclick="exacto()">SIN DIFERENCIA &nbsp;—</button>'+
+    '<div class="signo">'+
+      '<button id="sgMenos" onclick="setSigno(-1)">− Menos</button>'+
+      '<button id="sgMas" onclick="setSigno(1)">+ Más</button>'+
+    '</div>'+
+    '<div class="fracs" id="fracs"></div>'+
+    '<div class="otro"><input id="capInp" inputmode="numeric" placeholder="otra: 3 32" autocomplete="off">'+
+    '<span>numerador<br>y denominador</span></div>'+
+    '<div class="res neutro" id="capRes">Elige la diferencia</div>'+
+    '<div class="accs">'+
+      '<button class="btn ghost" onclick="cerrarPunto()">Cerrar</button>'+
+      '<button class="btn" id="btnGuardar" onclick="guardarPunto()" disabled>Guardar</button>'+
+    '</div></div>';
+}
+
 var FRACS=[[1,16],[1,8],[3,16],[1,4],[5,16],[3,8],[1,2],[5,8],[3,4],[7,8],[1,1],[0,0]];
-var SIGNO=1, DIF=null;
+var SIGNO=1, DIF=null, PUNTO=null;
 
 function pintarFracs(){
-  document.getElementById('fracs').innerHTML = FRACS.map(function(f,i){
+  var caja=document.getElementById('fracs');
+  if(!caja) return;
+  caja.innerHTML = FRACS.map(function(f,i){
     if(f[1]===0) return '<button data-i="'+i+'" onclick="elegirFrac('+i+')" style="font-size:13px;">otra</button>';
     var t = f[1]===1 ? ''+f[0] : f[0]+'/'+f[1];
     return '<button data-i="'+i+'" onclick="elegirFrac('+i+')">'+t+'</button>';
   }).join('');
+  setSigno(SIGNO);
+  var inp=document.getElementById('capInp');
+  if(inp){
+    inp.addEventListener('input', function(e){
+      e.target.value=e.target.value.replace(/[^\d ]/g,'').replace(/\s{2,}/g,' ');
+      var ps=e.target.value.trim().split(/\s+/).filter(Boolean).map(Number);
+      if(ps.length===2 && ps[1]) DIF=ps[0]/ps[1];
+      else if(ps.length===1) DIF=ps[0];
+      else if(ps.length===3 && ps[2]) DIF=ps[0]+ps[1]/ps[2];
+      else DIF=null;
+      if(e.target.value) marcarFrac(FRACS.length-1);
+      evaluar();
+    });
+    inp.addEventListener('keydown', function(e){
+      if(e.key==='Enter'){ e.preventDefault(); guardarPunto(); }
+    });
+  }
+  // si el punto ya estaba medido, se muestra su valor
+  var d=DATOS[clave(TACT,PACT,F.puntos[PUNTO][0])];
+  if(d){
+    SIGNO = d.dif<0 ? -1 : 1; setSigno(SIGNO);
+    DIF = Math.abs(d.dif);
+    var idx=-1;
+    FRACS.forEach(function(f,k){ if(f[1] && Math.abs(f[0]/f[1]-DIF)<1e-9) idx=k; });
+    if(idx>=0) marcarFrac(idx);
+  }
+  evaluar();
 }
 function marcarFrac(i){
   Array.prototype.forEach.call(document.querySelectorAll('#fracs button'),function(b){
@@ -526,74 +577,45 @@ function marcarFrac(i){
 }
 function elegirFrac(i){
   var f=FRACS[i];
-  if(f[1]===0){ marcarFrac(i); DIF=null; document.getElementById('capInp').focus(); evaluar(); return; }
-  document.getElementById('capInp').value='';
-  DIF = f[0]/f[1];
-  marcarFrac(i); evaluar();
+  if(f[1]===0){ marcarFrac(i); DIF=null; var e=document.getElementById('capInp'); if(e) e.focus(); evaluar(); return; }
+  var inp=document.getElementById('capInp'); if(inp) inp.value='';
+  DIF=f[0]/f[1]; marcarFrac(i); evaluar();
 }
 function setSigno(s){
   SIGNO=s;
-  document.getElementById('sgMas').classList.toggle('on', s===1);
-  document.getElementById('sgMenos').classList.toggle('on', s===-1);
+  var a=document.getElementById('sgMas'), b=document.getElementById('sgMenos');
+  if(a) a.classList.toggle('on', s===1);
+  if(b) b.classList.toggle('on', s===-1);
   evaluar();
 }
 
-function abrirPunto(i){
-  PUNTO=i;
-  var p=F.puntos[i], t=TACT, col=F.tallas.indexOf(t);
-  document.getElementById('capCod').textContent=p[0];
-  document.getElementById('capDesc').textContent=p[1]||('Talla '+t+' · Prenda '+PACT);
-  document.getElementById('capEsp').textContent=aFrac(p[2][col]);
-  document.getElementById('capTol').textContent='Tolerancia ± '+aFrac(p[3]);
-  DIF=null; SIGNO=1; setSigno(1);
-  document.getElementById('capInp').value='';
-  pintarFracs();
-  var prev=DATOS[clave(t,PACT,p[0])];
-  if(prev){
-    SIGNO = prev.dif<0 ? -1 : 1; setSigno(SIGNO);
-    DIF = Math.abs(prev.dif);
-    var idx=-1;
-    FRACS.forEach(function(f,k){ if(f[1] && Math.abs(f[0]/f[1]-DIF)<1e-9) idx=k; });
-    if(idx>=0) marcarFrac(idx);
-    else document.getElementById('capInp').value = prev.txtDif.replace(/[+\-\/]/g,' ').trim();
-  }
-  document.getElementById('cap').style.display='flex';
-  evaluar();
+function tocarPunto(i){
+  if(PUNTO===i){ cerrarPunto(); return; }
+  PUNTO=i; DIF=null; SIGNO=1;
+  pintarLista();
+  setTimeout(function(){
+    var el=document.querySelectorAll('#lista .pt-item')[i];
+    if(el) el.scrollIntoView({block:'start', behavior:'smooth'});
+  },40);
 }
-function cerrarCap(){ document.getElementById('cap').style.display='none'; PUNTO=null; }
-
-document.getElementById('capInp').addEventListener('input', function(e){
-  e.target.value = e.target.value.replace(/[^\d ]/g,'').replace(/\s{2,}/g,' ');
-  var ps=e.target.value.trim().split(/\s+/).filter(Boolean).map(Number);
-  if(ps.length===2 && ps[1]) DIF=ps[0]/ps[1];
-  else if(ps.length===1) DIF=ps[0];
-  else if(ps.length===3 && ps[2]) DIF=ps[0]+ps[1]/ps[2];
-  else DIF=null;
-  if(e.target.value) marcarFrac(FRACS.length-1);
-  evaluar();
-});
-document.getElementById('capInp').addEventListener('keydown', function(e){
-  if(e.key==='Enter'){ e.preventDefault(); guardarPunto(); }
-});
+function cerrarPunto(){ PUNTO=null; DIF=null; pintarLista(); }
 
 function evaluar(){
   if(PUNTO===null) return;
   var p=F.puntos[PUNTO], tol=p[3];
   var res=document.getElementById('capRes'), bg=document.getElementById('btnGuardar');
+  if(!res||!bg) return;
   if(DIF===null || isNaN(DIF)){
     res.className='res neutro'; res.textContent='Elige la diferencia';
     bg.disabled=true; return;
   }
   var d=SIGNO*DIF, ok=Math.abs(d)<=tol+1e-9;
   res.className='res '+(ok?'ok':'mal');
-  res.textContent = (ok?'Dentro de tolerancia  ·  ':'FUERA DE TOLERANCIA  ·  ')+
-                    (d>=0?'+':'−')+aFrac(Math.abs(d));
+  res.textContent=(ok?'Dentro de tolerancia  ·  ':'FUERA DE TOLERANCIA  ·  ')+
+                  (d>=0?'+':'−')+aFrac(Math.abs(d));
   bg.disabled=false;
 }
-function exacto(){
-  if(PUNTO===null) return;
-  registrar(0, '—', true);
-}
+function exacto(){ if(PUNTO!==null) registrar(0,'—',true); }
 function guardarPunto(){
   if(DIF===null || isNaN(DIF)) return;
   var d=SIGNO*DIF, p=F.puntos[PUNTO];
@@ -603,16 +625,16 @@ function registrar(dif, txtDif, ok){
   var p=F.puntos[PUNTO], t=TACT, col=F.tallas.indexOf(t);
   DATOS[clave(t,PACT,p[0])] = {dif:dif, txtDif:txtDif, ok:ok,
       esp:p[2][col], val:p[2][col]+dif, tol:p[3], cod:p[0], talla:t, prenda:PACT};
-  var pos = PUNTO;
-  cerrarCap(); pintarSelectores(); pintarLista();
-  // vuelve a la lista y deja a la vista el punto recién registrado
+  var pos=PUNTO;
+  PUNTO=null; DIF=null;
+  pintarSelectores(); pintarLista();
   setTimeout(function(){
     var el=document.querySelectorAll('#lista .pt-item')[pos];
     if(el) el.scrollIntoView({block:'center', behavior:'smooth'});
-  },60);
+  },50);
 }
 
-/* ---------- resumen ---------- */
+/* ---------- resumen siempre visible al pie ---------- */
 function tallasMedidas(){
   return F.tallas.filter(function(t){
     for(var p=1;p<=(PRENDAS[t]||0);p++) if(medidasDe(t,p)>0) return true;
@@ -634,43 +656,46 @@ function resumenTallas(){
     return t+': '+n+' prenda'+(n>1?'s':'');
   }).join('  ·  ');
 }
-function terminar(){
+
+function pintarResumen(){
+  var caja=document.getElementById('finBox');
+  if(!caja) return;
   var todos=Object.keys(DATOS).map(function(k){ return DATOS[k]; });
-  if(!todos.length){ alert('Todavía no has registrado ninguna medida.'); return; }
+  if(!todos.length){
+    caja.innerHTML='<div class="note" style="margin:0;">Toca un punto de la lista para registrar su diferencia. '+
+      'El resumen aparecerá aquí conforme vayas midiendo.</div>';
+    return;
+  }
   var fuera=todos.filter(function(d){ return !d.ok; });
-  var h='';
-  h+='<div class="sectitle">Resumen de la auditoría</div>';
-  h+='<div class="kpis">'+
-     '<div class="kpi"><div class="v">'+todos.length+'</div><div class="l">Medidas tomadas</div></div>'+
-     '<div class="kpi'+(fuera.length?' mal':'')+'"><div class="v">'+fuera.length+'</div><div class="l">Fuera de tolerancia</div></div>'+
-     '<div class="kpi"><div class="v">'+nPrendasMedidas()+'</div><div class="l">Prendas medidas</div></div>'+
-     '</div>';
-  h+='<div class="panel"><div class="pt">'+F.nombre+'</div>'+
-     '<div class="ph">'+F.tipo+' · Color: '+COLOR+' · '+resumenTallas()+'</div></div>';
+  var h='<div class="sectitle">Resumen</div>'+
+    '<div class="kpis">'+
+    '<div class="kpi"><div class="v">'+todos.length+'</div><div class="l">Medidas tomadas</div></div>'+
+    '<div class="kpi'+(fuera.length?' mal':'')+'"><div class="v">'+fuera.length+'</div><div class="l">Fuera de tolerancia</div></div>'+
+    '<div class="kpi"><div class="v">'+nPrendasMedidas()+'</div><div class="l">Prendas medidas</div></div>'+
+    '</div>'+
+    '<div class="panel"><div class="ph" style="margin:0;">'+resumenTallas()+'  ·  Color: '+COLOR+'</div></div>';
 
   if(fuera.length){
-    h+='<div class="sectitle">Medidas fuera de tolerancia</div>';
-    fuera.sort(function(a,b){ return a.talla===b.talla ? (a.prenda-b.prenda) : (a.talla>b.talla?1:-1); });
-    fuera.forEach(function(d){
-      h+='<div class="fuera">Talla <b>'+d.talla+'</b> · Prenda '+d.prenda+' · Punto <b>'+d.cod+'</b><br>'+
-         'Diferencia <b>'+d.txtDif+'</b> — tolerancia ± '+aFrac(d.tol)+
-         ' (esperado '+aFrac(d.esp)+', real '+aFrac(d.val)+')</div>';
+    h+='<div class="sectitle">Fuera de tolerancia</div>';
+    fuera.slice().sort(function(a,b){
+      return a.talla===b.talla ? (a.prenda-b.prenda) : (a.talla>b.talla?1:-1);
+    }).forEach(function(d){
+      h+='<div class="fuera">Talla <b>'+d.talla+'</b> · Prenda '+d.prenda+' · Punto <b>'+d.cod+'</b> — '+
+         'diferencia <b>'+d.txtDif+'</b> (tolerancia ± '+aFrac(d.tol)+')</div>';
     });
-  }else if(todos.length){
-    h+='<div class="panel" style="border-left:4px solid var(--emer);"><div class="pt" style="color:var(--sage);">Todas las medidas dentro de tolerancia</div></div>';
+  }else{
+    h+='<div class="panel" style="border-left:4px solid var(--emer);"><div class="pt" style="color:var(--sage);font-size:14px;">'+
+       'Todas las medidas dentro de tolerancia</div></div>';
   }
 
-  h+='<div class="sectitle">Decisión</div>'+
-     '<div class="panel"><div class="ph">La decisión es tuya. El sistema no aprueba ni rechaza solo.</div>'+
-     '<div class="accs"><button class="btn" onclick="decidir(\'APROBADO\')">Aprobar</button>'+
-     '<button class="btn rojo" onclick="decidir(\'RECHAZADO\')">Rechazar</button></div></div>';
-  h+='<div class="note">Prototipo: al decidir no se guarda nada todavía.</div>'+
-     '<button class="btn ghost full" style="margin-top:10px;" onclick="volverMedir()">Volver a medir</button>';
-
-  document.getElementById('finBox').innerHTML=h;
-  document.getElementById('fin').style.display='block';
+  h+='<div class="sectitle">Guardar auditoría</div>'+
+     '<div class="panel"><div class="ph">Puedes seguir midiendo. Guarda cuando termines.</div>'+
+     '<div class="accs"><button class="btn" onclick="decidir(\'APROBADO\')">Aprobar y guardar</button>'+
+     '<button class="btn rojo" onclick="decidir(\'RECHAZADO\')">Rechazar y guardar</button></div>'+
+     '<div id="avisoGuardar"></div></div>';
+  caja.innerHTML=h;
 }
-function volverMedir(){ document.getElementById('fin').style.display='none'; }
+
 function decidir(r){
   var det=Object.keys(DATOS).map(function(k){
     var d=DATOS[k];
@@ -678,6 +703,8 @@ function decidir(r){
              esp:d.esp, real:d.val, tol:d.tol, ok:d.ok };
   });
   if(!det.length){ alert('No hay medidas registradas.'); return; }
+  if(!confirm('¿Guardar esta auditoría como '+r+'?\n\n'+det.length+' medidas · '+
+      det.filter(function(x){return !x.ok;}).length+' fuera de tolerancia')) return;
 
   var prendas={};
   F.tallas.forEach(function(t){
@@ -688,10 +715,7 @@ function decidir(r){
 
   var btns=document.querySelectorAll('#finBox .accs .btn');
   Array.prototype.forEach.call(btns,function(b){ b.disabled=true; });
-  var caja=document.getElementById('finBox');
-  var av=document.createElement('div');
-  av.className='ok'; av.textContent='Guardando…';
-  caja.insertBefore(av, caja.firstChild);
+  document.getElementById('avisoGuardar').innerHTML='<div class="ok" style="margin-top:12px;">Guardando…</div>';
 
   post({ accion:'guardarMedicion',
          cab:{ estilo:PAR.estilo, grupo:PAR.grupo||ESPEC.grupo||'', tipo:ESPEC.tipo,
@@ -702,18 +726,20 @@ function decidir(r){
          det: det },
     function(res){
       if(!res || !res.ok){
-        av.style.background='#FBE9E9'; av.style.borderColor='#DC2626'; av.style.color='#991B1B';
-        av.textContent='No se pudo guardar: '+((res&&res.error)||'sin conexión')+'. Intenta de nuevo.';
         Array.prototype.forEach.call(btns,function(b){ b.disabled=false; });
+        document.getElementById('avisoGuardar').innerHTML=
+          '<div class="err" style="display:block;margin-top:12px;">No se pudo guardar: '+
+          ((res&&res.error)||'sin conexión')+'. Intenta de nuevo.</div>';
         return;
       }
-      av.textContent='Auditoría guardada como '+r+'.';
-      caja.innerHTML='<div class="ok" style="font-size:16px;">Auditoría guardada como <b>'+r+'</b></div>'+
+      document.getElementById('medir').innerHTML=
+        '<div class="wrap"><div class="ok" style="font-size:16px;">Auditoría guardada como <b>'+r+'</b></div>'+
         '<div class="panel"><div class="pt">'+F.nombre+'</div><div class="ph">'+
-        det.length+' medidas · '+det.filter(function(x){return !x.ok;}).length+' fuera de tolerancia · '+
-        SES.auditora+' · '+SES.taller+'</div></div>'+
+        det.length+' medidas · '+det.filter(function(x){return !x.ok;}).length+
+        ' fuera de tolerancia · '+SES.auditora+' · '+SES.taller+'</div></div>'+
         '<button class="btn full" onclick="volverBuscador()">Volver al buscador</button>'+
-        '<button class="btn ghost full" style="margin-top:10px;" onclick="location.reload()">Medir otra vez este estilo</button>';
+        '<button class="btn ghost full" style="margin-top:10px;" onclick="location.reload()">Medir otra vez este estilo</button></div>';
+      window.scrollTo(0,0);
     });
 }
 
