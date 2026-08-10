@@ -62,9 +62,10 @@ input.txt:focus{outline:none;border-color:var(--sage);}
 
 /* ---- lista de puntos ---- */
 .pt-item{background:#fff;border:1px solid var(--warm);border-left:4px solid var(--warm);border-radius:8px;padding:11px 13px;margin-bottom:8px;display:flex;align-items:center;gap:12px;cursor:pointer;}
-.pt-item .cod{font-size:17px;font-weight:800;color:#333;min-width:42px;}
 .pt-item .info{flex:1;min-width:0;}
-.pt-item .desc{font-size:12px;color:var(--stone);overflow-wrap:anywhere;}
+.pt-item .nombre{font-size:14.5px;font-weight:700;color:#333;line-height:1.25;overflow-wrap:anywhere;}
+.pt-item .codmin{display:inline-block;font-size:10.5px;font-weight:800;color:var(--stone);
+  background:var(--warm-light);border:1px solid var(--warm);border-radius:4px;padding:1px 6px;margin-top:3px;}
 .pt-item .esp{font-size:13px;color:#333;font-weight:700;}
 .pt-item .val{font-size:16px;font-weight:800;min-width:64px;text-align:right;}
 .pt-item.ok{border-left-color:var(--emer);}
@@ -78,6 +79,9 @@ input.txt:focus{outline:none;border-color:var(--sage);}
 .pt-item.abierto{border-left-color:var(--sage);background:#F7FBFA;}
 .panelPunto{background:#fff;border:1px solid var(--sage);border-top:none;border-radius:0 0 8px 8px;
             padding:14px;margin:-9px 0 9px;}
+.panelPunto .tituloPunto{font-size:14px;font-weight:800;color:#333;margin-bottom:9px;overflow-wrap:anywhere;}
+.panelPunto .tituloPunto b{font-size:11px;color:var(--stone);background:var(--warm-light);
+  border:1px solid var(--warm);border-radius:4px;padding:1px 6px;margin-left:5px;}
 .panelPunto .espLinea{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
             padding-bottom:10px;margin-bottom:12px;border-bottom:1px solid var(--warm);}
 .panelPunto .espVal{font-size:26px;font-weight:800;color:var(--sage);line-height:1;}
@@ -191,7 +195,8 @@ input.txt:focus{outline:none;border-color:var(--sage);}
     </div>
 
     <span class="lbl">Color de la prenda</span>
-    <input class="txt" id="colorOtro" placeholder="Escribe el color">
+    <div class="pills" id="pColores" style="margin-bottom:8px;"></div>
+    <input class="txt" id="colorOtro" placeholder="Otro color (escríbelo)">
 
     <button class="btn full" style="margin-top:18px;" onclick="empezar()">Empezar a medir</button>
     <div style="font-size:11.5px;color:var(--stone);margin-top:10px;text-align:center;">
@@ -318,6 +323,10 @@ function pintarHistorial(ms){
 }
 
 /* ---------- fracciones ---------- */
+/* ---------- estado de la auditoría ---------- */
+var F=null, COLOR='', PRENDAS={};
+var TACT='', PACT=1, DATOS={};
+
 /* ---------- etapa y combo ---------- */
 var VARIANTES=[], ETAPA='', COMBO='';
 var NOM_ETAPA={ TERMINADA:'Prenda terminada', ANTES_VAPOR:'Antes de vapor', CORTE:'Corte' };
@@ -358,6 +367,46 @@ function pintarCombos(){
 }
 function elegirCombo(c){ COMBO=c; pintarCombos(); }
 
+/* De "OLYMPIC (PARTIDA: 25-721628 ) // ECLIPSE (PARTIDA: 25-721629 )"
+   se sacan los nombres de color para ofrecerlos como opciones.        */
+function coloresDeCombo(combo){
+  var t=String(combo||'');
+  if(/TODOS\s+LOS\s+COLORES/i.test(t)) return [];
+  return t.split(/\/\/|,|;/)
+    .map(function(x){
+      return x.replace(/\(([^)]*)\)/g,'')          // quita (PARTIDA: ...)
+              .replace(/PARTIDA[^\w]*[\w-]*/ig,'')
+              .replace(/\b[A-Z]{2,5}-?\d{2,4}\b/ig,'')     // códigos de grupo
+              .replace(/[-–—]{2,}/g,' ')                    // guiones sueltos
+              .replace(/^[\s\-–—]+|[\s\-–—]+$/g,'')
+              .replace(/\s+/g,' ').trim();
+    })
+    .filter(function(x){ return x && x.length>1 && x.length<28; })
+    .filter(function(v,i,s){ return s.indexOf(v)===i; });
+}
+function pintarColores(){
+  var caja=document.getElementById('pColores');
+  if(!caja) return;
+  // colores de todos los combos de la etapa elegida, no solo del activo
+  var lista=[];
+  VARIANTES.filter(function(v){ return v.etapa===ETAPA; }).forEach(function(v){
+    coloresDeCombo(v.combo).forEach(function(c){ if(lista.indexOf(c)<0) lista.push(c); });
+  });
+  coloresDeCombo(COMBO).forEach(function(c){ if(lista.indexOf(c)<0) lista.push(c); });
+  if(!lista.length){ caja.style.display='none'; return; }
+  caja.style.display='flex';
+  caja.innerHTML = lista.map(function(c){
+    return '<button class="pill'+(c===COLOR?' on':'')+'" onclick="elegirColor(this,\''+
+           String(c).replace(/'/g,"\\'")+'\')">'+c+'</button>';
+  }).join('');
+}
+function elegirColor(b,c){
+  Array.prototype.forEach.call(document.querySelectorAll('#pColores .pill'),function(x){x.classList.remove('on');});
+  b.classList.add('on');
+  COLOR=c;
+  document.getElementById('colorOtro').value='';
+}
+
 function cargarEspec(){
   if(PRECARGA && PRECARGA.etapa===ETAPA && String(PRECARGA.combo||'')===String(COMBO||'')){
     var p=PRECARGA; PRECARGA=null;
@@ -385,6 +434,7 @@ function aplicarEspec(espec){
     txt('fichaInfo',
       (NOM_ETAPA[ESPEC.etapa]||F.tipo)+(ESPEC.combo?' · '+ESPEC.combo:'')+
       ' · '+F.puntos.length+' puntos · tallas '+F.tallas.join(', '));
+    pintarColores();
 }
 
 /* ---------- fracciones ---------- */
@@ -421,8 +471,9 @@ function textoFrac(txt){
 
 function empezar(){
   if(!F){ alert('Todavía no se cargó la tabla de medidas.'); return; }
-  COLOR=document.getElementById('colorOtro').value.trim();
-  if(!COLOR){ alert('Escribe el color de la prenda.'); return; }
+  var otro=document.getElementById('colorOtro').value.trim();
+  if(otro) COLOR=otro;                       // lo escrito manda sobre el botón
+  if(!COLOR){ alert('Elige o escribe el color de la prenda.'); return; }
   DATOS={}; PRENDAS={};
   F.tallas.forEach(function(t){ PRENDAS[t]=1; });
   TACT=F.tallas[0]; PACT=1;
@@ -499,8 +550,9 @@ function pintarLista(){
     var cls = d ? (d.ok?'ok':'mal') : '';
     if(i===PUNTO) cls+=' abierto';
     h+='<div class="pt-item '+cls+'" onclick="tocarPunto('+i+')">'+
-       '<div class="cod">'+p[0]+'</div><div class="info">'+
-       (p[1]?'<div class="desc">'+p[1]+'</div>':'')+
+       '<div class="info">'+
+       (p[1] ? '<div class="nombre">'+p[1]+'</div><div class="codmin">'+p[0]+'</div>'
+             : '<div class="nombre">'+p[0]+'</div>')+
        '<div class="esp">Esp. '+aFrac(esp)+' &nbsp;±'+aFrac(tol)+'</div></div>'+
        '<div class="val">'+(d? d.txtDif+'<small>'+aFrac(d.val)+'</small>' : '<small>medir</small>')+'</div>'+
        '</div>';
@@ -513,7 +565,9 @@ function pintarLista(){
 
 /* ---------- panel que se despliega dentro de la lista ---------- */
 function panelPunto(i, esp, tol){
+  var p=F.puntos[i];
   return '<div class="panelPunto" onclick="event.stopPropagation();">'+
+    '<div class="tituloPunto">'+(p[1]||p[0])+(p[1]?' <b>'+p[0]+'</b>':'')+'</div>'+
     '<div class="espLinea"><span class="espVal">'+aFrac(esp)+'</span>'+
     '<span class="espTol">tolerancia ± '+aFrac(tol)+'</span></div>'+
     '<button class="exacto" onclick="exacto()">SIN DIFERENCIA &nbsp;—</button>'+
@@ -680,8 +734,11 @@ function pintarResumen(){
     fuera.slice().sort(function(a,b){
       return a.talla===b.talla ? (a.prenda-b.prenda) : (a.talla>b.talla?1:-1);
     }).forEach(function(d){
-      h+='<div class="fuera">Talla <b>'+d.talla+'</b> · Prenda '+d.prenda+' · Punto <b>'+d.cod+'</b> — '+
-         'diferencia <b>'+d.txtDif+'</b> (tolerancia ± '+aFrac(d.tol)+')</div>';
+      var pto=F.puntos.filter(function(x){ return x[0]===d.cod; })[0];
+      var nom=(pto && pto[1]) ? pto[1] : d.cod;
+      h+='<div class="fuera"><b>'+nom+'</b>'+(pto&&pto[1]?' <span style="color:var(--stone);">('+d.cod+')</span>':'')+
+         '<br>Talla '+d.talla+' · Prenda '+d.prenda+' — diferencia <b>'+d.txtDif+
+         '</b> (tolerancia ± '+aFrac(d.tol)+')</div>';
     });
   }else{
     h+='<div class="panel" style="border-left:4px solid var(--emer);"><div class="pt" style="color:var(--sage);font-size:14px;">'+
