@@ -762,7 +762,7 @@ function irTablas(){ location.href='tablas.html'; }
    ============================================================ */
 function abrir(id,archivo,tipo,grupo,estilo){
   // la pestaña se abre en el mismo toque para que el móvil no la bloquee
-  window.open('https://drive.google.com/file/d/'+id+'/view', '_blank', 'noopener');
+  window.open('https://drive.google.com/file/d/'+id+'/preview', '_blank', 'noopener');
   // el acceso queda registrado sin hacer esperar a nadie
   jsonp('accion=archivo&id='+encodeURIComponent(id)+'&'+ident()+
         '&tipo='+encodeURIComponent(tipo)+'&grupo='+encodeURIComponent(grupo)+
