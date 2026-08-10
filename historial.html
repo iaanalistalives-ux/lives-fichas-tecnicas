@@ -505,7 +505,7 @@ function imprimir(){ window.print(); }
 var FICHA=null;
 function verFicha(){
   if(!FICHA || !FICHA.id){ alert('Esta medición no tiene la ficha asociada.'); return; }
-  window.open('https://drive.google.com/file/d/'+FICHA.id+'/view', '_blank', 'noopener');
+  window.open('https://drive.google.com/file/d/'+FICHA.id+'/preview', '_blank', 'noopener');
   jsonp('accion=archivo&clave='+encodeURIComponent(SES.clave)+'&id='+encodeURIComponent(FICHA.id)+
         '&auditora='+encodeURIComponent(SES.nombre||'')+'&taller='+encodeURIComponent(SES.area||'CONSULTA')+
         '&estilo='+encodeURIComponent(FICHA.estilo||''), function(){});
