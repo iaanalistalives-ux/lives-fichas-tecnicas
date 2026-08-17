@@ -182,7 +182,7 @@ td.falta{color:var(--rose);font-weight:700;}
    no en el orden del texto: así no se confunde el último valor
    de una fila con la tolerancia.
    ========================================================== */
-var TALLAS = ['XS','S','M','L','XL','XXL','2XL','XXXL','3XL'];
+var TALLAS = ['XXS','XS','S','M','L','XL','XXL','2XL','XXXL','3XL','4XL','XXXXL'];
 var RE_FRAC = /^\d+\/\d+$/;
 var RE_ENT  = /^\d+$/;
 
@@ -258,6 +258,7 @@ function unir(pal){
 
 /* --- agrupar palabras en renglones por su altura --- */
 function renglones(pal, tolY){
+  tolY = tolY || 5;
   var cp = pal.slice().sort(function(a,b){ return (b.y-a.y) || (a.x0-b.x0); });
   var gr=[], act=[], base=null;
   cp.forEach(function(w){
@@ -276,25 +277,29 @@ function renglones(pal, tolY){
 function columnas(pal){
   var cols={}, yCab=null;
   // el encabezado de tallas es el renglón que contiene más etiquetas de talla
-  var rs = renglones(pal, 3);
+  var rs = renglones(pal, 5);
   var mejor=null, maxN=0;
   rs.forEach(function(r){
     var n=r.filter(function(w){ return TALLAS.indexOf(w.t.toUpperCase())>=0; }).length;
     if(n>maxN){ maxN=n; mejor=r; }
   });
   if(!mejor || maxN<3) return null;
+  // se toman solo las etiquetas de ESTE renglón: si la letra aparece
+  // también en otra parte de la página, no debe desplazar la columna
   mejor.forEach(function(w){
-    var t=w.t.toUpperCase();
+    var t=w.t.toUpperCase().replace(/[^A-Z0-9]/g,'');
     if(TALLAS.indexOf(t)>=0 && !(t in cols)) cols[t]=(w.x0+w.x1)/2;
-    if(/^TOL/i.test(w.t)) cols['TOL']=(w.x0+w.x1)/2;
+    if(/^TOL/i.test(w.t) && !('TOL' in cols)) cols['TOL']=(w.x0+w.x1)/2;
   });
   yCab = mejor[0].y;
-  // si TOL no estaba en el mismo renglón, buscarlo cerca
   if(!('TOL' in cols)){
+    var mejorTol=null, dmin=1e9;
     pal.forEach(function(w){
-      if(/^TOL/i.test(w.t) && Math.abs(w.y-yCab)<14 && !('TOL' in cols))
-        cols['TOL']=(w.x0+w.x1)/2;
+      if(!/^TOL/i.test(w.t)) return;
+      var d=Math.abs(w.y-yCab);
+      if(d<20 && d<dmin){ dmin=d; mejorTol=w; }
     });
+    if(mejorTol) cols['TOL']=(mejorTol.x0+mejorTol.x1)/2;
   }
   return {cols:cols, y:yCab};
 }
@@ -310,26 +315,40 @@ function leerPagina(page){
 
     var reCod = /^([A-Z]|[A-Z]\d{1,2})$/;
     var filas=[];
-    renglones(pal, 3).forEach(function(r){
+    renglones(pal, 5).forEach(function(r){
       if(!r.length || r[0].y >= yCab-2) return;   // solo debajo del encabezado
       var cod = r[0].t.trim().toUpperCase();
       if(!reCod.test(cod)) return;
       var u = unir(r.slice(1));
+      // margen: la mitad de la separación entre columnas (formatos con
+      // columnas vacías intercaladas tienen las tallas muy separadas)
+      var xs = orden.map(function(o){ return cols[o]; }).sort(function(a,b){return a-b;});
+      var sep = 26, x0col = xs[0];
+      if(xs.length>1){
+        var d=[]; for(var q=1;q<xs.length;q++) d.push(xs[q]-xs[q-1]);
+        d.sort(function(a,b){return a-b;});
+        // margen = mitad de la separación más estrecha: sirve igual con
+        // columnas juntas que con columnas vacías intercaladas
+        sep = Math.max(14, Math.min(95, d[0]*0.55));
+      }
       var celdas={}; orden.forEach(function(o){ celdas[o]=[]; });
       var desc=[];
       u.forEach(function(w){
         var t=w.t.trim();
         var cen=(w.x0+w.x1)/2;
         if(RE_FRAC.test(t)||RE_ENT.test(t)){
+          // los números a la izquierda de la primera talla son columnas
+          // auxiliares (Nº de piezas, % de encogimiento): se ignoran
+          if(cen < x0col-sep) return;
           var col=null, dmin=1e9;
           orden.forEach(function(o){
             var d=Math.abs(cols[o]-cen);
             if(d<dmin){ dmin=d; col=o; }
           });
-          if(col && dmin<=26){ celdas[col].push(t); return; }
+          if(col && dmin<=sep){ celdas[col].push(t); return; }
         }
         // texto a la izquierda de la primera talla = descripción
-        if(cen < cols[orden[0]]-18 && /[A-ZÁÉÍÓÚÑ]/i.test(t)) desc.push(t);
+        if(cen < cols[orden[0]]-sep*0.6 && /[A-ZÁÉÍÓÚÑ]/i.test(t)) desc.push(t);
       });
       var vals={}, vacias=0, ilegibles=0;
       orden.forEach(function(o){
@@ -339,6 +358,10 @@ function leerPagina(page){
         if(d===null) ilegibles++;
         vals[o]={txt:txt, dec:d};
       });
+      // un renglón con menos de dos tallas llenas es texto suelto, no una fila
+      var llenas=0;
+      orden.forEach(function(o){ if(o!=='TOL' && vals[o]) llenas++; });
+      if(llenas<2) return;
       filas.push({cod:cod, desc:desc.join(' ').replace(/\s+/g,' ').trim(),
                   vals:vals, vacias:vacias, ilegibles:ilegibles});
     });
@@ -371,6 +394,13 @@ function cabecera(texto){
   else if((m=t.match(/ESTILO\s*:?\s*([\s\S]{0,40})/i)) && reEst.test(m[1]))
       o.estilo=m[1].match(reEst).slice(1,3).join('-');
   else if((m=t.match(reEst))) o.estilo=m[1]+'-'+m[2];
+
+  // fecha del documento: decide cuál versión es la vigente
+  var mfe=t.match(/\b(\d{2})[\/\-](\d{2})[\/\-](\d{2,4})\b/);
+  if(mfe){
+    var yy=mfe[3].length===2 ? '20'+mfe[3] : mfe[3];
+    o.fechaFicha = yy+'-'+mfe[2]+'-'+mfe[1];
+  }
   if((m=t.match(/CLIENTE\s*:?\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ0-9 .&\/]{1,25})/i)))
       o.cliente=m[1].split(/[–—-]/)[0].replace(/\s+/g,' ').trim().toUpperCase();
   if((m=t.match(/COLOR\s*:?\s*([^\n\r]{2,60})/i)))
@@ -703,9 +733,13 @@ function extraerDe(arr, cb){
 }
 
 /* Guarda una tabla ya extraída. */
-function guardarTabla(tabla, cab, fileId, archivo, quien, cb){
+function guardarTabla(tabla, cab, fileId, archivo, quien, cb, titulo, pagina){
   if(!cab.estilo){ cb({ok:false, error:'Sin estilo'}); return; }
-  var estiloBase=String(cab.estilo).split('-')[0];
+  // 24754-3A -> estilo 24754, versión 3A. Una corrección llega como 3B
+  // y se guarda aparte, sin pisar las medidas de la versión anterior.
+  var partes=String(cab.estilo).split(/[-–—]/);
+  var estiloBase=partes[0].trim();
+  var version=(partes[1]||'').trim().toUpperCase();
   var tipo = cab.tipo==='CORTE' ? 'CORTE' : 'TECNICA';
   var tallas = tabla.orden.filter(function(c){ return c!=='TOL'; });
   var puntos = tabla.filas.map(function(f){
@@ -713,10 +747,14 @@ function guardarTabla(tabla, cab, fileId, archivo, quien, cb){
     tallas.forEach(function(t){ vals[t]= f.vals[t] ? f.vals[t].dec : null; });
     return { cod:f.cod, desc:f.desc||'', vals:vals, tol: f.vals['TOL'] ? f.vals['TOL'].dec : null };
   });
-  post({ accion:'guardarEspec', estilo:estiloBase, grupo:cab.grupo||'', tipo:tipo,
-         fileId:fileId||'', archivo:archivo||'', tallas:tallas, puntos:puntos,
-         confirmadoPor:quien }, cb);
+  post({ accion:'guardarEspec', estilo:estiloBase, version:version,
+         grupo:cab.grupo||'', tipo:tipo,
+         etapa: codEtapa(titulo), combo: (titulo&&titulo.combo)||'',
+         fileId:fileId||'', archivo:archivo||'', pagina:pagina||'',
+         fechaFicha: cab.fechaFicha||'',
+         tallas:tallas, puntos:puntos, confirmadoPor:quien }, cb);
 }
+
 
 var TODAS=[], IDX=0, TOTALPAG=0;
 

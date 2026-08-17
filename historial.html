@@ -377,7 +377,7 @@ function pintarLista(){
     dias[d].forEach(function(m){
       var re = m.resultado==='RECHAZADO';
       h+='<div class="fila'+(re?' rech':'')+'" onclick="verDetalle(\''+m.id+'\')">'+
-         '<div class="est">'+m.estilo+'</div>'+
+         '<div class="est">'+m.estilo+(m.version?'<br><span style="font-size:11px;color:var(--stone);">'+m.version+'</span>':'')+'</div>'+
          '<div class="inf"><b>'+(m.grupo||'—')+'</b> · '+(m.color||'—')+
          (m.etapa?' · '+(NOM_ETAPA[m.etapa]||m.etapa):'')+
          '<br>'+(m.auditora||'—')+' · '+(m.taller||'—')+' · '+String(m.fecha).slice(11)+
@@ -433,6 +433,7 @@ function pintarDetalle(m){
     dato('Estilo',m.estilo)+dato('Grupo',m.grupo)+dato('Cliente',m.cliente)+
     dato('Color',m.color)+dato('Combo de ficha',m.combo||'—')+
     dato('Etapa',NOM_ETAPA[m.etapa]||m.etapa)+
+    dato('Versión de ficha',m.version||'—')+
     dato('Auditora',m.auditora)+dato('Taller',m.taller)+dato('Fecha',m.fecha)+
     dato('Resultado',m.resultado)+
     '</div></div>';

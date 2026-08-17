@@ -431,8 +431,10 @@ function aplicarEspec(espec){
           return [p.cod, p.desc||'', (ESPEC.tallas||[]).map(function(t){ return p.vals[t]; }), p.tol];
         }) };
     txt('fichaTit', F.nombre);
+    txt('fichaTit', F.nombre+(ESPEC.version?'-'+ESPEC.version:''));
     txt('fichaInfo',
       (NOM_ETAPA[ESPEC.etapa]||F.tipo)+(ESPEC.combo?' · '+ESPEC.combo:'')+
+      (ESPEC.version?' · versión '+ESPEC.version:'')+
       ' · '+F.puntos.length+' puntos · tallas '+F.tallas.join(', '));
     pintarColores();
 }
@@ -777,6 +779,7 @@ function decidir(r){
   post({ accion:'guardarMedicion',
          cab:{ estilo:PAR.estilo, grupo:PAR.grupo||ESPEC.grupo||'', tipo:ESPEC.tipo,
                etapa:ESPEC.etapa||ETAPA, combo:ESPEC.combo||COMBO,
+               version:ESPEC.version||'',
                cliente:PAR.cliente||'', color:COLOR, taller:SES.taller, auditora:SES.auditora,
                fileId:ESPEC.fileId||'', archivo:ESPEC.archivo||'',
                tallas:Object.keys(prendas), prendas:prendas, resultado:r, obs:'' },
