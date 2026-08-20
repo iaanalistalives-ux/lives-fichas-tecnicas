@@ -18,6 +18,7 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 .divider{width:1px;height:32px;background:rgba(255,255,255,.35);}
 .htitle{color:#fff;font-size:16px;font-weight:700;}
 .hsub{color:#F1F6F4;font-size:11.5px;}
+.quien{margin-left:auto;color:#F1F6F4;font-size:12px;text-align:right;max-width:45%;overflow-wrap:anywhere;}
 .volver{margin-left:auto;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.4);color:#fff;font-family:inherit;font-size:12.5px;font-weight:700;border-radius:6px;padding:9px 15px;cursor:pointer;white-space:nowrap;}
 .wrap{padding:16px 18px 50px;}
 
@@ -143,7 +144,7 @@ td.nada{color:#C8D3CF;}
     <div class="htitle">MEDICIONES REALIZADAS</div>
     <div class="hsub">Hojas de medidas llenadas por las auditoras</div>
   </div>
-  <button class="volver" onclick="volverBuscador()">← Volver al buscador</button>
+  <div class="quien" id="quienHd"></div>
 </div>
 
 <div class="wrap" id="app">
@@ -255,14 +256,8 @@ function salir(){ location.reload(); }
 
 function iniciar(){
   document.getElementById('app').style.display='block';
-  var v=document.querySelector('.header .volver');
-  if(DESDE_BUSCADOR){
-    v.textContent='← Volver al buscador'; v.onclick=volverBuscador;
-  }else if(SES.nombre){
-    v.textContent=SES.nombre+(SES.area?' · '+SES.area:''); v.onclick=function(){};
-  }else{
-    v.style.display='none';
-  }
+  var q=document.getElementById('quienHd');
+  if(q) q.textContent = SES.nombre ? SES.nombre+(SES.area?' · '+SES.area:'') : '';
   var p=params();
   if(p.estilo) document.getElementById('fEstilo').value=p.estilo;
   jsonp('accion=listas', function(r){
