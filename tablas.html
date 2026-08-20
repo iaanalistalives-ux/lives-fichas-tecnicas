@@ -146,15 +146,9 @@ td.falta{color:var(--rose);font-weight:700;}
 
   <div class="bar" id="bar">
     <div class="fname">Archivo: <b id="fname"></b></div>
-    <button class="btn ghost" onclick="reiniciar()">Abrir otro PDF</button>
+    <button class="btn ghost" onclick="reiniciar()">Volver a la lista</button>
   </div>
 
-  <div class="drop" id="drop">
-    <div class="big">Arrastra aquí la ficha en PDF</div>
-    <div class="sm">o haz clic para elegirla — funciona con hoja de corte y con prenda terminada</div>
-    <button class="btn">Elegir archivo</button>
-    <input type="file" id="file" accept="application/pdf" style="display:none;">
-  </div>
 
   <div id="salida"></div>
 </div>
@@ -652,7 +646,12 @@ var TABLA=null, CAB=null;
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-var drop=document.getElementById('drop'), inp=document.getElementById('file');
+// el recuadro para arrastrar PDF se retiró: Luz solo sube al Drive.
+// Se conserva un elemento oculto para no romper el resto del código.
+var drop=document.createElement('div'), inp=document.createElement('input');
+inp.type='file'; inp.accept='application/pdf';
+drop.style.display='none'; inp.style.display='none';
+document.body.appendChild(drop); document.body.appendChild(inp);
 drop.onclick=function(){ inp.click(); };
 inp.onchange=function(e){ if(e.target.files[0]) procesar(e.target.files[0]); };
 ['dragenter','dragover'].forEach(function(ev){
