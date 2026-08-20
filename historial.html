@@ -146,24 +146,7 @@ td.nada{color:#C8D3CF;}
   <button class="volver" onclick="volverBuscador()">← Volver al buscador</button>
 </div>
 
-<div id="acceso">
-  <div class="cajaAcc">
-    <div class="logoAcc"><img class="logolives" alt="LIVES"></div>
-    <h2>Consulta de mediciones</h2>
-    <p class="subAcc">Hojas de medidas auditadas y fichas técnicas.</p>
-    <div class="aerr" id="aerr"></div>
-    <span class="lbl">Tu nombre</span>
-    <input class="txt" id="aNombre" placeholder="Nombre y apellido" autocomplete="off">
-    <span class="lbl" style="margin-top:12px;">Área</span>
-    <input class="txt" id="aArea" placeholder="Ej. Producción, PCP, Ingeniería" autocomplete="off">
-    <span class="lbl" style="margin-top:12px;">Clave de acceso</span>
-    <input class="txt" id="aClave" type="password" placeholder="••••••" autocomplete="off">
-    <button class="btn" style="width:100%;margin-top:16px;padding:13px;font-size:15px;" onclick="entrar()">Entrar</button>
-    <div class="legAcc">Cada consulta queda registrada con tu nombre y área.</div>
-  </div>
-</div>
-
-<div class="wrap" id="app" style="display:none;">
+<div class="wrap" id="app">
   <div class="err" id="err"></div>
 
   <div class="panel">
@@ -212,6 +195,7 @@ td.nada{color:#C8D3CF;}
 
 <script>
 var APP_URL = "https://script.google.com/macros/s/AKfycby_r6c04rh7Iuxu9qIlpjIsh4pcHLNoXMhqURzLbIK9WrK1LYu3cxITPL6K4BdnaRwo3w/exec";
+var CLAVE_SISTEMA = "livessac";
 var SES=null, MEDS=[];
 var NOM_ETAPA={ TERMINADA:'Prenda terminada', ANTES_VAPOR:'Antes de vapor', CORTE:'Corte' };
 
@@ -245,53 +229,39 @@ function aFrac(dec){
 /* ---------- arranque ---------- */
 var DESDE_BUSCADOR=false;
 
-function arrancar(){
-  var s=null, c=null;
-  try{ s=JSON.parse(localStorage.getItem('lives_fichas')||'null'); }catch(e){}
-  try{ c=JSON.parse(localStorage.getItem('lives_consulta')||'null'); }catch(e){}
-  if(s && s.clave){                       // viene del buscador (auditora o Luz)
-    SES={ nombre:s.auditora, area:s.rol||s.taller, clave:s.clave };
-    DESDE_BUSCADOR=true;
-  }else if(c && c.clave){                 // consulta de otra área
-    SES=c;
-  }else{
-    document.getElementById('acceso').style.display='flex';
-    return;
+function paramDe(n){
+  var q=location.search.replace(/^\?/,'').split('&');
+  for(var i=0;i<q.length;i++){
+    var p=q[i].split('=');
+    if(decodeURIComponent(p[0])===n) return decodeURIComponent((p[1]||'').replace(/\+/g,' '));
   }
+  return '';
+}
+/* Entrada directa: el control de acceso lo lleva el portal. */
+function arrancar(){
+  var s=null;
+  try{ s=JSON.parse(localStorage.getItem('lives_fichas')||'null'); }catch(e){}
+  var c = paramDe('clave') || (s && s.clave) || CLAVE_SISTEMA;
+  try{ var g=localStorage.getItem('lives_clave'); if(!paramDe('clave') && g) c=g; }catch(e){}
+  DESDE_BUSCADOR = !!(s && s.clave) && !paramDe('usuario');
+  SES={ nombre: paramDe('usuario') || (s&&s.auditora) || '',
+        area:   paramDe('area')    || (s&&(s.rol||s.taller)) || '',
+        clave:  c };
   iniciar();
 }
-function entrar(){
-  var n=document.getElementById('aNombre').value.trim();
-  var a=document.getElementById('aArea').value.trim();
-  var k=document.getElementById('aClave').value.trim();
-  if(!n) return aerr('Escribe tu nombre.');
-  if(!a) return aerr('Escribe tu área.');
-  if(!k) return aerr('Escribe la clave de acceso.');
-  aerr('');
-  jsonp('accion=mediciones&clave='+encodeURIComponent(k), function(r){
-    if(!r || !r.ok) return aerr((r&&r.error)||'Clave incorrecta.');
-    SES={nombre:n, area:a, clave:k};
-    try{ localStorage.setItem('lives_consulta', JSON.stringify(SES)); }catch(e){}
-    document.getElementById('acceso').style.display='none';
-    iniciar();
-  });
-}
-function aerr(m){
-  var e=document.getElementById('aerr');
-  e.style.display=m?'block':'none'; e.textContent=m||'';
-}
-function salir(){
-  try{ localStorage.removeItem('lives_consulta'); }catch(e){}
-  location.reload();
-}
+
+function aerr(m){ if(m) error(m); }
+function salir(){ location.reload(); }
 
 function iniciar(){
   document.getElementById('app').style.display='block';
   var v=document.querySelector('.header .volver');
   if(DESDE_BUSCADOR){
     v.textContent='← Volver al buscador'; v.onclick=volverBuscador;
+  }else if(SES.nombre){
+    v.textContent=SES.nombre+(SES.area?' · '+SES.area:''); v.onclick=function(){};
   }else{
-    v.textContent=SES.nombre+' · '+SES.area+'  ·  Salir'; v.onclick=salir;
+    v.style.display='none';
   }
   var p=params();
   if(p.estilo) document.getElementById('fEstilo').value=p.estilo;
