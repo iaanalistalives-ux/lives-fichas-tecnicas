@@ -234,6 +234,7 @@ input.txt:focus{outline:none;border-color:var(--sage);}
    CONEXIÓN Y CARGA DE LA TABLA REAL
    ========================================================== */
 var APP_URL = "https://script.google.com/macros/s/AKfycby_r6c04rh7Iuxu9qIlpjIsh4pcHLNoXMhqURzLbIK9WrK1LYu3cxITPL6K4BdnaRwo3w/exec";
+var CLAVE_SISTEMA = "livessac";
 var SES=null, PAR={}, ESPEC=null;
 
 function jsonp(params, cb){
@@ -276,15 +277,12 @@ function params(){
 function arrancar(){
   PAR=params();
   try{ SES=JSON.parse(localStorage.getItem('lives_fichas')||'null'); }catch(e){ SES=null; }
+  // sin pantalla de acceso: la clave viene del portal o del buscador
   if(!SES || !SES.clave){
-    error('Debes entrar primero desde el buscador de fichas.');
-    document.getElementById('config').innerHTML=
-      '<div class="panel"><div class="pt">Sesión no iniciada</div>'+
-      '<div class="ph">Abre el buscador, identifícate y vuelve a entrar desde el botón Medir.</div>'+
-      '<button class="btn full" style="margin-top:12px;" onclick="volverBuscador()">Ir al buscador</button></div>';
-    return;
+    SES = { taller: PAR.taller||'', auditora: PAR.usuario||'',
+            clave: PAR.clave || CLAVE_SISTEMA, rol: PAR.rol||'' };
   }
-  txt('quienInfo', SES.auditora+' · '+SES.taller);
+  txt('quienInfo', (SES.auditora||'')+(SES.taller?' · '+SES.taller:''));
   if(!PAR.estilo || !PAR.tipo){
     error('Falta el estilo. Entra desde el botón Medir del buscador.');
     return;
