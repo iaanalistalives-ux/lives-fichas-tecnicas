@@ -151,35 +151,6 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 <body>
 
 <!-- ================= PANTALLA DE ACCESO ================= -->
-<div id="acceso">
-  <div class="box">
-    <div class="logo"><img class="logolives" alt="LIVES"></div>
-    <h2>Acceso a fichas técnicas</h2>
-    <p class="sub">Identifícate una sola vez. El equipo lo recuerda.</p>
-
-    <div class="aerr" id="aerr"></div>
-
-    <div class="fld">
-      <label>Taller donde estás</label>
-      <input id="aTaller" autocomplete="off" placeholder="Escribe y elige">
-      <div class="sug" id="sTaller"></div>
-    </div>
-    <div class="fld">
-      <label>Tu nombre</label>
-      <input id="aAud" autocomplete="off" placeholder="Escribe y elige">
-      <div class="sug" id="sAud"></div>
-    </div>
-    <div class="fld">
-      <label>Clave de acceso</label>
-      <input id="aClave" type="password" autocomplete="off" placeholder="••••••">
-    </div>
-
-    <button class="btn" onclick="entrar()">Entrar</button>
-    <div class="leg">Las fichas contienen especificaciones de nuestros clientes.<br>
-      Cada apertura queda registrada con tu nombre y taller.</div>
-  </div>
-</div>
-
 <!-- ================= APP ================= -->
 <div class="header">
   <img class="logolives" alt="LIVES">
@@ -259,6 +230,7 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
    CONFIGURACIÓN
    ============================================================ */
 var APP_URL = "https://script.google.com/macros/s/AKfycby_r6c04rh7Iuxu9qIlpjIsh4pcHLNoXMhqURzLbIK9WrK1LYu3cxITPL6K4BdnaRwo3w/exec";
+var CLAVE_SISTEMA = "livessac";   // respaldo si el portal no la envía
 
 var DATOS=[], TIPO="", TALLERES=[], AUDITORAS=[], SES=null, BLOBURL=null, ESPECS=[];
 
@@ -302,10 +274,7 @@ function ident(){
 /* ============================================================
    ACCESO
    ============================================================ */
-function mostrarAcceso(){
-  document.getElementById('acceso').style.display='flex';
-  cargarListas();
-}
+function mostrarAcceso(){ cargarListas(); entrar(); }
 function cargarListas(){
   jsonp('accion=listas', function(r){
     if(!r || !r.ok) return aerr('No se pudo conectar con el sistema.');
@@ -325,21 +294,54 @@ function rolDe(nombre){
 var ROLES_VERIFICAN = ['SUPERVISORA TOP SAMPLE','DIGITADORA'];
 function puedeVerificar(rol){ return ROLES_VERIFICAN.indexOf(String(rol||'').toUpperCase())>=0; }
 function esDigitadora(){ return SES && puedeVerificar(SES.rol); }
-function aerr(m){
-  var e=document.getElementById('aerr');
-  e.style.display = m?'block':'none'; e.textContent = m||'';
+// se activa con ?rol=SUPERVISORA%20TOP%20SAMPLE en la dirección
+function aerr(m){ if(m) error(m); }
+/* La clave la entrega el portal: llega por la dirección (?clave=) o queda
+   guardada en el equipo. Aquí solo se piden taller y nombre.             */
+function claveDelPortal(){
+  var q=location.search.replace(/^\?/,'').split('&');
+  for(var i=0;i<q.length;i++){
+    var p=q[i].split('=');
+    if(decodeURIComponent(p[0])==='clave') return decodeURIComponent((p[1]||'').replace(/\+/g,' '));
+  }
+  try{
+    var g=localStorage.getItem('lives_clave');
+    if(g) return g;
+    var s=JSON.parse(localStorage.getItem('lives_fichas')||'null');
+    if(s && s.clave) return s.clave;
+  }catch(e){}
+  return CLAVE_SISTEMA;
+}
+
+/* Entrada directa: no hay pantalla de acceso. El control de quién usa
+   el buscador se hace desde el portal.                                  */
+function claveDelPortal(){
+  var q=location.search.replace(/^\?/,'').split('&');
+  for(var i=0;i<q.length;i++){
+    var p=q[i].split('=');
+    if(decodeURIComponent(p[0])==='clave') return decodeURIComponent((p[1]||'').replace(/\+/g,' '));
+  }
+  try{
+    var g=localStorage.getItem('lives_clave');
+    if(g) return g;
+  }catch(e){}
+  return CLAVE_SISTEMA;
+}
+function paramDe(n){
+  var q=location.search.replace(/^\?/,'').split('&');
+  for(var i=0;i<q.length;i++){
+    var p=q[i].split('=');
+    if(decodeURIComponent(p[0])===n) return decodeURIComponent((p[1]||'').replace(/\+/g,' '));
+  }
+  return '';
 }
 function entrar(){
-  var t=document.getElementById('aTaller').value.trim();
-  var a=document.getElementById('aAud').value.trim();
-  var c=document.getElementById('aClave').value.trim();
-  if(!a) return aerr('Selecciona tu nombre.');
-  var rol=rolDe(a);
-  if(!puedeVerificar(rol) && !t) return aerr('Selecciona el taller donde estás.');
-  if(!c) return aerr('Escribe la clave de acceso.');
-  aerr('');
-  SES={ taller: puedeVerificar(rol) ? 'OFICINA' : t.split(' · ')[0],
-        auditora:a, clave:c, rol:rol };
+  var c=claveDelPortal();
+  try{ localStorage.setItem('lives_clave', c); }catch(e){}
+  SES={ taller: paramDe('taller')||'', auditora: paramDe('usuario')||'',
+        clave:c, rol: paramDe('rol')||'' };
+  guardarSes(SES);
+  pintarQuien();
   cargar(false, true);
 }
 function salir(){
@@ -347,9 +349,10 @@ function salir(){
   borrarSes(); location.reload();
 }
 function pintarQuien(){
-  document.getElementById('quien').innerHTML =
-    '<div><b>'+SES.auditora+'</b>'+(SES.rol ? SES.rol : SES.taller)+'</div>'+
-    '<button onclick="salir()">Cambiar</button>';
+  var q=document.getElementById('quien');
+  if(!SES || !SES.auditora){ q.innerHTML=''; return; }
+  q.innerHTML='<div><b>'+SES.auditora+'</b>'+(SES.rol?SES.rol:SES.taller)+'</div>'+
+              '<button onclick="salir()">Cambiar</button>';
 }
 
 /* ============================================================
@@ -370,7 +373,6 @@ function cargar(forzar, primera){
     }
     if(primera){
       guardarSes(SES);
-      document.getElementById('acceso').style.display='none';
       pintarQuien();
     }
     document.getElementById('panelTodo').style.display = esDigitadora() ? 'block' : 'none';
@@ -773,25 +775,17 @@ function cerrarVisor(){}
 /* ============================================================
    ARRANQUE
    ============================================================ */
-sugSimple('aTaller','sTaller',function(){ return TALLERES; });
-sugSimple('aAud','sAud',function(){ return AUDITORAS; });
-document.getElementById('aAud').addEventListener('input', ajustarTaller);
-document.getElementById('aAud').addEventListener('change', ajustarTaller);
-document.getElementById('aAud').addEventListener('blur', function(){ setTimeout(ajustarTaller,180); });
-function ajustarTaller(){
-  var esDig = puedeVerificar(rolDe(document.getElementById('aAud').value));
-  var campo = document.getElementById('aTaller').closest('.fld');
-  if(campo) campo.style.display = esDig ? 'none' : 'block';
-}
+
 montarSug('fCliente','sCliente','cliente');
 montarSug('fGrupo','sGrupo','grupo');
 montarSug('fEstilo','sEstilo','estilo');
 
 (function(){
   var s=leerSes();
-  if(s && s.clave && s.taller && s.auditora){
+  // si el portal envía datos en la dirección, esos mandan
+  if(paramDe('usuario') || paramDe('taller') || paramDe('clave')){ s=null; }
+  if(s && s.clave){
     SES=s; pintarQuien();
-    // se muestra al instante lo último conocido y se refresca por detrás
     var c=leerCache();
     if(c){
       DATOS=c.datos; ESPECS=c.especs||[];
@@ -800,13 +794,17 @@ montarSug('fEstilo','sEstilo','estilo');
     }
     cargar(false,false);
     jsonp('accion=listas',function(r){
-      if(r&&r.ok){ TALL_RAW=r.talleres||[];
-        TALLERES=(r.talleres||[]).map(function(t){return t.nombre+(t.proceso?' · '+t.proceso:'');});
-        AUDITORAS=r.auditoras||[]; }
+      if(r&&r.ok){
+        TALL_RAW=r.talleres||[];
+        TALLERES=TALL_RAW.map(function(t){return t.nombre+(t.proceso?' · '+t.proceso:'');});
+        AUD_RAW=r.auditoras||[];
+        AUDITORAS=AUD_RAW.map(function(a){ return typeof a==='string'? a : a.nombre; });
+      }
     });
   }else{
     document.getElementById('salida').innerHTML='';
-    mostrarAcceso();
+    entrar();
+    cargarListas();
   }
 })();
 
