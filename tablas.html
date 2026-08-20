@@ -19,6 +19,7 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 .htitle{color:#fff;font-size:16px;font-weight:700;letter-spacing:.3px;}
 .hsub{color:#F1F6F4;font-size:11.5px;}
 .wrap{max-width:100%;margin:0;padding:18px;}
+.quien{margin-left:auto;color:#F1F6F4;font-size:12px;text-align:right;}
 .volver{margin-left:auto;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.4);color:#fff;font-family:inherit;font-size:12.5px;font-weight:700;border-radius:6px;padding:9px 15px;cursor:pointer;white-space:nowrap;}
 .volver:hover{background:rgba(255,255,255,.28);}
 
@@ -123,7 +124,7 @@ td.falta{color:var(--rose);font-weight:700;}
     <div class="htitle">TABLAS DE MEDIDAS</div>
     <div class="hsub">Lectura y verificación de la hoja de medidas de cada ficha</div>
   </div>
-  <button class="volver" onclick="volverBuscador()">← Volver al buscador</button>
+  <div class="quien" id="quienHd"></div>
 </div>
 
 <div class="wrap" id="app">
@@ -441,6 +442,8 @@ function entrar(){
   var c=claveDelPortal();
   try{ localStorage.setItem('lives_clave', c); }catch(e){}
   SES={ nombre: paramDe('usuario')||'LUZ RAYME', clave:c };
+  var qh=document.getElementById('quienHd');
+  if(qh) qh.textContent = SES.nombre;
   jsonp('accion=datos&clave='+encodeURIComponent(c), function(r){
     if(!r || !r.ok){ error((r&&r.error)||'No se pudo conectar.'); return; }
     INDICE = r.datos || [];
