@@ -126,22 +126,7 @@ td.falta{color:var(--rose);font-weight:700;}
   <button class="volver" onclick="volverBuscador()">← Volver al buscador</button>
 </div>
 
-<div id="acceso">
-  <div class="cajaAcc">
-    <div class="logoAcc"><img class="logolives" alt="LIVES"></div>
-    <h2>Verificar tablas de medidas</h2>
-    <p class="sub">Confirma que la tabla se leyó bien antes de que las auditoras la usen.</p>
-    <div class="aerr" id="aerr"></div>
-    <label class="lb">Tu nombre</label>
-    <input class="txt" id="aNombre" placeholder="Ej. Luz" autocomplete="off">
-    <label class="lb">Clave de acceso</label>
-    <input class="txt" id="aClave" type="password" placeholder="••••••" autocomplete="off">
-    <button class="btn full" style="margin-top:16px;" onclick="entrar()">Entrar</button>
-    <button class="btn ghost full" style="margin-top:9px;" onclick="volverBuscador()">Volver al buscador</button>
-  </div>
-</div>
-
-<div class="wrap" id="app" style="display:none;">
+<div class="wrap" id="app">
   <div class="err" id="err"></div>
 
   <div class="panel" id="pendientes" style="display:none;">
@@ -413,6 +398,7 @@ function cabecera(texto){
    CONEXIÓN
    ========================================================== */
 var APP_URL = "https://script.google.com/macros/s/AKfycby_r6c04rh7Iuxu9qIlpjIsh4pcHLNoXMhqURzLbIK9WrK1LYu3cxITPL6K4BdnaRwo3w/exec";
+var CLAVE_SISTEMA = "livessac";
 var SES=null, INDICE=[], ESPECS=[], ARCH=null;
 
 function jsonp(params, cb){
@@ -433,38 +419,37 @@ function post(datos, cb){
     .catch(function(e){ cb({ok:false, error:String(e)}); });
 }
 
-function aerr(m){
-  var e=document.getElementById('aerr');
-  e.style.display=m?'block':'none'; e.textContent=m||'';
-}
-function arrancarConSesion(){
-  var s=null;
-  try{ s=JSON.parse(localStorage.getItem('lives_fichas')||'null'); }catch(e){ s=null; }
-  var ROLES=['SUPERVISORA TOP SAMPLE','DIGITADORA'];
-  if(!s || !s.clave || ROLES.indexOf(String(s.rol||'').toUpperCase())<0) return false;
-  SES={nombre:s.auditora, clave:s.clave};
-  jsonp('accion=datos&clave='+encodeURIComponent(s.clave), function(r){
-    if(!r || !r.ok){ document.getElementById('acceso').style.display='flex'; return; }
-    INDICE=r.datos||[];
-    document.getElementById('acceso').style.display='none';
-    document.getElementById('app').style.display='block';
-    cargarEspecs();
-  });
-  return true;
-}
+function aerr(m){ if(m) error(m); }
+
 function volverBuscador(){ location.href='index.html'; }
 
+/* Entrada directa: el control de acceso lo lleva el portal. */
+function paramDe(n){
+  var q=location.search.replace(/^\?/,'').split('&');
+  for(var i=0;i<q.length;i++){
+    var p=q[i].split('=');
+    if(decodeURIComponent(p[0])===n) return decodeURIComponent((p[1]||'').replace(/\+/g,' '));
+  }
+  return '';
+}
+function claveDelPortal(){
+  var c=paramDe('clave');
+  if(c) return c;
+  try{
+    var g=localStorage.getItem('lives_clave');
+    if(g) return g;
+    var s=JSON.parse(localStorage.getItem('lives_fichas')||'null');
+    if(s && s.clave) return s.clave;
+  }catch(e){}
+  return CLAVE_SISTEMA;
+}
 function entrar(){
-  var n=document.getElementById('aNombre').value.trim();
-  var c=document.getElementById('aClave').value.trim();
-  if(!n) return aerr('Escribe tu nombre.');
-  if(!c) return aerr('Escribe la clave.');
-  SES={nombre:n, clave:c};
-  aerr(''); 
+  var c=claveDelPortal();
+  try{ localStorage.setItem('lives_clave', c); }catch(e){}
+  SES={ nombre: paramDe('usuario')||'LUZ RAYME', clave:c };
   jsonp('accion=datos&clave='+encodeURIComponent(c), function(r){
-    if(!r || !r.ok) return aerr(r && r.error ? r.error : 'No se pudo conectar.');
+    if(!r || !r.ok){ error((r&&r.error)||'No se pudo conectar.'); return; }
     INDICE = r.datos || [];
-    document.getElementById('acceso').style.display='none';
     document.getElementById('app').style.display='block';
     cargarEspecs();
   });
@@ -924,9 +909,7 @@ function confirmar(){
     });
 }
 
-(function(){
-  if(!arrancarConSesion()) document.getElementById('acceso').style.display='flex';
-})();
+(function(){ entrar(); })();
 
 /* el logo se asigna una sola vez: el archivo pesa la mitad */
 (function(){
