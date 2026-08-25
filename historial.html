@@ -195,6 +195,16 @@ td.nada{color:#C8D3CF;}
 </div>
 
 <script>
+
+/* Dentro de un marco (portal) el navegador puede bloquear el
+   almacenamiento local. Se usa memoria si no está disponible.  */
+var __MEM={};
+var LS={
+  get:function(k){ try{ var v=LS.get(k); return v===null?(__MEM[k]||null):v; }
+                   catch(e){ return __MEM[k]||null; } },
+  set:function(k,v){ __MEM[k]=v; try{ LS.set(k,v); }catch(e){} },
+  del:function(k){ delete __MEM[k]; try{ LS.del(k); }catch(e){} }
+};
 var APP_URL = "https://script.google.com/macros/s/AKfycby_r6c04rh7Iuxu9qIlpjIsh4pcHLNoXMhqURzLbIK9WrK1LYu3cxITPL6K4BdnaRwo3w/exec";
 var CLAVE_SISTEMA = "livessac";
 var SES=null, MEDS=[];
@@ -241,9 +251,9 @@ function paramDe(n){
 /* Entrada directa: el control de acceso lo lleva el portal. */
 function arrancar(){
   var s=null;
-  try{ s=JSON.parse(localStorage.getItem('lives_fichas')||'null'); }catch(e){}
+  try{ s=JSON.parse(LS.get('lives_fichas')||'null'); }catch(e){}
   var c = paramDe('clave') || (s && s.clave) || CLAVE_SISTEMA;
-  try{ var g=localStorage.getItem('lives_clave'); if(!paramDe('clave') && g) c=g; }catch(e){}
+  try{ var g=LS.get('lives_clave'); if(!paramDe('clave') && g) c=g; }catch(e){}
   DESDE_BUSCADOR = !!(s && s.clave) && !paramDe('usuario');
   SES={ nombre: paramDe('usuario') || (s&&s.auditora) || '',
         area:   paramDe('area')    || (s&&(s.rol||s.taller)) || '',

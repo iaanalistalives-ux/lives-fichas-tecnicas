@@ -230,6 +230,16 @@ input.txt:focus{outline:none;border-color:var(--sage);}
 
 
 <script>
+
+/* Dentro de un marco (portal) el navegador puede bloquear el
+   almacenamiento local. Se usa memoria si no está disponible.  */
+var __MEM={};
+var LS={
+  get:function(k){ try{ var v=LS.get(k); return v===null?(__MEM[k]||null):v; }
+                   catch(e){ return __MEM[k]||null; } },
+  set:function(k,v){ __MEM[k]=v; try{ LS.set(k,v); }catch(e){} },
+  del:function(k){ delete __MEM[k]; try{ LS.del(k); }catch(e){} }
+};
 /* ==========================================================
    CONEXIÓN Y CARGA DE LA TABLA REAL
    ========================================================== */
@@ -276,7 +286,7 @@ function params(){
 
 function arrancar(){
   PAR=params();
-  try{ SES=JSON.parse(localStorage.getItem('lives_fichas')||'null'); }catch(e){ SES=null; }
+  try{ SES=JSON.parse(LS.get('lives_fichas')||'null'); }catch(e){ SES=null; }
   // sin pantalla de acceso: la clave viene del portal o del buscador
   if(!SES || !SES.clave){
     SES = { taller: PAR.taller||'', auditora: PAR.usuario||'',

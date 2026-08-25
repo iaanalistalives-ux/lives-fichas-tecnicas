@@ -151,11 +151,21 @@ td.falta{color:var(--rose);font-weight:700;}
   </div>
 
 
-  <div id="salida"></div>
+  <div id="salida"><div class="cargando">Cargando fichas…</div></div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
+
+/* Dentro de un marco (portal) el navegador puede bloquear el
+   almacenamiento local. Se usa memoria si no está disponible.  */
+var __MEM={};
+var LS={
+  get:function(k){ try{ var v=LS.get(k); return v===null?(__MEM[k]||null):v; }
+                   catch(e){ return __MEM[k]||null; } },
+  set:function(k,v){ __MEM[k]=v; try{ LS.set(k,v); }catch(e){} },
+  del:function(k){ delete __MEM[k]; try{ LS.del(k); }catch(e){} }
+};
 /* ==========================================================
    LECTURA DE LA TABLA DE MEDIDAS
    Se apoya en la POSICIÓN de cada número dentro de la página,
@@ -431,16 +441,17 @@ function claveDelPortal(){
   var c=paramDe('clave');
   if(c) return c;
   try{
-    var g=localStorage.getItem('lives_clave');
+    var g=LS.get('lives_clave');
     if(g) return g;
-    var s=JSON.parse(localStorage.getItem('lives_fichas')||'null');
+    var s=JSON.parse(LS.get('lives_fichas')||'null');
     if(s && s.clave) return s.clave;
   }catch(e){}
   return CLAVE_SISTEMA;
 }
 function entrar(){
-  var c=claveDelPortal();
-  try{ localStorage.setItem('lives_clave', c); }catch(e){}
+  var c;
+  try{ c=claveDelPortal(); }catch(e){ c=CLAVE_SISTEMA; }
+  try{ LS.set('lives_clave', c); }catch(e){}
   SES={ nombre: paramDe('usuario')||'LUZ RAYME', clave:c };
   var qh=document.getElementById('quienHd');
   if(qh) qh.textContent = SES.nombre;
@@ -448,6 +459,8 @@ function entrar(){
     if(!r || !r.ok){ error((r&&r.error)||'No se pudo conectar.'); return; }
     INDICE = r.datos || [];
     document.getElementById('app').style.display='block';
+    document.getElementById('salida').innerHTML =
+      INDICE.length ? '' : '<div class="vacio">No hay fichas cargadas en Drive todavía.</div>';
     cargarEspecs();
   });
 }
@@ -911,7 +924,13 @@ function confirmar(){
     });
 }
 
-(function(){ entrar(); })();
+(function(){
+  try{ entrar(); }
+  catch(e){
+    var s=document.getElementById('salida');
+    if(s) s.innerHTML='<div class="vacio">No se pudo iniciar: '+String(e)+'</div>';
+  }
+})();
 
 /* el logo se asigna una sola vez: el archivo pesa la mitad */
 (function(){

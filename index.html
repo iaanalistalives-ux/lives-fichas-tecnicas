@@ -226,6 +226,16 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 </div>
 
 <script>
+
+/* Dentro de un marco (portal) el navegador puede bloquear el
+   almacenamiento local. Se usa memoria si no está disponible.  */
+var __MEM={};
+var LS={
+  get:function(k){ try{ var v=LS.get(k); return v===null?(__MEM[k]||null):v; }
+                   catch(e){ return __MEM[k]||null; } },
+  set:function(k,v){ __MEM[k]=v; try{ LS.set(k,v); }catch(e){} },
+  del:function(k){ delete __MEM[k]; try{ LS.del(k); }catch(e){} }
+};
 /* ============================================================
    CONFIGURACIÓN
    ============================================================ */
@@ -235,20 +245,20 @@ var CLAVE_SISTEMA = "livessac";   // respaldo si el portal no la envía
 var DATOS=[], TIPO="", TALLERES=[], AUDITORAS=[], SES=null, BLOBURL=null, ESPECS=[];
 
 /* ---------- almacenamiento local ---------- */
-function guardarSes(s){ try{ localStorage.setItem('lives_fichas', JSON.stringify(s)); }catch(e){} }
-function leerSes(){ try{ return JSON.parse(localStorage.getItem('lives_fichas')||'null'); }catch(e){ return null; } }
-function borrarSes(){ try{ localStorage.removeItem('lives_fichas'); localStorage.removeItem('lives_cache'); }catch(e){} }
+function guardarSes(s){ try{ LS.set('lives_fichas', JSON.stringify(s)); }catch(e){} }
+function leerSes(){ try{ return JSON.parse(LS.get('lives_fichas')||'null'); }catch(e){ return null; } }
+function borrarSes(){ try{ LS.del('lives_fichas'); LS.del('lives_cache'); }catch(e){} }
 
 /* Guarda el índice en el equipo para que la próxima vez abra al instante. */
 function guardarCache(datos, especs){
   try{
-    localStorage.setItem('lives_cache', JSON.stringify({
+    LS.set('lives_cache', JSON.stringify({
       t:Date.now(), datos:datos||[], especs:especs||[] }));
   }catch(e){}
 }
 function leerCache(){
   try{
-    var c=JSON.parse(localStorage.getItem('lives_cache')||'null');
+    var c=JSON.parse(LS.get('lives_cache')||'null');
     if(!c || !c.datos || !c.datos.length) return null;
     if(Date.now()-c.t > 86400000) return null;   // más de un día: se descarta
     return c;
@@ -305,9 +315,9 @@ function claveDelPortal(){
     if(decodeURIComponent(p[0])==='clave') return decodeURIComponent((p[1]||'').replace(/\+/g,' '));
   }
   try{
-    var g=localStorage.getItem('lives_clave');
+    var g=LS.get('lives_clave');
     if(g) return g;
-    var s=JSON.parse(localStorage.getItem('lives_fichas')||'null');
+    var s=JSON.parse(LS.get('lives_fichas')||'null');
     if(s && s.clave) return s.clave;
   }catch(e){}
   return CLAVE_SISTEMA;
@@ -322,7 +332,7 @@ function claveDelPortal(){
     if(decodeURIComponent(p[0])==='clave') return decodeURIComponent((p[1]||'').replace(/\+/g,' '));
   }
   try{
-    var g=localStorage.getItem('lives_clave');
+    var g=LS.get('lives_clave');
     if(g) return g;
   }catch(e){}
   return CLAVE_SISTEMA;
@@ -337,7 +347,7 @@ function paramDe(n){
 }
 function entrar(){
   var c=claveDelPortal();
-  try{ localStorage.setItem('lives_clave', c); }catch(e){}
+  try{ LS.set('lives_clave', c); }catch(e){}
   SES={ taller: paramDe('taller')||'', auditora: paramDe('usuario')||'',
         clave:c, rol: paramDe('rol')||'' };
   guardarSes(SES);
