@@ -34,6 +34,12 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 .txt{width:100%;font-family:inherit;font-size:16px;padding:11px;border:1.5px solid var(--warm);border-radius:6px;}
 .txt:focus{outline:none;border-color:var(--sage);}
 .btn.full{width:100%;font-size:15px;padding:12px;}
+.accBar .subir{background:#fff;border:1.5px solid var(--sage);color:var(--sage);text-decoration:none;
+  display:inline-block;line-height:1.2;}
+.accBar .subir:hover{background:var(--warm-light);}
+.pasos{font-size:12px;color:var(--stone);background:var(--warm-light);border-radius:6px;
+  padding:9px 12px;margin-bottom:12px;}
+.pasos b{color:var(--sage-dark);}
 .accBar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:12px 0;}
 .accHint{font-size:11.5px;color:var(--stone);}
 .alerta{background:#FEF2F2;border:1px solid var(--rose);border-left:4px solid var(--rose);border-radius:8px;padding:12px 14px;margin-bottom:14px;}
@@ -138,8 +144,14 @@ td.falta{color:var(--rose);font-weight:700;}
       <div class="autoBar"><i id="autoBar"></i></div>
     </div>
     <div class="accBar">
+      <a class="btn subir" href="https://drive.google.com/drive/folders/1L0mdAy04_aSV9bLyVRl4BHVjysd5Ep7B"
+         target="_blank" rel="noopener">Subir fichas al Drive</a>
       <button class="btn" id="btnMasivo" onclick="procesarPendientes(true)">Procesar todas</button>
       <span class="accHint" id="accHint"></span>
+    </div>
+    <div class="pasos">
+      <b>1.</b> Abre el Drive y arrastra ahí tus PDF &nbsp;·&nbsp;
+      <b>2.</b> Vuelve aquí y toca <b>Procesar todas</b>
     </div>
     <div class="alerta" id="alertaRev" style="display:none;"></div>
     <div id="listaPend"></div>
