@@ -373,10 +373,25 @@ function leerPagina(page){
 }
 
 /* --- cabecera: identificar la ficha --- */
-function tituloTabla(texto){
+function tituloTabla(texto, tipoDoc){
   var t=(texto||'').replace(/\u00A0/g,' ');
-  var m=t.match(/COMBO\s*:?\s*([^\n\r]{2,90})/i);
-  var combo = m ? m[1].replace(/THY-?\d+|PAK-?\d+/gi,'').replace(/\s+/g,' ').trim() : '';
+  var combo='';
+  var m=t.match(/COMBO\s*:\s*([^\n\r]{2,90})/i);
+  if(m){
+    combo=m[1].split(/\s{2,}|Modelista|Analista|Elaborado/i)[0]
+              .replace(/\b[A-Z]{2,5}-?\d{2,4}\b/g,'')
+              .replace(/\s+/g,' ').replace(/^[\s\-–—\/]+|[\s\-–—\/]+$/g,'');
+    if(combo.length<3) combo='';
+  }
+  // En hojas de corte el discriminante natural es el COLOR
+  if(!combo && tipoDoc==='CORTE'){
+    var mc=t.match(/COLOR\s*:\s*([^\n\r]{2,60})/i);
+    if(mc){
+      var v=mc[1].split(/\d|Modelista|Analista|ROT|REV|Largo|Ancho|Cuello|Cuerpo|Mangas/i)[0]
+                 .replace(/\s+/g,' ').replace(/^[\s:\-–—]+|[\s:\-–—]+$/g,'');
+      if(v.length>2) combo=v;
+    }
+  }
   var etapa = /EN\s+PRENDA\s+TERMINADA/i.test(t) ? 'Prenda terminada (después de vapor)'
             : /EN\s+COSTURA/i.test(t)             ? 'En costura (antes de vapor)'
             : /CONTROL\s+DE\s+MEDIDAS\s*:?\s*CORTE/i.test(t) ? 'Corte'
@@ -390,12 +405,22 @@ function cabecera(texto){
          : /EN\s+PRENDA\s+TERMINADA/i.test(t) ? 'PRENDA TERMINADA' : '—';
   var m;
   if((m=t.match(/\b([A-Z]{2,5})\s*[–—-]\s*(\d{2,4})\b/)))  o.grupo=m[1].toUpperCase()+'-'+m[2];
+  // El estilo puede venir como "24754-3A" o como "ESTILO: 24941 MOLDE: 24941-4AA".
+  // En el segundo caso el molde NO es la versión, así que se corta antes.
   var reEst=/([0-9]{4,6})\s*[-–—]\s*([0-9A-Za-z]{1,3})\b/;
-  if((m=t.match(/ESTILO\s*[-–—]?\s*VERSI[ÓO]N\s*:?\s*([\s\S]{0,40})/i)) && reEst.test(m[1]))
-      o.estilo=m[1].match(reEst).slice(1,3).join('-');
-  else if((m=t.match(/ESTILO\s*:?\s*([\s\S]{0,40})/i)) && reEst.test(m[1]))
-      o.estilo=m[1].match(reEst).slice(1,3).join('-');
-  else if((m=t.match(reEst))) o.estilo=m[1]+'-'+m[2];
+  var pats=[/ESTILO\s*[-–—]?\s*VERSI[ÓO]N\s*:?\s*([\s\S]{0,40})/i,
+            /Est\.?\s*Lives\s*:?\s*([\s\S]{0,40})/i,
+            /ESTILO\s*:?\s*([\s\S]{0,40})/i];
+  for(var pi=0; pi<pats.length && !o.estilo; pi++){
+    var mm=t.match(pats[pi]);
+    if(!mm) continue;
+    var seg=mm[1].split(/MOLDE|PARTIDA|O\.\s*CORTE/i)[0];
+    var me=seg.match(reEst);
+    if(me){ o.estilo=me[1]+'-'+me[2].toUpperCase(); break; }
+    var mn=seg.match(/\b(\d{4,6})\b/);
+    if(mn){ o.estilo=mn[1]; break; }
+  }
+  if(!o.estilo && (m=t.match(reEst))) o.estilo=m[1]+'-'+m[2].toUpperCase();
 
   // fecha del documento: decide cuál versión es la vigente
   var mfe=t.match(/\b(\d{2})[\/\-](\d{2})[\/\-](\d{2,4})\b/);
@@ -730,11 +755,52 @@ function extraerDe(arr, cb){
     Promise.all(tareas).then(function(res){
       var c=res.filter(function(r){ return r.tabla; });
       if(!c.length){ cb(null); return; }
+
+      // Tipo y estilo del DOCUMENTO: las páginas de continuación no repiten
+      // el título, así que heredan lo de la primera página que sí lo trae.
+      var cabDoc=null, tipoDoc='';
+      for(var k=0;k<textos.length && !tipoDoc;k++){
+        var cc=cabecera(textos[k]);
+        if(/CONTROL\s+DE\s+MEDIDAS\s*:?\s*CORTE|ESPECIFICACIONES\s+TECNICAS/i.test(textos[k])){
+          tipoDoc=cc.tipo; cabDoc=cc;
+        }
+      }
+      if(!cabDoc) cabDoc=cabecera(textos[0]);
+      if(!tipoDoc) tipoDoc=cabDoc.tipo;
+
+      var ultEtapa='', ultCombo='';
       var todas=c.map(function(x){
-        return { tabla:x.tabla, cab:cabecera(textos[x.n-1]),
-                 titulo:tituloTabla(textos[x.n-1]), pagina:x.n };
+        var cb2=cabecera(textos[x.n-1]);
+        if(!cb2.estilo)   cb2.estilo   = cabDoc.estilo;
+        if(!cb2.grupo)    cb2.grupo    = cabDoc.grupo;
+        if(!cb2.fechaFicha) cb2.fechaFicha = cabDoc.fechaFicha;
+        cb2.tipo = tipoDoc;                       // el tipo lo manda el documento
+        var ti=tituloTabla(textos[x.n-1], tipoDoc);
+        if(ti.etapa==='Medidas'){                 // página de continuación
+          ti.etapa = ultEtapa || (tipoDoc==='CORTE' ? 'Corte' : 'Prenda terminada (después de vapor)');
+          if(!ti.combo) ti.combo = ultCombo;
+        }
+        ultEtapa=ti.etapa; ultCombo=ti.combo;
+        return { tabla:x.tabla, cab:cb2, titulo:ti, pagina:x.n };
       });
-      // por defecto, la de prenda terminada; si no hay, la de más filas
+
+      // Una misma tabla puede continuar en la página siguiente: se unen
+      // las que comparten etapa y combo, sin repetir códigos.
+      var mapa={}, unidas=[];
+      todas.forEach(function(x){
+        var k2=x.titulo.etapa+'|'+(x.titulo.combo||'');
+        if(!mapa[k2]){ mapa[k2]=x; unidas.push(x); return; }
+        var base=mapa[k2], vistos={};
+        base.tabla.filas.forEach(function(f){ vistos[f.cod]=true; });
+        x.tabla.filas.forEach(function(f){
+          if(!vistos[f.cod]){ base.tabla.filas.push(f); vistos[f.cod]=true; }
+        });
+        x.tabla.orden.forEach(function(o){
+          if(base.tabla.orden.indexOf(o)<0) base.tabla.orden.push(o);
+        });
+      });
+      todas=unidas;
+
       var pref=todas.filter(function(x){ return /Prenda terminada/.test(x.titulo.etapa); });
       var elegida = pref.length ? pref[0]
         : todas.slice().sort(function(a,b){ return b.tabla.filas.length-a.tabla.filas.length; })[0];
