@@ -33,8 +33,7 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 .modesel .mbtn{background:#fff;color:var(--sage);border:none;padding:7px 16px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;}
 .modesel .mbtn.active{background:var(--sage);color:#fff;}
 
-.filtros{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
-@media(max-width:760px){.filtros{grid-template-columns:1fr;}}
+.buscafld input{font-size:17px!important;padding:13px 14px!important;}
 .fld{position:relative;}
 .fld label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--stone);margin-bottom:4px;}
 .fld input{width:100%;font-family:inherit;font-size:16px;padding:10px 11px;border:1.5px solid var(--warm);border-radius:6px;background:#fff;color:#333;}
@@ -177,13 +176,9 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
       <button class="mbtn" data-tipo="RM" onclick="setTipo(this)">RM</button>
     </div>
 
-    <div class="filtros">
-      <div class="fld"><label>Cliente</label>
-        <input id="fCliente" autocomplete="off" placeholder="Ej. PAKA"><div class="sug" id="sCliente"></div></div>
-      <div class="fld"><label>Grupo</label>
-        <input id="fGrupo" autocomplete="off" placeholder="Ej. PAK-140"><div class="sug" id="sGrupo"></div></div>
-      <div class="fld"><label>Estilo</label>
-        <input id="fEstilo" autocomplete="off" placeholder="Ej. 25072" inputmode="numeric"><div class="sug" id="sEstilo"></div></div>
+    <div class="fld buscafld">
+      <input id="fTodo" autocomplete="off" placeholder="Estilo, grupo, cliente o nombre del archivo">
+      <div class="sug" id="sTodo"></div>
     </div>
 
     <div class="acciones">
@@ -465,33 +460,39 @@ function sugSimple(inputId,sugId,fuente){
 }
 function baseTipo(){ return TIPO?DATOS.filter(function(d){return d.tipo===TIPO;}):DATOS.slice(); }
 
-function montarSug(inputId,sugId,campo){
-  var inp=document.getElementById(inputId), box=document.getElementById(sugId), idx=-1;
+/* Sugerencias de la casilla única: propone estilos, grupos y clientes
+   que coincidan con lo escrito, indicando de qué se trata cada uno.     */
+function montarBusqueda(){
+  var inp=document.getElementById('fTodo'), box=document.getElementById('sTodo'), idx=-1;
+
   function opciones(){
     var q=norm(inp.value);
-    var otros={ fCliente:[['fGrupo','grupo'],['fEstilo','estilo']],
-                fGrupo:[['fCliente','cliente'],['fEstilo','estilo']],
-                fEstilo:[['fCliente','cliente'],['fGrupo','grupo']] }[inputId];
-    var pool=baseTipo().filter(function(d){
-      return otros.every(function(o){
-        var v=norm(document.getElementById(o[0]).value);
-        return !v || norm(d[o[1]]).indexOf(v)>=0;
+    if(!q || q.length<2) return [];
+    var vistos={}, ops=[];
+    baseTipo().forEach(function(d){
+      [[d.estilo,'estilo'],[d.grupo,'grupo'],[d.cliente,'cliente'],
+       [d.estiloCliente,'estilo cliente']].forEach(function(par){
+        var v=par[0];
+        if(!v || norm(v).indexOf(q)<0) return;
+        var k=par[1]+'|'+v;
+        if(vistos[k]) return;
+        vistos[k]=1; ops.push({v:String(v), tipo:par[1], n:0});
       });
     });
-    var mapa={};
-    pool.forEach(function(d){
-      var v=d[campo]; if(!v) return;
-      if(q && norm(v).indexOf(q)<0) return;
-      mapa[v]=(mapa[v]||0)+1;
+    ops.forEach(function(o){
+      o.n = baseTipo().filter(function(d){ return textoDe(d).indexOf(norm(o.v))>=0; }).length;
     });
-    return Object.keys(mapa).sort(function(a,b){
-      return campo==='estilo' ? (b>a?-1:1) : a.localeCompare(b,'es');
-    }).slice(0,60).map(function(k){ return {v:k,n:mapa[k]}; });
+    var orden={estilo:0, grupo:1, cliente:2, 'estilo cliente':3};
+    ops.sort(function(a,b){ return (orden[a.tipo]-orden[b.tipo]) || a.v.localeCompare(b.v,'es'); });
+    return ops.slice(0,40);
   }
   function abrir(){
     var ops=opciones();
     if(!ops.length){ box.style.display='none'; return; }
-    box.innerHTML=ops.map(function(o){ return '<div data-v="'+o.v+'">'+o.v+'<span class="cnt">'+o.n+'</span></div>'; }).join('');
+    box.innerHTML=ops.map(function(o){
+      return '<div data-v="'+o.v+'">'+o.v+
+             '<span class="cnt">'+o.tipo+' · '+o.n+'</span></div>';
+    }).join('');
     box.style.display='block'; idx=-1;
     Array.prototype.forEach.call(box.children,function(el){
       el.onmousedown=function(ev){ ev.preventDefault(); inp.value=el.dataset.v; box.style.display='none'; buscar(); };
@@ -513,17 +514,21 @@ function montarSug(inputId,sugId,campo){
   });
 }
 
+
 /* ============================================================
    RENDER
    ============================================================ */
 function setTipo(b){
   document.querySelectorAll('.modesel .mbtn').forEach(function(x){x.classList.remove('active');});
-  b.classList.add('active'); TIPO=b.dataset.tipo; buscar();
+  b.classList.add('active'); TIPO=b.dataset.tipo;
+  DATOS.forEach(function(d){ d.__txt=null; });
+  buscar();
   if(document.getElementById('todoBody').style.display==='block') pintarTodo();
 }
 function limpiar(){
-  ['fCliente','fGrupo','fEstilo'].forEach(function(id){document.getElementById(id).value='';});
-  buscar();
+  document.getElementById('fTodo').value='';
+  document.getElementById('salida').innerHTML=
+    '<div class="vacio">Escribe el <b>estilo</b>, el <b>grupo</b> o el <b>cliente</b>.</div>';
 }
 function pintarKpis(){
   var pdfs={},tec={},aca={},est={};
@@ -544,24 +549,42 @@ function fmt(f){
   var p=String(f).split('-');
   return p.length===3?(p[2]+'/'+p[1]+'/'+p[0]):f;
 }
+/* Texto donde se busca: si un campo no se leyó bien del PDF, el nombre
+   del archivo sirve de red de seguridad.                                */
+function textoDe(d){
+  if(d.__txt) return d.__txt;
+  d.__txt = norm([d.estilo, d.version, d.grupo, d.cliente, d.estiloCliente,
+                  d.descripcion, d.tela, d.temporada, d.archivo].join(' '));
+  return d.__txt;
+}
 function buscar(){
   if(!DATOS.length) return;
-  var qc=norm(document.getElementById('fCliente').value),
-      qg=norm(document.getElementById('fGrupo').value),
-      qe=norm(document.getElementById('fEstilo').value);
-  var res=baseTipo().filter(function(d){
-    if(qc&&norm(d.cliente).indexOf(qc)<0) return false;
-    if(qg&&norm(d.grupo).indexOf(qg)<0) return false;
-    if(qe&&norm(d.estilo).indexOf(qe)<0) return false;
-    return true;
+  var q=document.getElementById('fTodo').value.trim();
+  var partes=q.split(/\s+/).filter(Boolean).map(norm).filter(Boolean);
+  var base=baseTipo();
+  // deben aparecer todas las palabras escritas, en cualquier campo
+  var res=base.filter(function(d){
+    var t=textoDe(d);
+    return partes.every(function(p){ return t.indexOf(p)>=0; });
   });
   var out=document.getElementById('salida');
-  if(!qc&&!qg&&!qe){
-    out.innerHTML='<div class="vacio">Escribe un <b>cliente</b>, <b>grupo</b> o <b>estilo</b> para ver las fichas disponibles.</div>';
+  if(!partes.length){
+    out.innerHTML='<div class="vacio">Escribe el <b>estilo</b>, el <b>grupo</b> o el <b>cliente</b>.<br>'+
+      '<span style="font-size:12px;">También sirve parte del nombre del archivo.</span></div>';
     return;
   }
   if(!res.length){
-    out.innerHTML='<div class="vacio">No hay fichas que coincidan.<br><br>Verifica el estilo o toca <b>Actualizar</b> por si acaban de subirla.</div>';
+    // nada coincide: en vez de dejarla sin nada, se muestran las últimas subidas
+    var ult=base.slice().sort(function(a,b){
+      return String(b.fechaSubida||'').localeCompare(String(a.fechaSubida||''));
+    });
+    var vistos={}, rec=[];
+    ult.forEach(function(d){ if(!vistos[d.id]){ vistos[d.id]=1; rec.push(d); } });
+    rec=rec.slice(0,8);
+    out.innerHTML='<div class="vacio">No hay fichas con <b>'+q+'</b>.<br><br>'+
+      'Revisa cómo lo escribiste o toca <b>Actualizar</b> por si acaban de subirla.</div>'+
+      (rec.length ? '<div class="sectitle">Últimas fichas cargadas</div>'+
+        rec.map(function(d,i){ return tarjeta([d], 900+i); }).join('') : '');
     return;
   }
   var g={};
@@ -585,9 +608,13 @@ var TIPOS={ACABADOS:{c:'acab',t:'ACABADOS'},CORTE:{c:'corte',t:'CORTE'},
 function tarjeta(lista,i){
   var d=lista[0], ti=TIPOS[d.tipo]||TIPOS.TECNICA;
   var h='<div class="card'+(ti.c?' '+ti.c:'')+'">';
-  h+='<div class="chead"><div class="ctit">'+(d.estilo||'—')+
+  // si no se pudo leer el encabezado, al menos se ve el nombre del archivo
+  var titulo = d.estilo || d.grupo || d.cliente || d.archivo || '—';
+  var sub = (d.estilo ? [d.grupo, d.cliente].filter(Boolean).join(' · ') : d.archivo) ||
+            d.archivo || '—';
+  h+='<div class="chead"><div class="ctit">'+titulo+
      (d.version?'<span style="font-size:14px;color:#5F726C;"> · v'+d.version+'</span>':'')+
-     '<small>'+(d.grupo||'—')+' · '+(d.cliente||'—')+'</small></div><div style="text-align:right;">'+
+     '<small>'+sub+'</small></div><div style="text-align:right;">'+
      '<span class="tag'+(ti.c?' '+ti.c:'')+'">'+ti.t+'</span>';
   if(lista.length>1) h+=' <span class="tag vig">VIGENTE</span>';
   if(d.estado==='REVISAR') h+=' <span class="tag rev">REVISAR</span>';
@@ -786,9 +813,7 @@ function cerrarVisor(){}
    ARRANQUE
    ============================================================ */
 
-montarSug('fCliente','sCliente','cliente');
-montarSug('fGrupo','sGrupo','grupo');
-montarSug('fEstilo','sEstilo','estilo');
+montarBusqueda();
 
 (function(){
   var s=leerSes();
