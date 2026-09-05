@@ -46,7 +46,16 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 #visor .vdrive{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.4);color:#fff;
   font-size:12px;font-weight:700;border-radius:6px;padding:8px 12px;text-decoration:none;white-space:nowrap;}
 #visor .vcuerpo{flex:1;position:relative;background:#2b3532;}
-#visor iframe{width:100%;height:100%;border:none;display:block;background:#fff;}
+#visor .vzoom{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.4);color:#fff;
+  font-family:inherit;font-size:17px;font-weight:800;border-radius:6px;width:38px;height:34px;cursor:pointer;}
+#visor .pgs{position:absolute;inset:0;overflow:hidden;touch-action:none;}
+#visor #lz{position:absolute;left:0;top:0;transform-origin:0 0;padding:8px 0 24px;text-align:center;}
+#visor #lz canvas{display:block;margin:0 auto 10px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.4);}
+#visor #lz .pnum{color:#9FB3AD;font-size:11px;margin-bottom:12px;}
+#visor .vcarga{position:absolute;left:0;right:0;bottom:0;background:rgba(14,59,54,.92);color:#CFE5DE;
+  font-size:11.5px;text-align:center;padding:6px;}
+#visor .vbarra{height:5px;background:rgba(255,255,255,.2);border-radius:4px;overflow:hidden;margin-top:10px;}
+#visor .vbarra i{display:block;height:100%;background:var(--emer);transition:width .3s;}
 #visor .vmsg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   color:#F1F6F4;font-size:14px;text-align:center;padding:24px;}
 .fld{position:relative;}
@@ -170,7 +179,9 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
   <div class="vbar">
     <button class="vvolver" onclick="cerrarVisor()">← Volver a buscar</button>
     <div class="vtit" id="vtit"></div>
-    <a class="vdrive" id="vdrive" target="_blank" rel="noopener">Abrir en Drive</a>
+    <button class="vzoom" onclick="zoomV(-1)">−</button>
+    <button class="vzoom" onclick="zoomV(1)">+</button>
+    <a class="vdrive" id="vdrive" target="_blank" rel="noopener">Drive</a>
   </div>
   <div class="vcuerpo" id="vcuerpo"></div>
 </div>
@@ -827,27 +838,187 @@ function irTablas(){ location.href='tablas.html'; }
 /* La ficha se muestra con el visor de Drive dentro de una capa propia:
    así hay botón para volver y el zoom de dos dedos actúa sobre el PDF,
    no sobre toda la página.                                             */
+/* ============================================================
+   VISOR PROPIO — funciona dentro del portal (el visor de Drive
+   no se puede cargar en un marco anidado). Muestra la primera
+   página apenas está lista y sigue con el resto por detrás.
+   ============================================================ */
+var PDFDOC=null, ESC=1, OX=0, OY=0, PJS=false, NITIDEZ=2.2, PDFCACHE={};
+
+function cargarPdfJs(cb){
+  if(PJS) return cb(true);
+  var s=document.createElement('script');
+  s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+  s.onload=function(){
+    try{
+      window['pdfjs-dist/build/pdf'].GlobalWorkerOptions.workerSrc=
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      PJS=true; cb(true);
+    }catch(e){ cb(false); }
+  };
+  s.onerror=function(){ cb(false); };
+  document.head.appendChild(s);
+}
+function vmsg(txt, extra){
+  document.getElementById('vcuerpo').innerHTML=
+    '<div class="vmsg"><div>'+txt+(extra||'')+'</div></div>';
+}
+function vprogreso(txt, pct){
+  document.getElementById('vcuerpo').innerHTML=
+    '<div class="vmsg"><div style="width:240px;max-width:80vw;">'+txt+
+    '<div class="vbarra"><i style="width:'+(pct||4)+'%"></i></div></div></div>';
+}
+
 function abrir(id,archivo,tipo,grupo,estilo){
-  var v=document.getElementById('visor');
   document.getElementById('vtit').textContent=archivo||'';
   document.getElementById('vdrive').href='https://drive.google.com/file/d/'+id+'/view';
-  document.getElementById('vcuerpo').innerHTML=
-    '<div class="vmsg">Abriendo la ficha…</div>'+
-    '<iframe src="https://drive.google.com/file/d/'+id+'/preview" allow="autoplay"></iframe>';
-  v.style.display='flex';
+  document.getElementById('visor').style.display='flex';
   bloquearZoomPagina(true);
   try{ history.pushState({visor:1},''); }catch(e){}
-  jsonp('accion=archivo&id='+encodeURIComponent(id)+'&'+ident()+
+  ESC=1; OX=0; OY=0;
+
+  if(PDFCACHE[id]){                       // ya se abrió antes en esta sesión
+    vprogreso('Preparando la vista…', 60);
+    setTimeout(function(){ dibujar(PDFCACHE[id]); }, 20);
+    return;
+  }
+  vprogreso('Descargando la ficha…', 8);
+  jsonp('accion=bytes&id='+encodeURIComponent(id)+'&'+ident()+
         '&tipo='+encodeURIComponent(tipo)+'&grupo='+encodeURIComponent(grupo)+
-        '&estilo='+encodeURIComponent(estilo), function(){});
+        '&estilo='+encodeURIComponent(estilo), function(r){
+    if(!r||!r.ok||!r.b64){
+      vmsg((r&&r.error)||'No se pudo abrir la ficha.');
+      return;
+    }
+    var arr;
+    try{
+      var bin=atob(r.b64), n=bin.length; arr=new Uint8Array(n);
+      for(var i=0;i<n;i++) arr[i]=bin.charCodeAt(i);
+      if(n<9000000) PDFCACHE[id]=arr;
+    }catch(e){ vmsg('El archivo llegó dañado. Intenta de nuevo.'); return; }
+    vprogreso('Preparando la vista…', 55);
+    dibujar(arr);
+  });
 }
+
+function dibujar(arr){
+  cargarPdfJs(function(ok){
+    if(!ok){ vmsg('No se pudo cargar el visor. Revisa tu conexión.'); return; }
+    var lib=window['pdfjs-dist/build/pdf'];
+    lib.getDocument({data:arr}).promise.then(function(doc){
+      PDFDOC=doc; render();
+    }).catch(function(){ vmsg('No se pudo leer el PDF.'); });
+  });
+}
+
+function render(){
+  if(!PDFDOC) return;
+  var cont=document.getElementById('vcuerpo');
+  cont.innerHTML='<div class="pgs" id="pgs"><div id="lz"></div></div>'+
+                 '<div class="vcarga" id="vcarga">Página 1 de '+PDFDOC.numPages+'…</div>';
+  var marco=document.getElementById('pgs'), lz=document.getElementById('lz');
+  lz.style.width=marco.clientWidth+'px';
+  var ancho=marco.clientWidth-16;
+  gestos(marco);
+
+  var n=PDFDOC.numPages, hechas=0;
+  // una por una y en orden: así la primera se ve enseguida
+  (function siguiente(pg){
+    if(pg>n){
+      var c=document.getElementById('vcarga'); if(c) c.style.display='none';
+      return;
+    }
+    PDFDOC.getPage(pg).then(function(page){
+      var v1=page.getViewport({scale:1});
+      var vp=page.getViewport({scale:ancho/v1.width});
+      var q=Math.min(window.devicePixelRatio||1,2)*NITIDEZ, max=5200;
+      if(vp.width*q>max)  q=max/vp.width;
+      if(vp.height*q>max) q=Math.min(q, max/vp.height);
+      var cv=document.createElement('canvas');
+      cv.width=Math.floor(vp.width*q); cv.height=Math.floor(vp.height*q);
+      cv.style.width=Math.floor(vp.width)+'px';
+      cv.style.height=Math.floor(vp.height)+'px';
+      lz.appendChild(cv);
+      var et=document.createElement('div');
+      et.className='pnum'; et.textContent='Página '+pg+' de '+n;
+      lz.appendChild(et);
+      var ctx=cv.getContext('2d'); ctx.scale(q,q);
+      page.render({canvasContext:ctx, viewport:vp}).promise.then(function(){
+        hechas++;
+        colocar();
+        var c=document.getElementById('vcarga');
+        if(c) c.textContent='Cargando página '+(pg+1)+' de '+n+'…';
+        setTimeout(function(){ siguiente(pg+1); }, 10);
+      });
+    }).catch(function(){ setTimeout(function(){ siguiente(pg+1); }, 10); });
+  })(1);
+}
+
+function colocar(){
+  var lz=document.getElementById('lz'), c=document.getElementById('pgs');
+  if(!lz||!c) return;
+  var aw=lz.offsetWidth*ESC, ah=lz.offsetHeight*ESC;
+  if(aw<=c.clientWidth) OX=(c.clientWidth-aw)/2;
+  else OX=Math.min(0, Math.max(c.clientWidth-aw, OX));
+  if(ah<=c.clientHeight) OY=0;
+  else OY=Math.min(0, Math.max(c.clientHeight-ah, OY));
+  lz.style.transform='translate('+OX+'px,'+OY+'px) scale('+ESC+')';
+}
+function zoomV(d){
+  var c=document.getElementById('pgs'); if(!c) return;
+  var ant=ESC; ESC=Math.min(6, Math.max(1, ESC+d*0.4));
+  var cx=c.clientWidth/2, cy=c.clientHeight/2;
+  OX=cx-(cx-OX)*(ESC/ant); OY=cy-(cy-OY)*(ESC/ant);
+  colocar();
+}
+function gestos(marco){
+  var mx=0,my=0,ox=0,oy=0,arr=false,d0=0,e0=1;
+  function dist(t){
+    var dx=t[0].clientX-t[1].clientX, dy=t[0].clientY-t[1].clientY;
+    return Math.sqrt(dx*dx+dy*dy);
+  }
+  marco.addEventListener('touchstart',function(e){
+    if(e.touches.length===2){ d0=dist(e.touches); e0=ESC; arr=false; }
+    else if(e.touches.length===1){ arr=true; mx=e.touches[0].clientX; my=e.touches[0].clientY; ox=OX; oy=OY; }
+  },{passive:true});
+  marco.addEventListener('touchmove',function(e){
+    e.preventDefault();
+    if(e.touches.length===2 && d0){
+      var nuevo=Math.min(6,Math.max(1,e0*(dist(e.touches)/d0)));
+      var r=marco.getBoundingClientRect();
+      var cx=(e.touches[0].clientX+e.touches[1].clientX)/2-r.left;
+      var cy=(e.touches[0].clientY+e.touches[1].clientY)/2-r.top;
+      OX=cx-(cx-OX)*(nuevo/ESC); OY=cy-(cy-OY)*(nuevo/ESC); ESC=nuevo; colocar();
+    }else if(e.touches.length===1 && arr){
+      OX=ox+(e.touches[0].clientX-mx); OY=oy+(e.touches[0].clientY-my); colocar();
+    }
+  },{passive:false});
+  marco.addEventListener('touchend',function(e){ if(!e.touches.length){ arr=false; d0=0; } },{passive:true});
+
+  marco.style.cursor='grab';
+  marco.addEventListener('mousedown',function(e){
+    if(e.button!==0) return;
+    e.preventDefault(); arr=true; mx=e.clientX; my=e.clientY; ox=OX; oy=OY;
+    marco.style.cursor='grabbing';
+  });
+  window.addEventListener('mousemove',function(e){
+    if(!arr) return; OX=ox+(e.clientX-mx); OY=oy+(e.clientY-my); colocar();
+  });
+  window.addEventListener('mouseup',function(){ arr=false; marco.style.cursor='grab'; });
+  marco.addEventListener('wheel',function(e){
+    e.preventDefault();
+    if(e.ctrlKey) zoomV(e.deltaY<0?1:-1);
+    else { OY-=e.deltaY; colocar(); }
+  },{passive:false});
+  marco.addEventListener('dblclick',function(){ zoomV(ESC>1.5?-10:2); });
+}
+
 function cerrarVisor(){
   document.getElementById('visor').style.display='none';
-  document.getElementById('vcuerpo').innerHTML='';   // libera la memoria
+  document.getElementById('vcuerpo').innerHTML='';
+  if(PDFDOC){ try{PDFDOC.destroy();}catch(e){} PDFDOC=null; }
   bloquearZoomPagina(false);
 }
-/* Mientras la ficha está abierta, el pinch no debe agrandar la página
-   entera: el visor de Drive maneja su propio acercamiento.             */
 function bloquearZoomPagina(bloquear){
   var m=document.getElementById('vp');
   if(!m) return;
