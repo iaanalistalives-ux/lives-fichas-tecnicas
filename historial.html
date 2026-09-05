@@ -61,6 +61,19 @@ input.txt:focus,select.txt:focus{outline:none;border-color:var(--sage);}
 .cargando{text-align:center;padding:34px;color:var(--stone);font-size:13.5px;}
 .sectitle{font-size:16px;font-weight:700;color:var(--sage-dark);margin:20px 0 12px;padding-bottom:6px;border-bottom:2px solid var(--warm);}
 
+/* ---- visor de la ficha ---- */
+#visor{position:fixed;inset:0;z-index:400;background:#1c2320;display:none;flex-direction:column;}
+#visor .vbar{background:var(--petrol);border-bottom:2px solid var(--emer);padding:9px 12px;
+  display:flex;align-items:center;gap:10px;flex-shrink:0;}
+#visor .vvolver{background:#fff;color:var(--petrol);border:none;font-family:inherit;font-size:13px;
+  font-weight:800;border-radius:6px;padding:9px 14px;cursor:pointer;white-space:nowrap;}
+#visor .vtit{flex:1;min-width:0;color:#fff;font-size:12.5px;font-weight:700;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#visor .vdrive{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.4);color:#fff;
+  font-size:12px;font-weight:700;border-radius:6px;padding:8px 12px;text-decoration:none;white-space:nowrap;}
+#visor .vcuerpo{flex:1;position:relative;background:#2b3532;}
+#visor iframe{width:100%;height:100%;border:none;display:block;background:#fff;}
+
 /* ---- membrete (solo al imprimir) ---- */
 #membrete{display:none;align-items:center;gap:16px;padding:0 0 10px;border-bottom:2px solid #0E3B36;margin-bottom:14px;}
 #membrete img{height:40px;}
@@ -89,7 +102,7 @@ input.txt:focus,select.txt:focus{outline:none;border-color:var(--sage);}
   .leyenda{ font-size:9px; }
   .firmas{ display:flex!important; }
   .soloweb{ display:none!important; }
-  #acceso{ display:none!important; }
+  #acceso,#visor{ display:none!important; }
 }
 .firmas{display:none;gap:40px;margin-top:26px;padding-top:6px;}
 .firmas div{flex:1;border-top:1px solid #666;padding-top:5px;font-size:10px;color:#333;text-align:center;}
@@ -170,6 +183,15 @@ td.nada{color:#C8D3CF;}
 
   <div class="kpis" id="kpis" style="display:none;"></div>
   <div id="salida"><div class="cargando">Cargando…</div></div>
+</div>
+
+<div id="visor">
+  <div class="vbar">
+    <button class="vvolver" onclick="cerrarVisor()">← Volver</button>
+    <div class="vtit" id="vtit"></div>
+    <a class="vdrive" id="vdrive" target="_blank" rel="noopener">Abrir en Drive</a>
+  </div>
+  <div class="vcuerpo" id="vcuerpo"></div>
 </div>
 
 <div id="det"><div class="top">
@@ -481,10 +503,27 @@ function imprimir(){ window.print(); }
 var FICHA=null;
 function verFicha(){
   if(!FICHA || !FICHA.id){ alert('Esta medición no tiene la ficha asociada.'); return; }
-  window.open('https://drive.google.com/file/d/'+FICHA.id+'/preview', '_blank', 'noopener');
+  document.getElementById('vtit').textContent=FICHA.nombre||'';
+  document.getElementById('vdrive').href='https://drive.google.com/file/d/'+FICHA.id+'/view';
+  document.getElementById('vcuerpo').innerHTML=
+    '<iframe src="https://drive.google.com/file/d/'+FICHA.id+'/preview" allow="autoplay"></iframe>';
+  document.getElementById('visor').style.display='flex';
+  bloquearZoomPagina(true);
   jsonp('accion=archivo&clave='+encodeURIComponent(SES.clave)+'&id='+encodeURIComponent(FICHA.id)+
         '&auditora='+encodeURIComponent(SES.nombre||'')+'&taller='+encodeURIComponent(SES.area||'CONSULTA')+
         '&estilo='+encodeURIComponent(FICHA.estilo||''), function(){});
+}
+function cerrarVisor(){
+  document.getElementById('visor').style.display='none';
+  document.getElementById('vcuerpo').innerHTML='';
+  bloquearZoomPagina(false);
+}
+function bloquearZoomPagina(bloquear){
+  var m=document.querySelector('meta[name="viewport"]');
+  if(!m) return;
+  m.setAttribute('content', bloquear
+    ? 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no'
+    : 'width=device-width, initial-scale=1');
 }
 
 function dato(l,v){ return '<div><span>'+l+':</span> <b>'+(v||'—')+'</b></div>'; }
