@@ -47,6 +47,12 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 .alerta .aSub{font-size:12px;color:var(--stone);margin-bottom:8px;}
 .alerta .aItem{background:#fff;border:1px solid var(--warm);border-radius:6px;padding:9px 11px;margin-bottom:6px;font-size:12.5px;cursor:pointer;display:flex;gap:8px;align-items:center;}
 .alerta .aItem b{color:#333;}
+.alerta .aItem .aTx{min-width:0;overflow-wrap:anywhere;}
+.alerta .aItem small{display:block;color:var(--stone);font-size:11px;margin-top:2px;}
+.sectit{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--stone);margin:14px 0 4px;}
+.vacioOk{font-size:12.5px;color:var(--sage);font-weight:700;padding:10px 4px;}
+details.yaListas{margin-top:14px;border-top:1px solid var(--warm);padding-top:8px;}
+details.yaListas summary{cursor:pointer;font-size:12.5px;font-weight:700;color:var(--sage);padding:6px 4px;min-height:32px;}
 .alerta .aItem span{margin-left:auto;color:var(--rose);font-weight:800;font-size:11.5px;white-space:nowrap;}
 .auto{background:var(--warm-light);border-radius:8px;padding:11px 13px;margin-bottom:12px;}
 .auto .autoTxt{font-size:12.5px;color:var(--stone);font-weight:600;margin-bottom:7px;}
@@ -515,7 +521,8 @@ function normNombre(t){
 
 function jsonpGAS(params, cb){
   var fn='cb_'+Math.random().toString(36).slice(2), s=document.createElement('script');
-  var to=setTimeout(function(){ fin(); cb({ok:false,error:'Tiempo de espera agotado.'}); },90000);
+  var espera = /accion=bytes/.test(params) ? 240000 : 90000;   // un PDF grande tarda más
+  var to=setTimeout(function(){ fin(); cb({ok:false,error:'La ficha tardó demasiado en llegar. Vuelve a tocarla: la segunda vez suele ser más rápida.'}); },espera);
   function fin(){ clearTimeout(to); try{delete window[fn];}catch(e){window[fn]=undefined;} if(s.parentNode) s.parentNode.removeChild(s); }
   window[fn]=function(r){ fin(); cb(r); };
   s.onerror=function(){ fin(); cb({ok:false,error:'No se pudo conectar.'}); };
@@ -565,6 +572,7 @@ function entrar(){
   jsonp('accion=datos&clave='+encodeURIComponent(c), function(r){
     if(!r || !r.ok){ error((r&&r.error)||'No se pudo conectar.'); return; }
     INDICE = r.datos || [];
+    pdfLimpiar();
     document.getElementById('app').style.display='block';
     document.getElementById('salida').innerHTML =
       INDICE.length ? '' : '<div class="vacio">No hay fichas cargadas en Drive todavía.</div>';
@@ -587,8 +595,85 @@ function estadoDe(estilo, tipo){
   if(!e) return 'pendiente';
   return e.confirmadoPor==='(automático)' ? 'automatica' : 'verificada';
 }
-function marcadaRevisar(id){ return REVISAR.indexOf(id)>=0; }
+/* Fichas apartadas para revisión: se recuerdan en el equipo, así al volver
+   a abrir la pantalla no se vuelven a leer solas. La clave incluye la fecha
+   de subida: si Luz reemplaza el PDF en el Drive, se vuelve a intentar.   */
 var REVISAR=[];
+try{ REVISAR=JSON.parse(LS.get('fichas_revisar')||'[]')||[]; }catch(e){ REVISAR=[]; }
+function claveFicha(id){
+  var d=(INDICE||[]).filter(function(x){ return x.id===id; })[0];
+  return id+'|'+(d?(d.fechaSubida||''):'');
+}
+function marcadaRevisar(id){ return REVISAR.indexOf(claveFicha(id))>=0; }
+function marcarRevisar(id){
+  var k=claveFicha(id);
+  if(REVISAR.indexOf(k)<0) REVISAR.push(k);
+  LS.set('fichas_revisar', JSON.stringify(REVISAR));
+}
+function quitarRevisar(id){
+  var k=claveFicha(id), i=REVISAR.indexOf(k);
+  if(i>=0) REVISAR.splice(i,1);
+  LS.set('fichas_revisar', JSON.stringify(REVISAR));
+}
+function limpiarRevisar(){ REVISAR=[]; LS.set('fichas_revisar','[]'); }
+
+/* ---------- PDF: copia en el equipo (IndexedDB) ----------
+   La primera vez el PDF viene del Drive a través del Apps Script (lento).
+   Después se abre desde el equipo al instante.                          */
+var PDFDB=null, PDFDB_FALLO=false;
+function pdfDb(cb){
+  if(PDFDB || PDFDB_FALLO) return cb(PDFDB);
+  try{
+    var rq=indexedDB.open('lives_fichas_pdf',1);
+    rq.onupgradeneeded=function(){ rq.result.createObjectStore('pdf'); };
+    rq.onsuccess=function(){ PDFDB=rq.result; cb(PDFDB); };
+    rq.onerror=function(){ PDFDB_FALLO=true; cb(null); };
+  }catch(e){ PDFDB_FALLO=true; cb(null); }
+}
+function pdfLocal(clave, cb){
+  pdfDb(function(db){
+    if(!db) return cb(null);
+    try{
+      var g=db.transaction('pdf').objectStore('pdf').get(clave);
+      g.onsuccess=function(){ cb(g.result||null); };
+      g.onerror=function(){ cb(null); };
+    }catch(e){ cb(null); }
+  });
+}
+function pdfGuardar(clave, buf){
+  pdfDb(function(db){
+    if(!db) return;
+    try{ db.transaction('pdf','readwrite').objectStore('pdf').put(buf, clave); }catch(e){}
+  });
+}
+/* borra del equipo los PDF que ya no están en el índice o fueron reemplazados */
+function pdfLimpiar(){
+  pdfDb(function(db){
+    if(!db || !INDICE.length) return;
+    var vigentes={};
+    INDICE.forEach(function(d){ vigentes[d.id+'|'+(d.fechaSubida||'')]=1; });
+    try{
+      var st=db.transaction('pdf','readwrite').objectStore('pdf');
+      var rq=st.getAllKeys();
+      rq.onsuccess=function(){ (rq.result||[]).forEach(function(k){ if(!vigentes[k]) st.delete(k); }); };
+    }catch(e){}
+  });
+}
+/* cb(error, Uint8Array) */
+function bajarPdf(id, modo, cb){
+  var k=claveFicha(id);
+  pdfLocal(k, function(buf){
+    if(buf){ cb(null, new Uint8Array(buf)); return; }
+    jsonp('accion=bytes&clave='+encodeURIComponent(SES.clave)+'&id='+encodeURIComponent(id)+
+          '&auditora='+encodeURIComponent(SES.nombre)+'&taller='+modo, function(r){
+      if(!r || !r.ok || !r.b64){ cb((r&&r.error)||'No se pudo abrir la ficha.'); return; }
+      var bin=atob(r.b64), n=bin.length, arr=new Uint8Array(n);
+      for(var i=0;i<n;i++) arr[i]=bin.charCodeAt(i);
+      pdfGuardar(k, arr.buffer.slice(0));
+      cb(null, arr);
+    });
+  });
+}
 
 function archivosConMedidas(){
   var con = INDICE.filter(function(d){ return d.tipo==='TECNICA' || d.tipo==='CORTE'; });
@@ -607,6 +692,7 @@ function archivosConMedidas(){
   });
 }
 
+var VER_LISTAS=false;
 function pintarPendientes(){
   var lista = archivosConMedidas();
   if(!lista.length){ document.getElementById('pendientes').style.display='none'; return; }
@@ -624,7 +710,10 @@ function pintarPendientes(){
     : (pend ? pend+' sin procesar todavía.' : 'Todas las tablas están listas. No hay nada que hacer.');
 
   pintarAlerta();
-  document.getElementById('listaPend').innerHTML = lista.map(function(a){
+  // arriba solo lo que falta (sin procesar); lo ya listo va plegado al final
+  var faltan = lista.filter(function(a){ return a.estado==='pendiente' && !marcadaRevisar(a.d.id); });
+  var listas = lista.filter(function(a){ return a.estado!=='pendiente'; });
+  function fila(a){
     var d=a.d, ests=a.estilos.join(', ');
     var cls, txt;
     if(marcadaRevisar(d.id)){ cls='rev'; txt='revisar'; }
@@ -637,7 +726,16 @@ function pintarPendientes(){
       '<div class="inf"><b>'+(d.tipo==='CORTE'?'CORTE':'TÉCNICA')+'</b> · '+(d.grupo||'—')+' · '+(d.cliente||'—')+
       '<br>'+d.archivo+'</div>'+
       '<div class="est2 '+cls+'">'+txt+'</div></div>';
-  }).join('');
+  }
+  var h = faltan.length
+    ? '<div class="sectit">Sin procesar ('+faltan.length+')</div>'+faltan.map(fila).join('')
+    : '<div class="vacioOk">No hay fichas sin procesar.</div>';
+  if(listas.length){
+    h+='<details class="yaListas"'+(VER_LISTAS?' open':'')+' ontoggle="VER_LISTAS=this.open">'+
+       '<summary>Ya procesadas ('+listas.length+') — tócalo para verlas</summary>'+
+       listas.map(fila).join('')+'</details>';
+  }
+  document.getElementById('listaPend').innerHTML = h;
   document.getElementById('pendientes').style.display='block';
 }
 
@@ -669,7 +767,8 @@ function pintarAlerta(){
     malas.map(function(a){
       return '<div class="aItem" onclick="abrirDeDrive(\''+a.d.id+'\',\''+
         String(a.d.archivo).replace(/'/g,"\\'")+'\')">'+
-        '<b>'+(a.estilos.join(', ')||'—')+'</b> · '+(a.d.grupo||'—')+' · '+(a.d.cliente||'—')+
+        '<div class="aTx"><b>'+(a.estilos.join(', ')||'—')+'</b> · '+(a.d.tipo==='CORTE'?'Corte':'Técnica')+
+        ' · '+(a.d.grupo||'—')+' · '+(a.d.cliente||'—')+'<small>'+a.d.archivo+'</small></div>'+
         '<span>revisar →</span></div>';
     }).join('');
 }
@@ -689,7 +788,7 @@ function procesarPendientes(forzar){
     var yaOk = todos.filter(function(a){ return a.estado!=='pendiente'; }).length;
     if(yaOk && !confirm('Se volverán a leer las '+todos.length+' fichas y se reemplazarán sus tablas.\n\n¿Continuar?'))
       return;
-    REVISAR=[]; faltan=todos;
+    limpiarRevisar(); faltan=todos;
   }else{
     faltan = todos.filter(function(a){
       return a.estado==='pendiente' && !marcadaRevisar(a.d.id);
@@ -727,13 +826,10 @@ function procesarPendientes(forzar){
       'Leyendo '+(i+1)+' de '+faltan.length+': '+a.d.archivo;
     document.getElementById('autoBar').style.width=Math.round(i/faltan.length*100)+'%';
 
-    jsonp('accion=bytes&clave='+encodeURIComponent(SES.clave)+'&id='+encodeURIComponent(a.d.id)+
-          '&auditora='+encodeURIComponent(SES.nombre)+'&taller=AUTOMATICO', function(r){
-      if(!r || !r.ok){ REVISAR.push(a.d.id); dudosas++; i++; pintarPendientes(); paso(); return; }
-      var bin=atob(r.b64), n=bin.length, arr=new Uint8Array(n);
-      for(var k=0;k<n;k++) arr[k]=bin.charCodeAt(k);
+    bajarPdf(a.d.id, 'AUTOMATICO', function(err, arr){
+      if(err){ marcarRevisar(a.d.id); dudosas++; i++; pintarPendientes(); paso(); return; }
       extraerDe(arr, function(res){
-        if(!res){ REVISAR.push(a.d.id); dudosas++; i++; pintarPendientes(); paso(); return; }
+        if(!res){ marcarRevisar(a.d.id); dudosas++; i++; pintarPendientes(); paso(); return; }
         var lote = (res.todas && res.todas.length) ? res.todas
                  : [{tabla:res.tabla, cab:res.cab, titulo:res.titulo, pagina:res.pagina}];
         // si alguna tabla del documento tiene celdas vacías o ilegibles, no se guarda
@@ -742,12 +838,12 @@ function procesarPendientes(forzar){
           return !x.cab.estilo || x.tabla.filas.some(function(f){ return f.vacias>0 || f.ilegibles>0; });
         });
         if(conDuda){
-          REVISAR.push(a.d.id); dudosas++; i++; pintarPendientes(); paso(); return;
+          marcarRevisar(a.d.id); dudosas++; i++; pintarPendientes(); paso(); return;
         }
         var j=0, fallo=false;
         (function otra(){
           if(j>=lote.length){
-            if(fallo){ REVISAR.push(a.d.id); dudosas++; } else ok++;
+            if(fallo){ marcarRevisar(a.d.id); dudosas++; } else ok++;
             i++; pintarPendientes(); paso(); return;
           }
           var x=lote[j++];
@@ -769,11 +865,13 @@ function abrirDeDrive(id, nombre){
   document.getElementById('fname').textContent=nombre;
   document.getElementById('salida').innerHTML='<div class="cargando">Descargando la ficha…</div>';
   ARCH={id:id, nombre:nombre};
-  jsonp('accion=bytes&clave='+encodeURIComponent(SES.clave)+'&id='+encodeURIComponent(id)+
-        '&auditora='+encodeURIComponent(SES.nombre)+'&taller=VERIFICACION', function(r){
-    if(!r || !r.ok){ error((r&&r.error)||'No se pudo abrir la ficha.'); return; }
-    var bin=atob(r.b64), n=bin.length, arr=new Uint8Array(n);
-    for(var i=0;i<n;i++) arr[i]=bin.charCodeAt(i);
+  window.scrollTo({top:0, behavior:'smooth'});
+  bajarPdf(id, 'VERIFICACION', function(err, arr){
+    if(err){
+      document.getElementById('salida').innerHTML='';
+      error(err);
+      return;
+    }
     leerArrayBuffer(arr, nombre);
   });
 }
@@ -1091,7 +1189,7 @@ function confirmar(){
     SES.nombre, function(r){
       btn.disabled=false; btn.textContent='La tabla es correcta';
       if(!r || !r.ok){ error((r&&r.error)||'No se pudo guardar.'); return; }
-      var k=REVISAR.indexOf(ARCH?ARCH.id:''); if(k>=0) REVISAR.splice(k,1);
+      if(ARCH) quitarRevisar(ARCH.id);
       var ok=document.getElementById('ok');
       ok.textContent='Tabla guardada. Ya está disponible para las auditoras.';
       ok.style.display='block';
