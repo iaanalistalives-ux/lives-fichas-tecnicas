@@ -379,6 +379,22 @@ function leerPagina(page){
 }
 
 /* --- cabecera: identificar la ficha --- */
+/* El COMBO o COLOR leído del PDF suele traer pegada la cabecera de la
+   tabla ("... TALLAS COD. Nº") o el número de partida. Eso hacía que la
+   misma tabla se guardara dos veces con combos distintos.            */
+function limpiarCombo(v){
+  var t=String(v||'')
+    .replace(/\(\s*PARTIDA[^)]*\)?/ig,' ')
+    .replace(/PARTIDA\s*:?\s*[\d\s-]{0,14}/ig,' ')
+    .split(/\bTALLAS?\b|\bCOD\b|\bTOL\b|\bN[ºo°]\b|\bPZAS?\b|\bPIQ/i)[0]
+    .replace(/[=]+/g,' ')
+    .replace(/\s+/g,' ')
+    .replace(/[\(\[]\s*$/,'')
+    .replace(/^[\s:\-–—\/]+|[\s:\-–—\/]+$/g,'');
+  if(/^(PARA\s+)?(TODOS|TODAS|VARIOS|VARIAS)\b/i.test(t)) return '';   // no distingue nada
+  return t.length>2 ? t.toUpperCase() : '';
+}
+
 function tituloTabla(texto, tipoDoc){
   var t=(texto||'').replace(/\u00A0/g,' ');
   var combo='';
@@ -387,7 +403,7 @@ function tituloTabla(texto, tipoDoc){
     combo=m[1].split(/\s{2,}|Modelista|Analista|Elaborado/i)[0]
               .replace(/\b[A-Z]{2,5}-?\d{2,4}\b/g,'')
               .replace(/\s+/g,' ').replace(/^[\s\-–—\/]+|[\s\-–—\/]+$/g,'');
-    if(combo.length<3) combo='';
+    combo=limpiarCombo(combo);
   }
   // En hojas de corte el discriminante natural es el COLOR
   if(!combo && tipoDoc==='CORTE'){
@@ -395,7 +411,7 @@ function tituloTabla(texto, tipoDoc){
     if(mc){
       var v=mc[1].split(/\d|Modelista|Analista|ROT|REV|Largo|Ancho|Cuello|Cuerpo|Mangas/i)[0]
                  .replace(/\s+/g,' ').replace(/^[\s:\-–—]+|[\s:\-–—]+$/g,'');
-      if(v.length>2) combo=v;
+      combo=limpiarCombo(v);
     }
   }
   var etapa = /EN\s+PRENDA\s+TERMINADA/i.test(t) ? 'Prenda terminada (después de vapor)'
@@ -849,7 +865,10 @@ function procesarPendientes(forzar){
           marcarRevisar(a.d.id); dudosas++; i++; pintarPendientes(); paso(); return;
         }
         var j=0, fallo=false;
-        (function otra(){
+        // primero se borran las tablas guardadas de este archivo, para que
+        // no queden combos viejos o mal leídos junto a los nuevos
+        post({ accion:'borrarEspecArchivo', fileId:a.d.id }, function(){ otra(); });
+        function otra(){
           if(j>=lote.length){
             if(fallo){ marcarRevisar(a.d.id); dudosas++; } else ok++;
             i++; pintarPendientes(); paso(); return;
@@ -861,7 +880,7 @@ function procesarPendientes(forzar){
               otra();
             }, x.titulo, x.pagina);
           }catch(err){ fallo=true; otra(); }
-        })();
+        }
       });
     });
   }
@@ -1018,11 +1037,12 @@ function lineaDe(t){
 /* Código de etapa que usan el backend y la pantalla de medir.
    (Esta función faltaba: todo guardado fallaba en silencio.)  */
 function codEtapa(titulo, tipo){
+  if(tipo==='CORTE') return 'CORTE';      // una hoja de corte solo mide corte
   var e = titulo && titulo.etapa ? String(titulo.etapa) : '';
   if(/Prenda terminada/i.test(e)) return 'TERMINADA';
   if(/antes de vapor|En costura/i.test(e)) return 'ANTES_VAPOR';
   if(/^Corte/i.test(e)) return 'CORTE';
-  return tipo==='CORTE' ? 'CORTE' : 'TERMINADA';
+  return 'TERMINADA';
 }
 
 /* Combo que se guarda: línea de tallas + color (si hay). "PLUS · HEATHER" */
