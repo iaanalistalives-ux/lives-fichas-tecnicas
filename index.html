@@ -262,10 +262,10 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
    almacenamiento local. Se usa memoria si no está disponible.  */
 var __MEM={};
 var LS={
-  get:function(k){ try{ var v=LS.get(k); return v===null?(__MEM[k]||null):v; }
+  get:function(k){ try{ var v=window.localStorage.getItem(k); return v===null?(__MEM[k]||null):v; }
                    catch(e){ return __MEM[k]||null; } },
-  set:function(k,v){ __MEM[k]=v; try{ LS.set(k,v); }catch(e){} },
-  del:function(k){ delete __MEM[k]; try{ LS.del(k); }catch(e){} }
+  set:function(k,v){ __MEM[k]=v; try{ window.localStorage.setItem(k,v); }catch(e){} },
+  del:function(k){ delete __MEM[k]; try{ window.localStorage.removeItem(k); }catch(e){} }
 };
 /* ============================================================
    CONFIGURACIÓN
@@ -297,7 +297,77 @@ function leerCache(){
 }
 
 /* ---------- JSONP ---------- */
+
+/* ---------- LECTURA: Supabase primero, Apps Script de respaldo (v3 · 17/09/2026) ----------
+   Las acciones de lectura se piden a Supabase (rápido). Si Supabase no responde,
+   la pantalla sigue sola con el Apps Script. Guardar sigue yendo al Apps Script,
+   que copia a Supabase en el mismo momento.                                        */
+var SB_URL='https://xxfufpddgoyhbotjmaiy.supabase.co';
+var SB_KEY='sb_publishable_1g-n6UT70EUlNAo8Lyc04w_jKR4LpXZ';
+var SB_OK=true;
+var ORIGEN_DATOS='';
+function qsObj(params){
+  var o={};
+  String(params||'').split('&').forEach(function(x){
+    if(!x) return;
+    var i=x.indexOf('='), k=i<0?x:x.slice(0,i), v=i<0?'':x.slice(i+1);
+    try{ k=decodeURIComponent(k); v=decodeURIComponent(v.replace(/\+/g,' ')); }catch(e){}
+    o[k]=v;
+  });
+  return o;
+}
+function sbRpc(fn, cuerpo, cb){
+  var ctl = window.AbortController ? new AbortController() : null;
+  var hecho=false;
+  var to = setTimeout(function(){ if(ctl) ctl.abort(); if(!hecho){ hecho=true; cb(new Error('tiempo')); } }, 10000);
+  fetch(SB_URL+'/rest/v1/rpc/'+fn, {
+    method:'POST',
+    headers:{ 'apikey':SB_KEY, 'Content-Type':'application/json' },
+    body:JSON.stringify(cuerpo||{}),
+    signal: ctl ? ctl.signal : undefined
+  }).then(function(r){
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return r.json();
+  }).then(function(j){
+    clearTimeout(to); if(!hecho){ hecho=true; cb(null,j); }
+  }).catch(function(e){
+    clearTimeout(to); if(!hecho){ hecho=true; cb(e); }
+  });
+}
+var SB_MAPA={
+  inicio:     function(p){ return ['fichas_inicio',{}]; },
+  datos:      function(p){ return ['fichas_inicio',{}, function(r){ return {ok:true,auth:true,origen:r.origen,datos:r.datos,estado:r.estado,verifican:r.verifican}; }]; },
+  listas:     function(p){ return ['fichas_listas',{}]; },
+  especs:     function(p){ return ['fichas_variantes',{p_estilo:'',p_tipo:''}, function(r){ return {ok:true,auth:true,origen:r.origen,especs:r.variantes}; }]; },
+  variantes:  function(p){ return ['fichas_variantes',{p_estilo:p.estilo||'',p_tipo:p.tipo||''}]; },
+  espec:      function(p){ return ['fichas_espec',{p_estilo:p.estilo||'',p_tipo:p.tipo||'',p_etapa:p.etapa||'',p_combo:p.combo||''}]; },
+  medir:      function(p){ return ['fichas_medir',{p_estilo:p.estilo||'',p_tipo:p.tipo||'',p_etapa:p.etapa||'',p_combo:p.combo||''}]; },
+  mediciones: function(p){ return ['fichas_mediciones',{p_estilo:p.estilo||'',p_grupo:p.grupo||'',p_taller:p.taller||'',
+                                   p_auditora:p.auditora||'',p_desde:p.desde||'',p_hasta:p.hasta||''}]; },
+  medicion:   function(p){ return ['fichas_medicion',{p_id:p.id||''}]; },
+  quien:      function(p){ return ['fichas_quien',{p_usuario:p.usuario||''}]; }
+};
 function jsonp(params, cb){
+  var p=qsObj(params), m=SB_MAPA[p.accion||'datos'];
+  if(!m || !SB_OK){ jsonpGAS(params, function(r){ if(m) ORIGEN_DATOS='respaldo'; cb(r); }); return; }
+  var d=m(p);
+  sbRpc(d[0], d[1], function(err, r){
+    if(err || !r || r.ok===false){
+      SB_OK=false;
+      try{ console.warn('Supabase no respondió; se usa el Apps Script.', err); }catch(e){}
+      jsonpGAS(params, function(x){ ORIGEN_DATOS='respaldo'; cb(x); });
+      return;
+    }
+    ORIGEN_DATOS='supabase';
+    cb(d[2] ? d[2](r) : r);
+  });
+}
+function normNombre(t){
+  return String(t||'').normalize('NFD').replace(/[\u0300-\u0302\u0304-\u036f]/g,'').normalize('NFC')
+           .toUpperCase().replace(/\s+/g,' ').trim();
+}
+
+function jsonpGAS(params, cb){
   var fn='cb_'+Math.random().toString(36).slice(2), s=document.createElement('script');
   var to=setTimeout(function(){ fin(); cb({ok:false,error:'Tiempo de espera agotado. Revisa tu señal.'}); },90000);
   function fin(){ clearTimeout(to); try{delete window[fn];}catch(e){window[fn]=undefined;} if(s.parentNode) s.parentNode.removeChild(s); }
@@ -323,6 +393,7 @@ function cargarListas(){
     TALL_RAW = (r.talleres||[]);
     AUD_RAW  = r.auditoras||[];
     AUDITORAS = AUD_RAW.map(function(a){ return typeof a==='string' ? a : a.nombre; });
+    if(r.verifican){ VERIFICAN=r.verifican; mostrarPanelTodo(); pintarQuien(); }
   });
 }
 var TALL_RAW=[], AUD_RAW=[];
@@ -332,10 +403,18 @@ function rolDe(nombre){
   })[0];
   return (a && a.rol) ? a.rol : '';
 }
-var ROLES_VERIFICAN = ['SUPERVISORA TOP SAMPLE','DIGITADORA'];
-function puedeVerificar(rol){ return ROLES_VERIFICAN.indexOf(String(rol||'').toUpperCase())>=0; }
-function esDigitadora(){ return SES && puedeVerificar(SES.rol); }
-// se activa con ?rol=SUPERVISORA%20TOP%20SAMPLE en la dirección
+/* Verificadora = quien tiene permiso para "Confirmación de Fichas Técnicas"
+   en el portal (hoy Luz Rayme). La lista viene de Supabase.           */
+var VERIFICAN=[];
+function esDigitadora(){
+  if(!SES || !SES.auditora) return false;
+  var n=normNombre(SES.auditora);
+  return VERIFICAN.some(function(v){ return normNombre(v)===n; });
+}
+function mostrarPanelTodo(){
+  var p=document.getElementById('panelTodo');
+  if(p) p.style.display = esDigitadora() ? 'block' : 'none';
+}
 function aerr(m){ if(m) error(m); }
 /* La clave la entrega el portal: llega por la dirección (?clave=) o queda
    guardada en el equipo. Aquí solo se piden taller y nombre.             */
@@ -380,7 +459,7 @@ function entrar(){
   var c=claveDelPortal();
   try{ LS.set('lives_clave', c); }catch(e){}
   SES={ taller: paramDe('taller')||'', auditora: paramDe('usuario')||'',
-        clave:c, rol: paramDe('rol')||'' };
+        clave:c, rol:'' };
   guardarSes(SES);
   pintarQuien();
   cargar(false, true);
@@ -392,7 +471,7 @@ function salir(){
 function pintarQuien(){
   var q=document.getElementById('quien');
   if(!SES || !SES.auditora){ q.innerHTML=''; return; }
-  q.innerHTML='<div><b>'+SES.auditora+'</b>'+(SES.rol?SES.rol:SES.taller)+'</div>'+
+  q.innerHTML='<div><b>'+SES.auditora+'</b>'+(esDigitadora()?'Verificadora de fichas':(SES.taller||''))+'</div>'+
               '<button onclick="salir()">Cambiar</button>';
 }
 
@@ -412,6 +491,7 @@ function cargar(forzar, primera){
       error(r && r.error ? r.error : 'No se pudo cargar el índice.');
       return;
     }
+    if(r.verifican) VERIFICAN=r.verifican;
     if(primera){
       guardarSes(SES);
       pintarQuien();
@@ -696,7 +776,8 @@ function tg(i){
 
 function medir(estilo, tipo, grupo, cliente){
   var q='?estilo='+encodeURIComponent(estilo)+'&tipo='+encodeURIComponent(tipo)+
-        '&grupo='+encodeURIComponent(grupo||'')+'&cliente='+encodeURIComponent(cliente||'');
+        '&grupo='+encodeURIComponent(grupo||'')+'&cliente='+encodeURIComponent(cliente||'')+
+        '&usuario='+encodeURIComponent((SES&&SES.auditora)||'');
   location.href='medidas.html'+q;
 }
 
@@ -1058,6 +1139,7 @@ window.addEventListener('popstate', function(){
         TALLERES=TALL_RAW.map(function(t){return t.nombre+(t.proceso?' · '+t.proceso:'');});
         AUD_RAW=r.auditoras||[];
         AUDITORAS=AUD_RAW.map(function(a){ return typeof a==='string'? a : a.nombre; });
+        if(r.verifican){ VERIFICAN=r.verifican; mostrarPanelTodo(); pintarQuien(); }
       }
     });
   }else{
