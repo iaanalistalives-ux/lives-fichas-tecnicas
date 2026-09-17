@@ -688,6 +688,14 @@ function archivosConMedidas(){
     a.base = a.estilos.length ? String(a.estilos[0]).split('-')[0] : '';
     a.tipo = a.d.tipo==='CORTE' ? 'CORTE' : 'TECNICA';
     a.estado = a.base ? estadoDe(a.base, a.tipo) : 'pendiente';
+    var lin = lineaDe(a.d.archivo);
+    if(lin && a.estado!=='pendiente'){
+      var tiene = ESPECS.some(function(e){
+        return String(e.estilo)===String(a.base) && e.tipo===a.tipo &&
+               String(e.combo||'').split(' · ')[0]===lin;
+      });
+      if(!tiene) a.estado='pendiente';
+    }
     return a;
   });
 }
@@ -950,6 +958,7 @@ function extraerDe(arr, cb){
         }
       }
       if(!cabDoc) cabDoc=cabecera(textos[0]);
+      cabDoc.linea = lineaDe(String(textos[0]||'').slice(0,4000));
       if(!tipoDoc) tipoDoc=cabDoc.tipo;
 
       var ultEtapa='', ultCombo='';
@@ -958,6 +967,7 @@ function extraerDe(arr, cb){
         if(!cb2.estilo)   cb2.estilo   = cabDoc.estilo;
         if(!cb2.grupo)    cb2.grupo    = cabDoc.grupo;
         if(!cb2.fechaFicha) cb2.fechaFicha = cabDoc.fechaFicha;
+        cb2.linea = cabDoc.linea;
         cb2.tipo = tipoDoc;                       // el tipo lo manda el documento
         var ti=tituloTabla(textos[x.n-1], tipoDoc);
         if(ti.etapa==='Medidas'){                 // página de continuación
@@ -994,6 +1004,17 @@ function extraerDe(arr, cb){
   }).catch(function(){ cb(null); });
 }
 
+
+/* Línea de tallas de EFI: Missy (XXS–XL), Plus (1X–3X), Petite.
+   Sale del nombre del archivo o del encabezado ("... – Missy").
+   No es una versión: las líneas conviven, cada una con su tabla.   */
+function lineaDe(t){
+  t=String(t||'');
+  var m = t.match(/\(\s*(MISSY|PLUS|PETITE)\s*\)/i) ||
+          t.match(/[–—-]\s*(MISSY|PLUS|PETITE)\b/i);
+  return m ? m[1].toUpperCase() : '';
+}
+
 /* Código de etapa que usan el backend y la pantalla de medir.
    (Esta función faltaba: todo guardado fallaba en silencio.)  */
 function codEtapa(titulo, tipo){
@@ -1002,6 +1023,14 @@ function codEtapa(titulo, tipo){
   if(/antes de vapor|En costura/i.test(e)) return 'ANTES_VAPOR';
   if(/^Corte/i.test(e)) return 'CORTE';
   return tipo==='CORTE' ? 'CORTE' : 'TERMINADA';
+}
+
+/* Combo que se guarda: línea de tallas + color (si hay). "PLUS · HEATHER" */
+function comboConLinea(titulo, cab, archivo){
+  var combo=(titulo&&titulo.combo)||'';
+  var linea=lineaDe(archivo) || (cab&&cab.linea) || '';
+  if(!linea || lineaDe('('+combo.split(' · ')[0]+')')===linea) return combo;
+  return linea + (combo ? ' · '+combo : '');
 }
 
 /* Guarda una tabla ya extraída. */
@@ -1023,7 +1052,7 @@ function guardarTabla(tabla, cab, fileId, archivo, quien, cb, titulo, pagina){
   });
   post({ accion:'guardarEspec', estilo:estiloBase, version:version,
          grupo:cab.grupo||'', tipo:tipo,
-         etapa: codEtapa(titulo, tipo), combo: (titulo&&titulo.combo)||'',
+         etapa: codEtapa(titulo, tipo), combo: comboConLinea(titulo, cab, archivo),
          fileId:fileId||'', archivo:archivo||'', pagina:pagina||'',
          fechaFicha: cab.fechaFicha||'',
          tallas:tallas, puntos:puntos, confirmadoPor:quien }, cb);
@@ -1079,7 +1108,7 @@ function pintar(pag, total){
   }
   h+='<div class="panel"><div class="pt">Ficha identificada</div>'+
      '<div class="ph">Datos leídos del encabezado de esa página</div><div class="datos">'+
-     dato('Tabla',(CAB.titulo?CAB.titulo.etapa:'')+(CAB.titulo&&CAB.titulo.combo?' · '+CAB.titulo.combo:''))+
+     dato('Tabla',(CAB.titulo?CAB.titulo.etapa:'')+(comboConLinea(CAB.titulo,CAB,ARCH?ARCH.nombre:'')?' · '+comboConLinea(CAB.titulo,CAB,ARCH?ARCH.nombre:''):''))+
      dato('Estilo',CAB.estilo)+dato('Grupo',CAB.grupo)+
      dato('Cliente',CAB.cliente)+dato('Color',CAB.color)+dato('O. Corte',CAB.ocorte)+
      '</div></div>';
