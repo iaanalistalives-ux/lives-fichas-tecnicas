@@ -151,12 +151,12 @@ td.falta{color:var(--rose);font-weight:700;}
     </div>
     <div class="accBar">
       <a class="btn subir" href="https://drive.google.com/drive/folders/1L0mdAy04_aSV9bLyVRl4BHVjysd5Ep7B"
-         target="_blank" rel="noopener">Subir fichas al Drive</a>
+         target="_blank" rel="noopener">Abrir la carpeta del Drive</a>
       <button class="btn" id="btnMasivo" onclick="procesarPendientes(true)">Procesar todas</button>
       <span class="accHint" id="accHint"></span>
     </div>
     <div class="pasos">
-      <b>1.</b> Abre el Drive y arrastra ahí tus PDF &nbsp;·&nbsp;
+      <b>1.</b> Arrastra tus PDF a la carpeta del Drive &nbsp;·&nbsp;
       <b>2.</b> Vuelve aquí y toca <b>Procesar todas</b>
     </div>
     <div class="alerta" id="alertaRev" style="display:none;"></div>
@@ -903,7 +903,7 @@ function procesarPendientes(forzar){
             }, x.titulo, x.pagina);
           }catch(err){ fallo=true; otra(); }
         }
-      });
+      }, a.tipo);
     });
   }
   paso();
@@ -921,7 +921,8 @@ function abrirDeDrive(id, nombre){
       error(err);
       return;
     }
-    leerArrayBuffer(arr, nombre);
+    var d=(INDICE||[]).filter(function(x){ return x.id===id; })[0];
+    leerArrayBuffer(arr, nombre, d ? (d.tipo==='CORTE'?'CORTE':'TECNICA') : '');
   });
 }
 
@@ -972,7 +973,11 @@ function procesar(file){
 }
 
 /* Extrae tabla y cabecera de un PDF ya en memoria. Devuelve null si no hay tabla. */
-function extraerDe(arr, cb){
+/* tipoIndice: CORTE o TECNICA según el índice (lo determina el servidor,
+   que además usa el nombre del archivo). Manda sobre el título impreso:
+   hubo hojas de corte cuyo título no se reconoció y quedaron guardadas
+   como ficha técnica, pisando la tabla de la técnica real.            */
+function extraerDe(arr, cb, tipoIndice){
   pdfjsLib.getDocument({data:arr}).promise.then(function(doc){
     var textos=[], tareas=[];
     for(var i=1;i<=doc.numPages;i++){
@@ -1001,6 +1006,10 @@ function extraerDe(arr, cb){
       if(!cabDoc) cabDoc=cabecera(textos[0]);
       cabDoc.linea = lineaDe(String(textos[0]||'').slice(0,4000));
       if(!tipoDoc) tipoDoc=cabDoc.tipo;
+      if(tipoIndice==='CORTE' || tipoIndice==='TECNICA'){
+        tipoDoc = tipoIndice;                      // el índice manda
+        cabDoc.tipo = tipoIndice==='CORTE' ? 'CORTE' : 'PRENDA TERMINADA';
+      }
 
       var ultEtapa='', ultCombo='';
       var todas=c.map(function(x){
@@ -1103,7 +1112,7 @@ function guardarTabla(tabla, cab, fileId, archivo, quien, cb, titulo, pagina){
 
 var TODAS=[], IDX=0, TOTALPAG=0;
 
-function leerArrayBuffer(arr, nombre){
+function leerArrayBuffer(arr, nombre, tipoIndice){
   document.getElementById('salida').innerHTML='<div class="cargando">Leyendo el PDF…</div>';
   extraerDe(arr, function(res){
     if(!res){
@@ -1117,7 +1126,7 @@ function leerArrayBuffer(arr, nombre){
     IDX=0;
     TODAS.forEach(function(x,i){ if(x.pagina===res.pagina) IDX=i; });
     usarTabla(IDX, res.total);
-  });
+  }, tipoIndice);
 }
 function usarTabla(i, total){
   IDX=i; if(total) TOTALPAG=total;
