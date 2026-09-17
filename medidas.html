@@ -156,6 +156,20 @@ input.txt:focus{outline:none;border-color:var(--sage);}
 .sel button i{font-style:normal;font-size:10px;font-weight:700;display:block;opacity:.75;}
 .sel-lbl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#9FC9BE;margin-bottom:5px;}
 .pieacc{margin-top:18px;padding-top:16px;border-top:2px solid var(--warm);}
+/* ---- dibujo de la ficha ---- */
+#btnDib{position:fixed;left:12px;bottom:12px;z-index:60;background:var(--sage);color:#fff;border:0;
+  border-radius:24px;min-height:48px;padding:0 18px;font:inherit;font-size:14px;font-weight:700;
+  box-shadow:0 4px 12px rgba(14,59,54,.25);display:none;align-items:center;gap:8px;}
+#btnDib:disabled{opacity:.6;}
+#dibujo{position:fixed;inset:0;z-index:80;background:rgba(14,59,54,.94);display:none;flex-direction:column;}
+#dibujo .dTop{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--petrol);
+  border-bottom:3px solid var(--emer);color:#fff;}
+#dibujo .dTit{font-size:14px;font-weight:700;flex:1;min-width:0;overflow-wrap:anywhere;}
+#dibujo .dTop button{min-height:40px;min-width:44px;border:0;border-radius:8px;background:#ffffff22;color:#fff;
+  font:inherit;font-size:16px;font-weight:700;}
+#dibujo .dCaja{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;background:#fff;}
+#dibujo canvas{display:block;}
+#dibujo .dPie{padding:8px 12px;background:var(--petrol);color:#fff;font-size:12px;text-align:center;}
 .sectitle{font-size:15.5px;font-weight:700;color:var(--sage-dark);margin:18px 0 10px;padding-bottom:5px;border-bottom:2px solid var(--warm);}
 .note{background:#fff;border:1px solid var(--warm);border-left:4px solid var(--tan);border-radius:6px;padding:10px 13px;font-size:11.5px;color:var(--stone);margin:14px 0;line-height:1.5;}
 </style>
@@ -215,6 +229,21 @@ input.txt:focus{outline:none;border-color:var(--sage);}
   </div>
 
 
+</div>
+
+<!-- ================= DIBUJO DE LA FICHA ================= -->
+<button id="btnDib" onclick="abrirDibujo()">Ver dibujo</button>
+<div id="dibujo">
+  <div class="dTop">
+    <div class="dTit" id="dibTit">Dibujo de la ficha</div>
+    <button onclick="pasarDib(-1)" aria-label="Página anterior">‹</button>
+    <button onclick="pasarDib(1)" aria-label="Página siguiente">›</button>
+    <button onclick="zoomDib(-1)" aria-label="Alejar">−</button>
+    <button onclick="zoomDib(1)" aria-label="Acercar">+</button>
+    <button onclick="cerrarDibujo()" aria-label="Cerrar">✕</button>
+  </div>
+  <div class="dCaja" id="dibCaja"></div>
+  <div class="dPie" id="dibPie">Las medidas del dibujo van con su código.</div>
 </div>
 
 <!-- ================= MEDICIÓN ================= -->
@@ -692,6 +721,7 @@ function empezar(){
   document.querySelector('.header').style.display='none';
   document.getElementById('medir').style.display='block';
   pintarSelectores(); pintarLista(); ajustarTope();
+  verBotonDibujo();
 }
 
 /* ---------- lista de puntos ---------- */
@@ -772,6 +802,12 @@ function pintarLista(){
   document.getElementById('lista').innerHTML=h;
   if(PUNTO!==null) pintarFracs();
   pintarResumen();
+  verBotonDibujo();
+  if(DIB.pdf && document.getElementById('dibujo').style.display==='flex' && PUNTO!==null){
+    DIB.cod=String(F.puntos[PUNTO][0]).toUpperCase();
+    txt('dibTit','Dibujo · punto '+DIB.cod);
+    irAlPunto();
+  }
 }
 
 /* ---------- panel que se despliega dentro de la lista ---------- */
@@ -794,6 +830,198 @@ function panelPunto(i, esp, tol){
       '<button class="btn ghost" onclick="cerrarPunto()">Cerrar</button>'+
       '<button class="btn" id="btnGuardar" onclick="guardarPunto()" disabled>Guardar</button>'+
     '</div></div>';
+}
+
+/* ==========================================================
+   DIBUJO DE LA FICHA (v3 · 17/09/2026)
+   En las hojas de corte los puntos son solo códigos (A1, B7…), así que
+   el dibujo es la única forma de saber qué se mide. El PDF se baja una
+   vez y queda guardado en el celular; el botón abre la página del
+   dibujo ajustada a la pantalla, con zoom y cambio de página.
+   Nota: las letras del dibujo son parte de la imagen, no texto, así que
+   el sistema no puede señalarlas solo; sí sabe en qué página están.
+   ========================================================== */
+var DIB={ pdf:null, fileId:null, escala:null, pagina:1, paginas:null, cod:'' };
+
+function pdfjsListo(cb){
+  if(window.pdfjsLib){ cb(true); return; }
+  var s=document.createElement('script');
+  s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+  s.onload=function(){
+    try{
+      if(window['pdfjs-dist/build/pdf']) window.pdfjsLib=window['pdfjs-dist/build/pdf'];
+      pdfjsLib.GlobalWorkerOptions.workerSrc=
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }catch(e){}
+    cb(!!window.pdfjsLib);
+  };
+  s.onerror=function(){ cb(false); };
+  document.body.appendChild(s);
+}
+
+/* ---- el PDF, guardado en el celular ---- */
+var PDFDB=null, PDFDB_NO=false;
+function pdfDb(cb){
+  if(PDFDB || PDFDB_NO) return cb(PDFDB);
+  try{
+    var rq=indexedDB.open('lives_fichas_pdf',1);
+    rq.onupgradeneeded=function(){ rq.result.createObjectStore('pdf'); };
+    rq.onsuccess=function(){ PDFDB=rq.result; cb(PDFDB); };
+    rq.onerror=function(){ PDFDB_NO=true; cb(null); };
+  }catch(e){ PDFDB_NO=true; cb(null); }
+}
+function pdfLocal(k, cb){
+  pdfDb(function(db){
+    if(!db) return cb(null);
+    try{
+      var g=db.transaction('pdf').objectStore('pdf').get(k);
+      g.onsuccess=function(){ cb(g.result||null); };
+      g.onerror=function(){ cb(null); };
+    }catch(e){ cb(null); }
+  });
+}
+function pdfGuardar(k, buf){
+  pdfDb(function(db){
+    if(!db) return;
+    try{ db.transaction('pdf','readwrite').objectStore('pdf').put(buf,k); }catch(e){}
+  });
+}
+function bajarFicha(cb){
+  var id=ESPEC && ESPEC.fileId;
+  if(!id){ cb('Esta tabla no tiene la ficha guardada en el Drive.'); return; }
+  var k=id+'|'+(ESPEC.archivo||'');
+  pdfLocal(k, function(buf){
+    if(buf){ cb(null, new Uint8Array(buf)); return; }
+    jsonp('accion=bytes&clave='+encodeURIComponent(SES.clave)+'&id='+encodeURIComponent(id)+
+          '&auditora='+encodeURIComponent(SES.auditora)+'&taller=DIBUJO', function(r){
+      if(!r || !r.ok || !r.b64){ cb((r&&r.error)||'No se pudo bajar la ficha.'); return; }
+      var bin=atob(r.b64), n=bin.length, arr=new Uint8Array(n);
+      for(var i=0;i<n;i++) arr[i]=bin.charCodeAt(i);
+      pdfGuardar(k, arr.buffer.slice(0));
+      cb(null, arr);
+    });
+  });
+}
+
+/* ---- qué hay en cada página: códigos del cuadro y si es el dibujo ---- */
+function leerPaginas(cb){
+  if(DIB.paginas) return cb(DIB.paginas);
+  var pdf=DIB.pdf, total=pdf.numPages, listo=0, info={};
+  var codigos={}; (F&&F.puntos||[]).forEach(function(p){ codigos[String(p[0]).toUpperCase()]=1; });
+  for(var n=1;n<=total;n++){
+    (function(n){
+      pdf.getPage(n).then(function(pg){
+        return pg.getTextContent().then(function(tc){
+          var cods={}, txtPag='';
+          tc.items.forEach(function(it){
+            var t=String(it.str||'').trim();
+            txtPag += ' '+t;
+            var u=t.toUpperCase();
+            if(codigos[u]) cods[u]=1;
+          });
+          info[n]={ cods:cods, dibujo:/TOMA\s+DE\s+MEDIDAS/i.test(txtPag) };
+          listo++; if(listo===total){ DIB.paginas=info; cb(info); }
+        });
+      }).catch(function(){
+        info[n]={cods:{},dibujo:false};
+        listo++; if(listo===total){ DIB.paginas=info; cb(info); }
+      });
+    })(n);
+  }
+  if(!total) cb(info);
+}
+
+/* La página del dibujo: la hoja "TOMA DE MEDIDAS" si existe (ficha
+   técnica); si no, la página donde figura ese código (en las hojas de
+   corte el dibujo está junto a su cuadro).                           */
+function paginaDe(cod, info){
+  var conDibujo=null, conCod=null;
+  Object.keys(info).forEach(function(n){
+    n=parseInt(n,10);
+    if(info[n].dibujo && conDibujo===null) conDibujo=n;
+    if(cod && info[n].cods[cod] && conCod===null) conCod=n;
+  });
+  if(conDibujo) return conDibujo;
+  if(conCod) return conCod;
+  var p=parseInt(ESPEC&&ESPEC.pagina,10);
+  return p>0 ? p : 1;
+}
+
+function abrirDibujo(){
+  var caja=document.getElementById('dibCaja');
+  DIB.cod = (PUNTO!==null && F && F.puntos[PUNTO]) ? String(F.puntos[PUNTO][0]).toUpperCase() : '';
+  document.getElementById('dibujo').style.display='flex';
+  txt('dibTit', DIB.cod ? 'Dibujo · punto '+DIB.cod : 'Dibujo de la ficha');
+  caja.innerHTML='<div style="padding:24px;color:var(--stone);font-size:14px;">Bajando la ficha… '+
+    'la primera vez tarda; después queda guardada en este celular.</div>';
+  txt('dibPie','Bajando la ficha…');
+  pdfjsListo(function(ok){
+    if(!ok){ caja.innerHTML=aviso('No se pudo cargar el visor. Revisa tu señal.'); txt('dibPie',''); return; }
+    if(DIB.pdf && DIB.fileId===(ESPEC&&ESPEC.fileId)){ irAlPunto(); return; }
+    bajarFicha(function(err, arr){
+      if(err){ caja.innerHTML=aviso(err); txt('dibPie',''); return; }
+      pdfjsLib.getDocument({data:arr}).promise.then(function(pdf){
+        DIB.pdf=pdf; DIB.fileId=ESPEC.fileId; DIB.paginas=null; DIB.escala=null;
+        irAlPunto();
+      }).catch(function(){ caja.innerHTML=aviso('No se pudo abrir la ficha.'); txt('dibPie',''); });
+    });
+  });
+}
+function aviso(m){
+  return '<div style="padding:24px;color:var(--rose);font-size:14px;font-weight:700;">'+m+'</div>';
+}
+function cerrarDibujo(){ document.getElementById('dibujo').style.display='none'; }
+function irAlPunto(){
+  leerPaginas(function(info){
+    DIB.pagina=paginaDe(DIB.cod, info);
+    DIB.escala=null;                       // ajustar al ancho de la pantalla
+    pintarDibujo();
+  });
+}
+function zoomDib(d){
+  if(!DIB.pdf) return;
+  DIB.escala=Math.max(0.4, Math.min(4, (DIB.escala||1) + d*0.4));
+  pintarDibujo();
+}
+function pasarDib(d){
+  if(!DIB.pdf) return;
+  var p=DIB.pagina+d;
+  if(p<1 || p>DIB.pdf.numPages) return;
+  DIB.pagina=p; DIB.escala=null; pintarDibujo();
+}
+
+function pintarDibujo(){
+  var caja=document.getElementById('dibCaja');
+  if(!DIB.pdf) return;
+  DIB.pdf.getPage(DIB.pagina).then(function(pg){
+    var v1=pg.getViewport({scale:1});
+    if(DIB.escala===null){
+      var ancho=(caja.clientWidth||360)-4;
+      DIB.escala=Math.max(0.4, ancho/v1.width);   // entra completa de ancho
+    }
+    var vp=pg.getViewport({scale:DIB.escala});
+    var cv=document.createElement('canvas');
+    cv.width=Math.round(vp.width); cv.height=Math.round(vp.height);
+    caja.innerHTML=''; caja.appendChild(cv);
+    window.__dib={ pagina:DIB.pagina, escala:Math.round(DIB.escala*100)/100, cod:DIB.cod,
+                   ancho:cv.width, alto:cv.height, paginas:DIB.pdf.numPages };
+    pg.render({ canvasContext:cv.getContext('2d'), viewport:vp }).promise.then(function(){
+      caja.scrollTop=0; caja.scrollLeft=0;
+      txt('dibPie', (DIB.cod ? 'El punto '+DIB.cod+' está en esta página. ' : '')+
+        'Página '+DIB.pagina+' de '+DIB.pdf.numPages+' · usa + para acercar');
+    });
+  }).catch(function(){ caja.innerHTML=aviso('No se pudo dibujar la página.'); });
+}
+
+/* El botón solo aparece mientras se mide y si la ficha está en el Drive */
+function verBotonDibujo(){
+  var b=document.getElementById('btnDib');
+  if(!b) return;
+  var midiendo = document.getElementById('medir').style.display==='block';
+  b.style.display = (midiendo && ESPEC && ESPEC.fileId) ? 'inline-flex' : 'none';
+  b.textContent = (PUNTO!==null && F && F.puntos[PUNTO])
+    ? 'Ver ' + F.puntos[PUNTO][0] + ' en el dibujo'
+    : 'Ver dibujo';
 }
 
 var FRACS=[[1,16],[1,8],[3,16],[1,4],[5,16],[3,8],[1,2],[5,8],[3,4],[7,8],[1,1],[0,0]];
