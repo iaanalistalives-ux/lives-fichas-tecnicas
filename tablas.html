@@ -190,7 +190,12 @@ var LS={
    no en el orden del texto: así no se confunde el último valor
    de una fila con la tolerancia.
    ========================================================== */
-var TALLAS = ['XXS','XS','S','M','L','XL','XXL','2XL','XXXL','3XL','4XL','XXXXL'];
+/* Etiquetas de talla que el lector reconoce. Faltaban las de la línea
+   Plus (1X, 2X, 3X) y la P de THEORY/PAKA: sin ellas la página entera
+   se descartaba o se perdía esa columna.                              */
+var TALLAS = ['PP','PS','PM','PL','PXL',
+              'P','XXS','XS','S','M','L','XL','XXL','2XL','XXXL','3XL','4XL','XXXXL',
+              '0X','1X','2X','3X','4X','5X','6X'];
 var RE_FRAC = /^\d+\/\d+$/;
 var RE_ENT  = /^\d+$/;
 
@@ -300,6 +305,21 @@ function columnas(pal){
     if(/^TOL/i.test(w.t) && !('TOL' in cols)) cols['TOL']=(w.x0+w.x1)/2;
   });
   yCab = mejor[0].y;
+  /* Borde izquierdo de la primera talla: la mitad entre ella y la última
+     etiqueta del encabezado que esté a su izquierda ("COD.", "N°", "%",
+     "DESCRIPCIÓN"). Sin esto, el número de la columna N° se pegaba al
+     valor de la primera talla (16 5/8 se leía 17 5/8).                */
+  var xTallas = Object.keys(cols).filter(function(k){ return k!=='TOL'; })
+                      .map(function(k){ return cols[k]; });
+  var xIzq = null;
+  if(xTallas.length){
+    var x1ra = Math.min.apply(null, xTallas), ultima = null;
+    mejor.forEach(function(w){
+      var c=(w.x0+w.x1)/2;
+      if(c < x1ra-1 && (ultima===null || c>ultima)) ultima=c;
+    });
+    if(ultima!==null) xIzq = (ultima + x1ra)/2;
+  }
   if(!('TOL' in cols)){
     var mejorTol=null, dmin=1e9;
     pal.forEach(function(w){
@@ -309,7 +329,7 @@ function columnas(pal){
     });
     if(mejorTol) cols['TOL']=(mejorTol.x0+mejorTol.x1)/2;
   }
-  return {cols:cols, y:yCab};
+  return {cols:cols, y:yCab, xIzq:xIzq};
 }
 
 /* --- leer una página --- */
@@ -317,8 +337,9 @@ function leerPagina(page){
   return palabras(page).then(function(pal){
     var c = columnas(pal);
     if(!c) return null;
-    var cols=c.cols, yCab=c.y;
-    var orden = TALLAS.filter(function(t){ return t in cols; });
+    var cols=c.cols, yCab=c.y, xIzq=c.xIzq;
+    var orden = Object.keys(cols).filter(function(t){ return t!=='TOL'; })
+                      .sort(function(a,b){ return cols[a]-cols[b]; });   // de izquierda a derecha
     if('TOL' in cols) orden.push('TOL');
 
     var reCod = /^([A-Z]|[A-Z]\d{1,2})$/;
@@ -347,7 +368,8 @@ function leerPagina(page){
         if(RE_FRAC.test(t)||RE_ENT.test(t)){
           // los números a la izquierda de la primera talla son columnas
           // auxiliares (Nº de piezas, % de encogimiento): se ignoran
-          if(cen < x0col-sep) return;
+          var limIzq = (xIzq===null||xIzq===undefined) ? x0col-sep : Math.max(xIzq, x0col-sep);
+          if(cen < limIzq) return;
           var col=null, dmin=1e9;
           orden.forEach(function(o){
             var d=Math.abs(cols[o]-cen);
