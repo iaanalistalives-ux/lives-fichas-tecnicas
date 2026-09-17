@@ -498,12 +498,57 @@ function pintarEtapas(){
   }
   pintarCombos();
 }
-function elegirEtapa(e){ ETAPA=e; COMBO=''; pintarEtapas(); }
+function elegirEtapa(e){ ETAPA=e; COMBO=''; LINEA_OK=false; pintarEtapas(); }
+
+/* Línea de tallas de EFI: Missy (XXS–XL), Plus (1X–3X), Petite.
+   Sale del nombre del archivo o del encabezado ("... – Missy").
+   No es una versión: las líneas conviven, cada una con su tabla.   */
+function lineaDe(t){
+  t=String(t||'');
+  var m = t.match(/\(\s*(MISSY|PLUS|PETITE)\s*\)/i) ||
+          t.match(/[–—-]\s*(MISSY|PLUS|PETITE)\b/i);
+  return m ? m[1].toUpperCase() : '';
+}
+
+var LINEA_OK=false;
+var NOM_LINEA={ MISSY:'Missy', PLUS:'Plus', PETITE:'Petite' };
+function lineaDeCombo(c){ var l=String(c||'').split(' · ')[0]; return NOM_LINEA[l] ? l : ''; }
+function rangoTallas(v){
+  var t=(v && v.tallas)||[];
+  return t.length ? (t.length>1 ? t[0]+'–'+t[t.length-1] : t[0]) : '';
+}
 
 function pintarCombos(){
-  var combos=VARIANTES.filter(function(v){ return v.etapa===ETAPA; })
-                      .map(function(v){ return v.combo||''; });
+  var vars=VARIANTES.filter(function(v){ return v.etapa===ETAPA; });
+  var combos=vars.map(function(v){ return v.combo||''; });
   combos=combos.filter(function(v,i,s){ return s.indexOf(v)===i; });
+  var conLinea = combos.filter(lineaDeCombo);
+  if(conLinea.length){
+    // Missy / Plus: la auditora TIENE que elegir; no se asume ninguna
+    combos = conLinea;
+    if(combos.length===1){ COMBO=combos[0]; LINEA_OK=true; }
+    if(!LINEA_OK || combos.indexOf(COMBO)<0){ COMBO=''; LINEA_OK=false; }
+    document.getElementById('selCombo').style.display='block';
+    document.querySelector('#selCombo .lbl').textContent='Línea de tallas de la prenda';
+    document.getElementById('pCombo').innerHTML = combos.map(function(c){
+      var v=vars.filter(function(x){ return (x.combo||'')===c; })[0];
+      var resto=String(c).split(' · ').slice(1).join(' · ');
+      var nom=NOM_LINEA[lineaDeCombo(c)]+(rangoTallas(v)?' ('+rangoTallas(v)+')':'')+(resto?' · '+resto:'');
+      return '<button class="pill'+(c===COMBO?' on':'')+'" onclick="elegirCombo(\''+
+             String(c).replace(/'/g,"\\'")+'\')">'+nom+'</button>';
+    }).join('');
+    document.getElementById('avisoCombo').textContent = LINEA_OK ? '' :
+      'Esta ficha tiene una tabla por línea de tallas. Elige la de la prenda que vas a medir.';
+    if(!LINEA_OK){
+      F=null; ESPEC=null; PRECARGA=null;
+      txt('fichaTit','Elige la línea de tallas');
+      txt('fichaInfo','');
+      return;
+    }
+    cargarEspec();
+    return;
+  }
+  document.querySelector('#selCombo .lbl').textContent='Combo de la ficha';
   if(!COMBO || combos.indexOf(COMBO)<0) COMBO = combos[0]||'';
   if(combos.length>1 && combos.some(function(c){ return c; })){
     document.getElementById('selCombo').style.display='block';
@@ -518,12 +563,13 @@ function pintarCombos(){
   }
   cargarEspec();
 }
-function elegirCombo(c){ COMBO=c; pintarCombos(); }
+function elegirCombo(c){ COMBO=c; LINEA_OK=true; pintarCombos(); }
 
 /* De "OLYMPIC (PARTIDA: 25-721628 ) // ECLIPSE (PARTIDA: 25-721629 )"
    se sacan los nombres de color para ofrecerlos como opciones.        */
 function coloresDeCombo(combo){
   var t=String(combo||'');
+  if(lineaDeCombo(t)) t=t.split(' · ').slice(1).join(' · ');   // sin la línea de tallas
   if(/TODOS\s+LOS\s+COLORES/i.test(t)) return [];
   return t.split(/\/\/|,|;/)
     .map(function(x){
@@ -625,7 +671,12 @@ function textoFrac(txt){
 /* ---------- configuración ---------- */
 
 function empezar(){
-  if(!F){ alert('Todavía no se cargó la tabla de medidas.'); return; }
+  if(!F){
+    alert(document.getElementById('selCombo').style.display==='block' && !COMBO
+      ? 'Elige la línea de tallas de la prenda (Missy o Plus).'
+      : 'Todavía no se cargó la tabla de medidas.');
+    return;
+  }
   var otro=document.getElementById('colorOtro').value.trim();
   if(otro) COLOR=otro;                       // lo escrito manda sobre el botón
   if(!COLOR){ alert('Elige o escribe el color de la prenda.'); return; }
