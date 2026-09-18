@@ -860,32 +860,64 @@ function pdfjsListo(cb){
 }
 
 /* ---- el PDF, guardado en el celular ---- */
-var PDFDB=null, PDFDB_NO=false;
+/* Guardar los PDF en el equipo es una comodidad, no un requisito: si el
+   navegador tarda o se llena su cupo, se sigue sin copia local. Todas las
+   llamadas llevan tiempo límite, porque una que no responde congelaba la
+   carga completa a media lista.                                        */
+var PDFDB=null, PDFDB_FALLO=false, PDF_NO_GUARDAR=false;
 function pdfDb(cb){
-  if(PDFDB || PDFDB_NO) return cb(PDFDB);
+  if(PDFDB || PDFDB_FALLO) return cb(PDFDB);
+  var listo=false;
+  function fin(db){ if(listo) return; listo=true; if(!db) PDFDB_FALLO=true; cb(db); }
+  setTimeout(function(){ fin(null); }, 3000);
   try{
     var rq=indexedDB.open('lives_fichas_pdf',1);
-    rq.onupgradeneeded=function(){ rq.result.createObjectStore('pdf'); };
-    rq.onsuccess=function(){ PDFDB=rq.result; cb(PDFDB); };
-    rq.onerror=function(){ PDFDB_NO=true; cb(null); };
-  }catch(e){ PDFDB_NO=true; cb(null); }
+    rq.onupgradeneeded=function(){ try{ rq.result.createObjectStore('pdf'); }catch(e){} };
+    rq.onsuccess=function(){ PDFDB=rq.result; fin(PDFDB); };
+    rq.onerror=function(){ fin(null); };
+    rq.onblocked=function(){ fin(null); };
+  }catch(e){ fin(null); }
 }
-function pdfLocal(k, cb){
+function pdfLocal(clave, cb){
   pdfDb(function(db){
     if(!db) return cb(null);
+    var listo=false;
+    function fin(v){ if(listo) return; listo=true; cb(v); }
+    setTimeout(function(){ fin(null); }, 4000);
     try{
-      var g=db.transaction('pdf').objectStore('pdf').get(k);
-      g.onsuccess=function(){ cb(g.result||null); };
-      g.onerror=function(){ cb(null); };
-    }catch(e){ cb(null); }
+      var g=db.transaction('pdf').objectStore('pdf').get(clave);
+      g.onsuccess=function(){ fin(g.result||null); };
+      g.onerror=function(){ fin(null); };
+    }catch(e){ fin(null); }
   });
 }
-function pdfGuardar(k, buf){
+function pdfGuardar(clave, buf){
+  if(PDF_NO_GUARDAR) return;
   pdfDb(function(db){
     if(!db) return;
-    try{ db.transaction('pdf','readwrite').objectStore('pdf').put(buf,k); }catch(e){}
+    try{
+      var tx=db.transaction('pdf','readwrite');
+      tx.onerror=function(){ PDF_NO_GUARDAR=true; };   // cupo lleno: se sigue sin copia
+      tx.onabort=function(){ PDF_NO_GUARDAR=true; };
+      tx.objectStore('pdf').put(buf, clave);
+    }catch(e){ PDF_NO_GUARDAR=true; }
   });
 }
+/* borra del equipo los PDF que ya no están en el índice o fueron reemplazados */
+function pdfLimpiar(){
+  pdfDb(function(db){
+    if(!db || !INDICE.length) return;
+    var vigentes={};
+    INDICE.forEach(function(d){ vigentes[d.id+'|'+(d.fechaSubida||'')]=1; });
+    try{
+      var st=db.transaction('pdf','readwrite').objectStore('pdf');
+      var rq=st.getAllKeys();
+      rq.onsuccess=function(){ (rq.result||[]).forEach(function(k){ if(!vigentes[k]) st.delete(k); }); };
+    }catch(e){}
+  });
+}
+/* cb(error, Uint8Array). Si el PDF no llega, se reintenta una vez; si
+   tampoco, se sigue con la siguiente ficha en vez de quedarse esperando. */
 function bajarFicha(cb){
   var id=ESPEC && ESPEC.fileId;
   if(!id){ cb('Esta tabla no tiene la ficha guardada en el Drive.'); return; }
