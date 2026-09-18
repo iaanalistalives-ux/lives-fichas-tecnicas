@@ -153,6 +153,7 @@ td.falta{color:var(--rose);font-weight:700;}
       <a class="btn subir" href="https://drive.google.com/drive/folders/1L0mdAy04_aSV9bLyVRl4BHVjysd5Ep7B"
          target="_blank" rel="noopener">Abrir la carpeta del Drive</a>
       <button class="btn" id="btnMasivo" onclick="procesarPendientes(true)">Procesar todas</button>
+      <button class="btn" id="btnSeguir" onclick="procesarPendientes(false)" style="display:none;">Continuar con las que faltan</button>
       <span class="accHint" id="accHint"></span>
     </div>
     <div class="pasos">
@@ -559,7 +560,7 @@ function normNombre(t){
 
 function jsonpGAS(params, cb){
   var fn='cb_'+Math.random().toString(36).slice(2), s=document.createElement('script');
-  var espera = /accion=bytes/.test(params) ? 240000 : 90000;   // un PDF grande tarda más
+  var espera = /accion=bytes/.test(params) ? ESPERA_BYTES : 90000;
   var to=setTimeout(function(){ fin(); cb({ok:false,error:'La ficha tardó demasiado en llegar. Vuelve a tocarla: la segunda vez suele ser más rápida.'}); },espera);
   function fin(){ clearTimeout(to); try{delete window[fn];}catch(e){window[fn]=undefined;} if(s.parentNode) s.parentNode.removeChild(s); }
   window[fn]=function(r){ fin(); cb(r); };
@@ -658,30 +659,47 @@ function limpiarRevisar(){ REVISAR=[]; LS.set('fichas_revisar','[]'); }
 /* ---------- PDF: copia en el equipo (IndexedDB) ----------
    La primera vez el PDF viene del Drive a través del Apps Script (lento).
    Después se abre desde el equipo al instante.                          */
-var PDFDB=null, PDFDB_FALLO=false;
+/* Guardar los PDF en el equipo es una comodidad, no un requisito: si el
+   navegador tarda o se llena su cupo, se sigue sin copia local. Todas las
+   llamadas llevan tiempo límite, porque una que no responde congelaba la
+   carga completa a media lista.                                        */
+var PDFDB=null, PDFDB_FALLO=false, PDF_NO_GUARDAR=false;
 function pdfDb(cb){
   if(PDFDB || PDFDB_FALLO) return cb(PDFDB);
+  var listo=false;
+  function fin(db){ if(listo) return; listo=true; if(!db) PDFDB_FALLO=true; cb(db); }
+  setTimeout(function(){ fin(null); }, 3000);
   try{
     var rq=indexedDB.open('lives_fichas_pdf',1);
-    rq.onupgradeneeded=function(){ rq.result.createObjectStore('pdf'); };
-    rq.onsuccess=function(){ PDFDB=rq.result; cb(PDFDB); };
-    rq.onerror=function(){ PDFDB_FALLO=true; cb(null); };
-  }catch(e){ PDFDB_FALLO=true; cb(null); }
+    rq.onupgradeneeded=function(){ try{ rq.result.createObjectStore('pdf'); }catch(e){} };
+    rq.onsuccess=function(){ PDFDB=rq.result; fin(PDFDB); };
+    rq.onerror=function(){ fin(null); };
+    rq.onblocked=function(){ fin(null); };
+  }catch(e){ fin(null); }
 }
 function pdfLocal(clave, cb){
   pdfDb(function(db){
     if(!db) return cb(null);
+    var listo=false;
+    function fin(v){ if(listo) return; listo=true; cb(v); }
+    setTimeout(function(){ fin(null); }, 4000);
     try{
       var g=db.transaction('pdf').objectStore('pdf').get(clave);
-      g.onsuccess=function(){ cb(g.result||null); };
-      g.onerror=function(){ cb(null); };
-    }catch(e){ cb(null); }
+      g.onsuccess=function(){ fin(g.result||null); };
+      g.onerror=function(){ fin(null); };
+    }catch(e){ fin(null); }
   });
 }
 function pdfGuardar(clave, buf){
+  if(PDF_NO_GUARDAR) return;
   pdfDb(function(db){
     if(!db) return;
-    try{ db.transaction('pdf','readwrite').objectStore('pdf').put(buf, clave); }catch(e){}
+    try{
+      var tx=db.transaction('pdf','readwrite');
+      tx.onerror=function(){ PDF_NO_GUARDAR=true; };   // cupo lleno: se sigue sin copia
+      tx.onabort=function(){ PDF_NO_GUARDAR=true; };
+      tx.objectStore('pdf').put(buf, clave);
+    }catch(e){ PDF_NO_GUARDAR=true; }
   });
 }
 /* borra del equipo los PDF que ya no están en el índice o fueron reemplazados */
@@ -697,19 +715,29 @@ function pdfLimpiar(){
     }catch(e){}
   });
 }
-/* cb(error, Uint8Array) */
+/* cb(error, Uint8Array). Si el PDF no llega, se reintenta una vez; si
+   tampoco, se sigue con la siguiente ficha en vez de quedarse esperando. */
 function bajarPdf(id, modo, cb){
   var k=claveFicha(id);
   pdfLocal(k, function(buf){
     if(buf){ cb(null, new Uint8Array(buf)); return; }
-    jsonp('accion=bytes&clave='+encodeURIComponent(SES.clave)+'&id='+encodeURIComponent(id)+
-          '&auditora='+encodeURIComponent(SES.nombre)+'&taller='+modo, function(r){
-      if(!r || !r.ok || !r.b64){ cb((r&&r.error)||'No se pudo abrir la ficha.'); return; }
-      var bin=atob(r.b64), n=bin.length, arr=new Uint8Array(n);
-      for(var i=0;i<n;i++) arr[i]=bin.charCodeAt(i);
-      pdfGuardar(k, arr.buffer.slice(0));
-      cb(null, arr);
-    });
+    var intentos=0;
+    (function pedir(){
+      intentos++;
+      jsonp('accion=bytes&clave='+encodeURIComponent(SES.clave)+'&id='+encodeURIComponent(id)+
+            '&auditora='+encodeURIComponent(SES.nombre)+'&taller='+modo, function(r){
+        if(!r || !r.ok || !r.b64){
+          if(intentos<2){ setTimeout(pedir, 1500); return; }
+          FALLOS_BAJADA++;
+          cb((r&&r.error)||'No se pudo abrir la ficha.');
+          return;
+        }
+        var bin=atob(r.b64), n=bin.length, arr=new Uint8Array(n);
+        for(var i=0;i<n;i++) arr[i]=bin.charCodeAt(i);
+        pdfGuardar(k, arr.buffer.slice(0));
+        cb(null, arr);
+      });
+    })();
   });
 }
 
@@ -738,6 +766,20 @@ function archivosConMedidas(){
   });
 }
 
+/* "Continuar con las que faltan": aparece si quedó alguna ficha sin
+   procesar (por ejemplo, un PDF que no llegó del Drive).              */
+function verBotonContinuar(){
+  var b=document.getElementById('btnSeguir');
+  if(!b) return;
+  var faltan=0;
+  try{
+    faltan=archivosConMedidas().filter(function(a){
+      return a.estado==='pendiente' && !marcadaRevisar(a.d.id);
+    }).length;
+  }catch(e){ faltan=0; }
+  b.style.display = faltan>0 ? 'inline-flex' : 'none';
+  b.textContent = 'Continuar con las que faltan ('+faltan+')';
+}
 var VER_LISTAS=false;
 function pintarPendientes(){
   var lista = archivosConMedidas();
@@ -756,6 +798,7 @@ function pintarPendientes(){
     : (pend ? pend+' sin procesar todavía.' : 'Todas las tablas están listas. No hay nada que hacer.');
 
   pintarAlerta();
+  verBotonContinuar();
   // arriba solo lo que falta (sin procesar); lo ya listo va plegado al final
   var faltan = lista.filter(function(a){ return a.estado==='pendiente' && !marcadaRevisar(a.d.id); });
   var listas = lista.filter(function(a){ return a.estado!=='pendiente'; });
@@ -822,7 +865,9 @@ function pintarAlerta(){
 /* ---------- proceso automático en lote ----------
    Lee las fichas sin tabla y guarda sola las que salen completas.
    Solo aparta para revisión las que quedan dudosas.                */
+var ESPERA_BYTES=60000;      // un PDF que no llega en 1 min se reintenta una vez
 var ERROR_BORRADO='';
+var FALLOS_BAJADA=0;
 function procesarPendientes(forzar){
   ERROR_BORRADO='';
   var todos = archivosConMedidas().filter(function(a){ return a.base; });
@@ -855,14 +900,18 @@ function procesarPendientes(forzar){
   caja.style.display='block';
   document.getElementById('autoTxt').textContent='Preparando '+faltan.length+' ficha(s)…';
   document.getElementById('autoBar').style.width='2%';
-  var i=0, ok=0, dudosas=0;
+  var i=0, ok=0, dudosas=0, sinBajar=0;
 
   function paso(){
     if(i>=faltan.length){
       document.getElementById('autoTxt').textContent = ERROR_BORRADO
         ? 'No se pudo reemplazar las tablas anteriores ('+ERROR_BORRADO+'). '+
           'Avisa a Christian: falta publicar la versión nueva del servidor. No se guardó nada.'
-        : ok+' tabla(s) leídas y guardadas'+(dudosas?' · '+dudosas+' necesitan revisión':'  ·  nada pendiente');
+        : ok+' tabla(s) leídas y guardadas'+
+          (dudosas?' · '+dudosas+' necesitan revisión':'')+
+          (sinBajar?' · '+sinBajar+' no se pudieron bajar del Drive: toca "Continuar con las que faltan"':
+                    (dudosas?'':'  ·  nada pendiente'));
+      verBotonContinuar();
       document.getElementById('autoBar').style.width='100%';
       document.getElementById('btnMasivo').disabled=false;
       document.getElementById('btnMasivo').textContent='Procesar todas';
@@ -877,7 +926,7 @@ function procesarPendientes(forzar){
     document.getElementById('autoBar').style.width=Math.round(i/faltan.length*100)+'%';
 
     bajarPdf(a.d.id, 'AUTOMATICO', function(err, arr){
-      if(err){ marcarRevisar(a.d.id); dudosas++; i++; pintarPendientes(); paso(); return; }
+      if(err){ quitarRevisar(a.d.id); sinBajar++; i++; pintarPendientes(); paso(); return; }
       extraerDe(arr, function(res){
         if(!res){ marcarRevisar(a.d.id); dudosas++; i++; pintarPendientes(); paso(); return; }
         var lote = (res.todas && res.todas.length) ? res.todas
