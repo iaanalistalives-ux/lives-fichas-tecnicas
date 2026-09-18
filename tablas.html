@@ -885,7 +885,8 @@ var SB_MAPA={
   mediciones: function(p){ return ['fichas_mediciones',{p_estilo:p.estilo||'',p_grupo:p.grupo||'',p_taller:p.taller||'',
                                    p_auditora:p.auditora||'',p_desde:p.desde||'',p_hasta:p.hasta||''}]; },
   medicion:   function(p){ return ['fichas_medicion',{p_id:p.id||''}]; },
-  quien:      function(p){ return ['fichas_quien',{p_usuario:p.usuario||''}]; }
+  quien:      function(p){ return ['fichas_quien',{p_usuario:p.usuario||''}]; },
+  archivos:   function(p){ return ['fichas_archivos',{}]; }
 };
 function jsonp(params, cb){
   var p=qsObj(params), m=SB_MAPA[p.accion||'datos'];
@@ -969,11 +970,25 @@ function entrar(){
   });
 }
 var PRIMERA=true;
+/* Archivos que ya tienen tabla guardada, esté vigente o no. Sin esto, un
+   PDF cuya tabla perdió la marca VIGENTE (porque otro archivo del mismo
+   estilo y versión la tiene) aparecía "sin procesar" para siempre.   */
+var ARCHIVOS_CON_TABLA = null;
+function anotarArchivo(nombre){
+  if(!ARCHIVOS_CON_TABLA || !nombre) return;
+  ARCHIVOS_CON_TABLA[String(nombre)] = { archivo:String(nombre), tablas:1, fecha:'9999' };
+}
 function cargarEspecs(){
   jsonp('accion=especs&clave='+encodeURIComponent(SES.clave), function(r){
     ESPECS = (r && r.ok) ? (r.especs||[]) : [];
-    pintarPendientes();
-    if(PRIMERA){ PRIMERA=false; setTimeout(procesarPendientes, 400); }
+    jsonp('accion=archivos', function(a){
+      ARCHIVOS_CON_TABLA = {};
+      ((a && a.archivos) || []).forEach(function(x){
+        ARCHIVOS_CON_TABLA[String(x.archivo)] = x;
+      });
+      pintarPendientes();
+      if(PRIMERA){ PRIMERA=false; setTimeout(procesarPendientes, 400); }
+    });
   });
 }
 function yaConfirmada(estilo, tipo){
@@ -1107,13 +1122,12 @@ function archivosConMedidas(){
     /* Una ficha vuelve a "sin procesar" si no hay ninguna tabla guardada
        con SU nombre de archivo, o si la tabla guardada es anterior a la
        fecha en que se subió el PDF (Luz reemplazó la ficha por una nueva). */
-    if(a.estado!=='pendiente'){
-      var mias = ESPECS.filter(function(e){ return String(e.archivo||'')===String(a.d.archivo||''); });
-      if(!mias.length) a.estado='pendiente';
+    if(a.estado!=='pendiente' && ARCHIVOS_CON_TABLA){
+      var mia = ARCHIVOS_CON_TABLA[String(a.d.archivo||'')];
+      if(!mia) a.estado='pendiente';
       else {
         var subida=String(a.d.fechaSubida||'').slice(0,16);
-        var ultima='';
-        mias.forEach(function(e){ var f=String(e.fecha||'').slice(0,16); if(f>ultima) ultima=f; });
+        var ultima=String(mia.fecha||'').slice(0,16);
         if(subida && ultima && ultima < subida) a.estado='pendiente';
       }
     }
@@ -1318,7 +1332,8 @@ function procesarPendientes(forzar){
         });
         function otra(){
           if(j>=lote.length){
-            if(fallo){ marcarRevisar(a.d.id); dudosas++; } else ok++;
+            if(fallo){ marcarRevisar(a.d.id); dudosas++; }
+            else { ok++; anotarArchivo(a.d.archivo); }
             i++; pintarPendientes(); paso(); return;
           }
           var x=lote[j++];
@@ -1695,7 +1710,7 @@ function confirmar(){
     SES.nombre, function(r){
       btn.disabled=false; btn.textContent='La tabla es correcta';
       if(!r || !r.ok){ error((r&&r.error)||'No se pudo guardar.'); return; }
-      if(ARCH) quitarRevisar(ARCH.id);
+      if(ARCH){ quitarRevisar(ARCH.id); anotarArchivo(ARCH.nombre); }
       var ok=document.getElementById('ok');
       ok.textContent='Tabla guardada. Ya está disponible para las auditoras.';
       ok.style.display='block';
