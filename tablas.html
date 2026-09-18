@@ -822,7 +822,9 @@ function pintarAlerta(){
 /* ---------- proceso automático en lote ----------
    Lee las fichas sin tabla y guarda sola las que salen completas.
    Solo aparta para revisión las que quedan dudosas.                */
+var ERROR_BORRADO='';
 function procesarPendientes(forzar){
+  ERROR_BORRADO='';
   var todos = archivosConMedidas().filter(function(a){ return a.base; });
   var faltan;
   if(forzar){
@@ -857,8 +859,10 @@ function procesarPendientes(forzar){
 
   function paso(){
     if(i>=faltan.length){
-      document.getElementById('autoTxt').textContent =
-        ok+' tabla(s) leídas y guardadas'+(dudosas?' · '+dudosas+' necesitan revisión':'  ·  nada pendiente');
+      document.getElementById('autoTxt').textContent = ERROR_BORRADO
+        ? 'No se pudo reemplazar las tablas anteriores ('+ERROR_BORRADO+'). '+
+          'Avisa a Christian: falta publicar la versión nueva del servidor. No se guardó nada.'
+        : ok+' tabla(s) leídas y guardadas'+(dudosas?' · '+dudosas+' necesitan revisión':'  ·  nada pendiente');
       document.getElementById('autoBar').style.width='100%';
       document.getElementById('btnMasivo').disabled=false;
       document.getElementById('btnMasivo').textContent='Procesar todas';
@@ -888,8 +892,18 @@ function procesarPendientes(forzar){
         }
         var j=0, fallo=false;
         // primero se borran las tablas guardadas de este archivo, para que
-        // no queden combos viejos o mal leídos junto a los nuevos
-        post({ accion:'borrarEspecArchivo', fileId:a.d.id }, function(){ otra(); });
+        // no queden combos viejos o mal leídos junto a los nuevos.
+        // Si el borrado falla (por ejemplo, si el servidor publicado es una
+        // versión anterior), NO se guarda nada: si no, quedarían la tabla
+        // vieja y la nueva conviviendo, las dos como vigentes.
+        post({ accion:'borrarEspecArchivo', fileId:a.d.id }, function(b){
+          if(!b || !b.ok){
+            ERROR_BORRADO = (b && b.error) || 'el servidor no respondió';
+            marcarRevisar(a.d.id); dudosas++; i++; pintarPendientes(); paso();
+            return;
+          }
+          otra();
+        });
         function otra(){
           if(j>=lote.length){
             if(fallo){ marcarRevisar(a.d.id); dudosas++; } else ok++;
