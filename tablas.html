@@ -754,6 +754,19 @@ function archivosConMedidas(){
     a.base = a.estilos.length ? String(a.estilos[0]).split('-')[0] : '';
     a.tipo = a.d.tipo==='CORTE' ? 'CORTE' : 'TECNICA';
     a.estado = a.base ? estadoDe(a.base, a.tipo) : 'pendiente';
+    /* Una ficha vuelve a "sin procesar" si no hay ninguna tabla guardada
+       con SU nombre de archivo, o si la tabla guardada es anterior a la
+       fecha en que se subió el PDF (Luz reemplazó la ficha por una nueva). */
+    if(a.estado!=='pendiente'){
+      var mias = ESPECS.filter(function(e){ return String(e.archivo||'')===String(a.d.archivo||''); });
+      if(!mias.length) a.estado='pendiente';
+      else {
+        var subida=String(a.d.fechaSubida||'').slice(0,16);
+        var ultima='';
+        mias.forEach(function(e){ var f=String(e.fecha||'').slice(0,16); if(f>ultima) ultima=f; });
+        if(subida && ultima && ultima < subida) a.estado='pendiente';
+      }
+    }
     var lin = lineaDe(a.d.archivo);
     if(lin && a.estado!=='pendiente'){
       var tiene = ESPECS.some(function(e){
