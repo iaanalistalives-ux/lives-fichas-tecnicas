@@ -41,6 +41,7 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 .btn:disabled{opacity:.45;}
 .btn.rojo{background:var(--rose);}
 input.txt{width:100%;font-family:inherit;font-size:16px;padding:11px;border:1.5px solid var(--warm);border-radius:6px;}
+input.txt.mayus{text-transform:uppercase;}
 select.txt{width:100%;min-height:44px;font-family:inherit;font-size:16px;padding:10px;border:1.5px solid var(--warm);border-radius:6px;background:#fff;color:#333;}
 select.txt.falta{border-color:var(--rose);background:#FFF7F7;}
 .avisoQuien{background:#FFFBEB;border:1px solid var(--tan);border-left:4px solid var(--tan);border-radius:8px;padding:10px 13px;font-size:13px;color:#92400E;margin:10px 0 0;line-height:1.45;}
@@ -56,12 +57,12 @@ input.txt:focus{outline:none;border-color:var(--sage);}
 .num b{font-size:26px;min-width:34px;text-align:center;}
 
 /* ---- barra de avance ---- */
-.avance{position:fixed;top:0;left:0;right:0;z-index:40;box-shadow:0 2px 10px rgba(0,0,0,.22);background:var(--petrol);color:#fff;padding:11px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-bottom:2px solid var(--emer);}
+.avance{position:fixed;top:0;left:0;right:0;z-index:40;box-shadow:0 2px 10px rgba(0,0,0,.22);background:var(--petrol);color:#fff;padding:6px 12px 5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-bottom:2px solid var(--emer);}
 .avance .t{font-size:15px;font-weight:800;}
-.avance .s{font-size:11.5px;color:#CFE5DE;}
+.avance .s{font-size:10.5px;color:#CFE5DE;white-space:nowrap;}
 .avance .der{margin-left:auto;display:flex;gap:8px;}
 .avance button{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.32);color:#fff;font-family:inherit;font-size:12px;font-weight:700;border-radius:6px;padding:7px 12px;cursor:pointer;}
-.barra{height:5px;background:var(--warm);border-radius:4px;overflow:hidden;margin-top:8px;}
+.barra{height:4px;background:var(--warm);border-radius:4px;overflow:hidden;margin-top:4px;}
 .barra i{display:block;height:100%;background:var(--emer);transition:width .2s;}
 
 /* ---- lista de puntos ---- */
@@ -147,14 +148,16 @@ input.txt:focus{outline:none;border-color:var(--sage);}
 .kpi.mal .v{color:var(--rose);}
 .fuera{background:#fff;border:1px solid var(--warm);border-left:4px solid var(--rose);border-radius:8px;padding:10px 13px;margin-bottom:7px;font-size:13px;}
 .fuera b{color:var(--rose);}
-.sel{display:flex;gap:6px;flex-wrap:wrap;}
-.sel button{background:rgba(255,255,255,.13);border:1.5px solid rgba(255,255,255,.3);color:#fff;font-family:inherit;font-size:14px;font-weight:800;border-radius:18px;padding:7px 14px;cursor:pointer;}
+.sel{display:flex;gap:5px;flex-wrap:wrap;}
+.avFila{display:flex;align-items:center;gap:8px;flex-basis:100%;}
+.avFila .sel-lbl{margin:0;flex:0 0 auto;min-width:44px;}
+.sel button{background:rgba(255,255,255,.13);border:1.5px solid rgba(255,255,255,.3);color:#fff;font-family:inherit;font-size:13.5px;font-weight:800;border-radius:16px;padding:4px 11px;cursor:pointer;line-height:1.15;min-height:34px;}
 .sel button.on{background:var(--emer);border-color:var(--emer);color:#04231F;}
 .sel button.hecho{border-color:var(--emer);}
 .sel button.hecho i{color:#7FE3C0;opacity:1;}
 .sel button.add{background:transparent;border-style:dashed;font-weight:700;}
-.sel button i{font-style:normal;font-size:10px;font-weight:700;display:block;opacity:.75;}
-.sel-lbl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#9FC9BE;margin-bottom:5px;}
+.sel button i{font-style:normal;font-size:9px;font-weight:700;display:block;opacity:.75;}
+.sel-lbl{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#9FC9BE;margin-bottom:3px;}
 .pieacc{margin-top:18px;padding-top:16px;border-top:2px solid var(--warm);}
 /* ---- dibujo de la ficha ---- */
 #btnDib{position:fixed;left:12px;bottom:12px;z-index:60;background:var(--sage);color:#fff;border:0;
@@ -220,7 +223,8 @@ input.txt:focus{outline:none;border-color:var(--sage);}
 
     <span class="lbl">Color de la prenda</span>
     <div class="pills" id="pColores" style="margin-bottom:8px;"></div>
-    <input class="txt" id="colorOtro" placeholder="Otro color (escríbelo)">
+    <input class="txt mayus" id="colorOtro" placeholder="Otro color (escríbelo)"
+           oninput="this.value=this.value.toUpperCase()" autocapitalize="characters" spellcheck="false">
 
     <button class="btn full" style="margin-top:18px;" onclick="empezar()">Empezar a medir</button>
     <div style="font-size:11.5px;color:var(--stone);margin-top:10px;text-align:center;">
@@ -236,6 +240,7 @@ input.txt:focus{outline:none;border-color:var(--sage);}
 <div id="dibujo">
   <div class="dTop">
     <div class="dTit" id="dibTit">Dibujo de la ficha</div>
+    <button id="btnHoja" onclick="alternarHoja()" style="font-size:12px;font-weight:700;">Ver hoja completa</button>
     <button onclick="pasarDib(-1)" aria-label="Página anterior">‹</button>
     <button onclick="pasarDib(1)" aria-label="Página siguiente">›</button>
     <button onclick="zoomDib(-1)" aria-label="Alejar">−</button>
@@ -249,13 +254,15 @@ input.txt:focus{outline:none;border-color:var(--sage);}
 <!-- ================= MEDICIÓN ================= -->
 <div id="medir" style="display:none;">
   <div class="avance">
-    <div style="flex-basis:100%;">
+    <div class="avFila">
       <div class="sel-lbl">Talla</div>
       <div class="sel" id="selTalla"></div>
-      <div class="sel-lbl" style="margin-top:9px;">Prenda</div>
-      <div class="sel" id="selPrenda"></div>
     </div>
-    <div class="s" id="avSub" style="flex-basis:100%;margin-top:9px;">0 de 20 puntos medidos</div>
+    <div class="avFila" style="margin-top:3px;">
+      <div class="sel-lbl">Prenda</div>
+      <div class="sel" id="selPrenda"></div>
+      <div class="s" id="avSub" style="margin-left:auto;">0 de 20 puntos</div>
+    </div>
     <div class="barra" style="flex-basis:100%;"><i id="avBar" style="width:0%"></i></div>
   </div>
   <div class="wrap">
@@ -752,7 +759,7 @@ function pintarSelectores(){
 function ajustarTope(){
   var b=document.querySelector('.avance');
   var w=document.querySelector('#medir .wrap');
-  if(b&&w) w.style.paddingTop=(b.offsetHeight+14)+'px';
+  if(b&&w) w.style.paddingTop=(b.offsetHeight+10)+'px';
 }
 window.addEventListener('resize', ajustarTope);
 
@@ -841,7 +848,7 @@ function panelPunto(i, esp, tol){
    Nota: las letras del dibujo son parte de la imagen, no texto, así que
    el sistema no puede señalarlas solo; sí sabe en qué página están.
    ========================================================== */
-var DIB={ pdf:null, fileId:null, escala:null, pagina:1, paginas:null, cod:'' };
+var DIB={ pdf:null, fileId:null, escala:null, pagina:1, paginas:null, cod:'', soloDibujo:true };
 
 function pdfjsListo(cb){
   if(window.pdfjsLib){ cb(true); return; }
@@ -944,14 +951,20 @@ function leerPaginas(cb){
     (function(n){
       pdf.getPage(n).then(function(pg){
         return pg.getTextContent().then(function(tc){
-          var cods={}, txtPag='';
+          var cods={}, txtPag='', vp=pg.getViewport({scale:1});
+          var yCuadro=null, yTitulo=null, yTextoArriba=null;
           tc.items.forEach(function(it){
             var t=String(it.str||'').trim();
             txtPag += ' '+t;
             var u=t.toUpperCase();
-            if(codigos[u]) cods[u]=1;
+            var y=vp.height-it.transform[5];        // desde arriba
+            if(codigos[u]){ cods[u]=1; if(yCuadro===null || y>yCuadro) yCuadro=y; }
+            if(/TOMA\s+DE\s+MEDIDAS/i.test(t) && yTitulo===null) yTitulo=y;
+            // texto de la mitad superior: cuadros, notas y observaciones
+            if(t && y < vp.height*0.45 && (yTextoArriba===null || y>yTextoArriba)) yTextoArriba=y;
           });
-          info[n]={ cods:cods, dibujo:/TOMA\s+DE\s+MEDIDAS/i.test(txtPag) };
+          info[n]={ cods:cods, dibujo:/TOMA\s+DE\s+MEDIDAS/i.test(txtPag),
+                    yCuadro:yCuadro, yTitulo:yTitulo, yTextoArriba:yTextoArriba, alto:vp.height };
           listo++; if(listo===total){ DIB.paginas=info; cb(info); }
         });
       }).catch(function(){
@@ -1022,27 +1035,61 @@ function pasarDib(d){
   DIB.pagina=p; DIB.escala=null; pintarDibujo();
 }
 
+/* Desde dónde empieza el dibujo en la hoja:
+   - si en esa página está el cuadro de medidas (sus códigos son texto),
+     el dibujo va debajo de la última fila del cuadro;
+   - si es la hoja "TOMA DE MEDIDAS", debajo de su título;
+   - si el trozo sale muy chico, se muestra la hoja completa.        */
+function zonaDibujo(pg){
+  var info=(DIB.paginas||{})[DIB.pagina]||{};
+  var alto=info.alto||pg.getViewport({scale:1}).height;
+  var y=null;
+  if(info.yCuadro!=null) y=info.yCuadro+14;
+  else if(info.yTitulo!=null) y=info.yTitulo+6;
+  // y por debajo de las notas y observaciones de la mitad superior
+  if(info.yTextoArriba!=null) y=Math.max(y||0, info.yTextoArriba+10);
+  if(!y) return null;
+  if(alto-y < alto*0.22) return null;      // no quedaría dibujo que mostrar
+  return { y:y, alto:alto-y };
+}
+
 function pintarDibujo(){
   var caja=document.getElementById('dibCaja');
   if(!DIB.pdf) return;
   DIB.pdf.getPage(DIB.pagina).then(function(pg){
     var v1=pg.getViewport({scale:1});
+    var zona = DIB.soloDibujo ? zonaDibujo(pg) : null;
     if(DIB.escala===null){
       var ancho=(caja.clientWidth||360)-4;
-      DIB.escala=Math.max(0.4, ancho/v1.width);   // entra completa de ancho
+      DIB.escala=Math.max(0.4, ancho/v1.width);
+      if(zona) DIB.escala=DIB.escala*1.6;    // el recorte se ve más grande
     }
     var vp=pg.getViewport({scale:DIB.escala});
     var cv=document.createElement('canvas');
-    cv.width=Math.round(vp.width); cv.height=Math.round(vp.height);
+    var dy = zona ? Math.round(zona.y*DIB.escala) : 0;
+    cv.width=Math.round(vp.width);
+    cv.height=zona ? Math.round(zona.alto*DIB.escala) : Math.round(vp.height);
     caja.innerHTML=''; caja.appendChild(cv);
+    var g=cv.getContext('2d');
+    g.fillStyle='#fff'; g.fillRect(0,0,cv.width,cv.height);
+    g.translate(0, -dy);                     // se dibuja solo la zona del dibujo
     window.__dib={ pagina:DIB.pagina, escala:Math.round(DIB.escala*100)/100, cod:DIB.cod,
-                   ancho:cv.width, alto:cv.height, paginas:DIB.pdf.numPages };
-    pg.render({ canvasContext:cv.getContext('2d'), viewport:vp }).promise.then(function(){
+                   ancho:cv.width, alto:cv.height, paginas:DIB.pdf.numPages,
+                   recorte: zona? {desde:Math.round(zona.y), alto:Math.round(zona.alto)} : null };
+    pg.render({ canvasContext:g, viewport:vp }).promise.then(function(){
       caja.scrollTop=0; caja.scrollLeft=0;
-      txt('dibPie', (DIB.cod ? 'El punto '+DIB.cod+' está en esta página. ' : '')+
-        'Página '+DIB.pagina+' de '+DIB.pdf.numPages+' · usa + para acercar');
+      var b=document.getElementById('btnHoja');
+      if(b){ b.textContent = DIB.soloDibujo ? 'Ver hoja completa' : 'Ver solo el dibujo'; }
+      txt('dibPie', (DIB.cod ? 'Punto '+DIB.cod+'. ' : '')+
+        (zona? 'Dibujo de la prenda' : 'Hoja completa')+
+        ' · página '+DIB.pagina+' de '+DIB.pdf.numPages+' · usa + para acercar');
     });
   }).catch(function(){ caja.innerHTML=aviso('No se pudo dibujar la página.'); });
+}
+function alternarHoja(){
+  DIB.soloDibujo=!DIB.soloDibujo;
+  DIB.escala=null;
+  pintarDibujo();
 }
 
 /* El botón solo aparece mientras se mide y si la ficha está en el Drive */
