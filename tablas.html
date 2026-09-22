@@ -843,6 +843,10 @@ function normNombre(t){
 }
 
 function jsonpGAS(params, cb){
+  /* 22/09/2026: Fichas ya no usa el Apps Script. Todo va a Supabase; si
+     Supabase no responde, se avisa en vez de ir a una copia vieja. */
+  setTimeout(function(){ cb({ ok:false, error:'No hay conexión con la base de datos. Revisa tu señal y vuelve a intentar.' }); }, 0);
+  return;
   var fn='cb_'+Math.random().toString(36).slice(2), s=document.createElement('script');
   var espera = /accion=bytes/.test(params) ? ESPERA_BYTES : 90000;
   var to=setTimeout(function(){ fin(); cb({ok:false,error:'La ficha tardó demasiado en llegar. Vuelve a tocarla: la segunda vez suele ser más rápida.'}); },espera);
