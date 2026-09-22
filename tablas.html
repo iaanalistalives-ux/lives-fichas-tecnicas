@@ -25,25 +25,12 @@
   box-shadow:0 10px 30px rgba(14,59,54,.13);}
 #lsCapa .lsCab{background:#0E3B36;border-bottom:3px solid #10B981;padding:20px;display:flex;justify-content:center;}
 #lsCapa .lsCab img{height:34px;display:block;}
-#lsCapa .lsCuerpo{padding:24px 24px 20px;}
-#lsCapa .lsTit{font-size:19px;font-weight:800;color:#1a1a1a;margin-bottom:5px;}
-#lsCapa .lsSub{font-size:13px;color:#0F7A5A;margin-bottom:18px;line-height:1.4;}
-#lsCapa .lsCampo{margin-bottom:15px;}
-#lsCapa label{display:block;font-size:10.5px;font-weight:800;color:#5F726C;text-transform:uppercase;
-  letter-spacing:.7px;margin-bottom:6px;}
-#lsCapa input{width:100%;box-sizing:border-box;font-family:inherit;font-size:16px;color:#1a1a1a;min-height:44px;
-  padding:11px 13px;border:1.5px solid #DCE5E2;border-radius:9px;background:#fff;outline:none;}
-#lsCapa input:focus{border-color:#0F7A5A;}
-#lsCapa .lsBtn{width:100%;min-height:46px;background:#0F7A5A;color:#fff;border:none;border-radius:9px;
-  font-family:inherit;font-size:15px;font-weight:800;padding:13px;cursor:pointer;}
+#lsCapa .lsCuerpo{padding:24px 24px 22px;text-align:center;}
+#lsCapa .lsTit{font-size:19px;font-weight:800;color:#1a1a1a;margin-bottom:8px;}
+#lsCapa .lsSub{font-size:13.5px;color:#5F726C;margin-bottom:22px;line-height:1.5;}
+#lsCapa .lsBtn{display:inline-block;min-height:46px;background:#0F7A5A;color:#fff;border:none;border-radius:9px;
+  font-family:inherit;font-size:15px;font-weight:800;padding:13px 26px;text-decoration:none;line-height:20px;}
 #lsCapa .lsBtn:hover{background:#0B815E;}
-#lsCapa .lsBtn:disabled{opacity:.6;cursor:default;}
-#lsCapa .lsErr{display:none;background:#FDE8E6;color:#B42318;border-radius:9px;padding:10px 12px;
-  font-size:13px;font-weight:700;margin-bottom:14px;}
-#lsCapa .lsErr.ver{display:block;}
-#lsCapa .lsPie{margin-top:16px;padding-top:14px;border-top:1px dashed #DCE5E2;font-size:11.5px;
-  color:#5F726C;line-height:1.6;text-align:center;}
-#lsCapa .lsPie a{color:#0F7A5A;font-weight:700;}
 </style>
 <script id="lsJs">
 (function(){
@@ -66,7 +53,9 @@
 
   /* ---------- guardar y leer la sesión (mismo formato que el portal) ---------- */
   function leerJ(area, k){ try{ return JSON.parse(area.getItem(k) || 'null'); }catch(e){ return null; } }
-  function valida(d){ return !!(d && d.token && d.permisos); }
+  function valida(d){
+    return !!(d && d.token && d.permisos && d.sb && d.sb.access && d.sb.refresh);
+  }
 
   /* La sesión vigente. Si hay dos copias (la de esta pestaña y el respaldo común) y son
      de la misma persona, se queda con la llave más nueva: otra pestaña o el portal pudo
@@ -196,9 +185,9 @@
         if (r.status !== 401) return r;
         /* 401: la llave venció o la cerraron. Se renueva una vez y se reintenta. */
         return llave(true).then(function(tk2){
-          if (!tk2){ pedirSesion(false); return r; }
+          if (!tk2){ pedirSesion(); return r; }
           return fetchBase(url, conLlave(init, tk2)).then(function(r2){
-            if (r2.status === 401) pedirSesion(false);
+            if (r2.status === 401) pedirSesion();
             return r2;
           });
         });
@@ -219,8 +208,12 @@
     }catch(e){}
   }
 
-  /* ---------- pantalla de acceso ---------- */
-  var recargarAlEntrar = true;
+  /* ---------- aviso de "sin sesión" (21/09: sin formulario propio) ----------
+     El portal es la ÚNICA puerta. Esta herramienta nunca pide usuario ni clave: si
+     no hay sesión del portal (o quedó vieja/vencida), solo avisa y enlaza de vuelta
+     al portal. Entrar ahí es lo único que arregla esto — no hay nada que escribir
+     aquí. Esto es a propósito: evita que cada herramienta tenga su propia puerta
+     que pueda fallar o quedar desincronizada del portal. */
   function capa(){
     var c = document.getElementById('lsCapa');
     if (c) return c;
@@ -229,96 +222,26 @@
     c.setAttribute('role', 'dialog');
     c.innerHTML =
       '<div class="lsCaja"><div class="lsCab"><img alt="LIVES" src="' + LOGO + '"></div>' +
-      '<div class="lsCuerpo"><div class="lsTit" id="lsTit">Entra para usar esta herramienta</div>' +
-      '<div class="lsSub" id="lsSub">Con tu usuario y clave de siempre, los mismos del portal.</div>' +
-      '<div class="lsErr" id="lsErr"></div>' +
-      '<div class="lsCampo"><label for="lsUsu">Usuario</label>' +
-      '<input type="text" id="lsUsu" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Tu usuario"></div>' +
-      '<div class="lsCampo"><label for="lsCla">Clave de acceso</label>' +
-      '<input type="password" id="lsCla" autocomplete="current-password" placeholder="••••••"></div>' +
-      '<button class="lsBtn" id="lsBtn" type="button">Entrar</button>' +
-      '<div class="lsPie">Lo que ya escribiste en la pantalla no se pierde.<br>' +
-      '<a href="' + PORTAL + '" target="_top">Ir al portal</a></div></div></div>';
+      '<div class="lsCuerpo"><div class="lsTit" id="lsTit">Abre esto desde el portal</div>' +
+      '<div class="lsSub" id="lsSub">Esta herramienta no tiene su propia entrada. ' +
+      'Ve al portal LIVES e inicia sesión ahí; esta pantalla se abre sola en cuanto lo hagas.</div>' +
+      '<a class="lsBtn" href="' + PORTAL + '" target="_top">Ir al portal</a></div></div>';
     document.body.appendChild(c);
-    document.getElementById('lsBtn').addEventListener('click', entrar);
-    ['lsUsu', 'lsCla'].forEach(function(id){
-      document.getElementById(id).addEventListener('keydown', function(e){ if (e.key === 'Enter') entrar(); });
-    });
     return c;
   }
-  function mostrarError(t){ var e = document.getElementById('lsErr'); e.textContent = t; e.classList.add('ver'); }
 
   var pidiendo = false;
-  /* alInicio = true: no había sesión al abrir; tras entrar se recarga (no hay nada escrito).
-     alInicio = false: la sesión venció mientras se trabajaba; tras entrar solo se cierra el
-     aviso, para no borrar lo que la persona estaba llenando. */
-  function pedirSesion(alInicio){
+  function pedirSesion(){
     if (pidiendo) return;
     pidiendo = true;
-    recargarAlEntrar = !!alInicio;
-    function abrir(){
-      var c = capa();
-      if (!alInicio){
-        document.getElementById('lsTit').textContent = 'Tu sesión venció';
-        document.getElementById('lsSub').textContent = 'Vuelve a entrar para seguir. Lo que escribiste sigue en la pantalla.';
-      }
-      var s = sesion();
-      if (s && s.usuario) document.getElementById('lsUsu').value = s.usuario;
-      c.classList.add('ver');
-      setTimeout(function(){
-        var u = document.getElementById('lsUsu');
-        (u.value ? document.getElementById('lsCla') : u).focus();
-      }, 50);
-    }
+    function abrir(){ capa().classList.add('ver'); }
     if (document.body) abrir(); else document.addEventListener('DOMContentLoaded', abrir);
-  }
-
-  function entrar(){
-    var btn = document.getElementById('lsBtn');
-    var usuario = document.getElementById('lsUsu').value.trim().toLowerCase();
-    var clave = String(document.getElementById('lsCla').value || '').trim().toLowerCase();
-    document.getElementById('lsErr').classList.remove('ver');
-    if (!usuario || !clave){ mostrarError('Escribe tu usuario y tu clave.'); return; }
-    btn.disabled = true; btn.textContent = 'Comprobando…';
-    var eq = equipo();
-    function fin(t){ btn.disabled = false; btn.textContent = 'Entrar'; document.getElementById('lsCla').value = ''; if (t) mostrarError(t); }
-    pedir('/auth/v1/token?grant_type=password', { email: usuario + DOMINIO, password: PREFIJO + clave })
-      .then(function(r){
-        if (r.status >= 500) throw new Error('Supabase ' + r.status);
-        if (!r.ok){
-          pedir('/rest/v1/rpc/registrar_ingreso_fallido', { p_usuario: usuario, p_equipo: eq }).catch(function(){});
-          var j = r.json || {};
-          var bloqueado = /banned/i.test(String(j.error_code || j.code || '') + ' ' + String(j.msg || j.message || j.error_description || ''));
-          fin(bloqueado ? 'Tu acceso está desactivado. Habla con el área de Datos e IA.' : 'Usuario o clave incorrectos.');
-          return;
-        }
-        var t = r.json || {};
-        return pedir('/rest/v1/rpc/mi_sesion', { p_equipo: eq }, t.access_token).then(function(m){
-          if (!m.ok || !m.json) throw new Error('mi_sesion ' + m.status);
-          var d = m.json;
-          if (!d.ok){ fin(d.error || 'No se pudo abrir tu sesión.'); return; }
-          d.token = 'supabase';
-          d.sb = { access: t.access_token, refresh: t.refresh_token,
-                   exp: Date.now() + (Number(t.expires_in) || 3600) * 1000 };
-          return pedir('/rest/v1/rpc/version_sesion', {}, null, 5000)
-            .then(function(v){ d.vsesion = (v.ok && typeof v.json === 'number') ? v.json : null; },
-                  function(){ d.vsesion = null; })
-            .then(function(){
-              guardar(d);
-              pidiendo = false;
-              if (recargarAlEntrar){ fijarNombre(d); location.reload(); return; }
-              document.getElementById('lsCapa').classList.remove('ver');
-              fin('');
-            });
-        });
-      })
-      .catch(function(){ fin('No hay conexión con el sistema de accesos. Acércate a una zona con mejor señal y vuelve a intentarlo.'); });
   }
 
   /* ---------- al abrir ---------- */
   var s0 = sesion();
   if (!s0){
-    pedirSesion(true);
+    pedirSesion();
   } else {
     fijarNombre(s0);
     /* Si alguien ejecutó cerrar_todas_las_sesiones(), esta sesión ya no vale. Sin señal
@@ -326,7 +249,7 @@
     pedir('/rest/v1/rpc/version_sesion', {}, null, 8000).then(function(v){
       if (!v.ok || typeof v.json !== 'number') return;
       var s = sesion(); if (!s) return;
-      if (s.vsesion === undefined || (s.vsesion !== null && s.vsesion !== v.json)){ borrar(); pedirSesion(true); return; }
+      if (s.vsesion === undefined || (s.vsesion !== null && s.vsesion !== v.json)){ borrar(); pedirSesion(); return; }
       if (s.vsesion === null){ s.vsesion = v.json; guardar(s); }
     }).catch(function(){});
     /* Abierta fuera del portal: se anota igual que cuando se abre desde el portal. */
@@ -343,10 +266,10 @@
   }
 
   window.LIVES_SESION = {
-    version: 'lives-sesion v1 · 2026-09-18',
+    version: 'lives-sesion v2 · 2026-09-21 (sin login propio, solo portal)',
     actual: function(){ var s = sesion(); return s ? { usuario: s.usuario, nombre: s.nombre, conSupabase: !!s.sb } : null; },
     llave: function(){ return llave(false); },
-    pedir: function(){ pedirSesion(false); }
+    pedir: function(){ pedirSesion(); }
   };
 })();
 </script>
@@ -429,6 +352,13 @@ details.yaListas summary{cursor:pointer;font-size:12.5px;font-weight:700;color:v
 .bar{display:none;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--warm);}
 .bar .fname{font-size:12.5px;color:var(--stone);}
 .bar .fname b{color:#333;}
+.zona{border:2px dashed var(--sage);border-radius:12px;background:#F4FAF7;padding:22px 16px;text-align:center;cursor:pointer;margin:12px 0 10px;transition:background .15s;}
+.zona.encima{background:#E2F3EC;}
+.zona.ocupada{cursor:progress;opacity:.9;}
+.zIco{font-size:26px;color:var(--sage);line-height:1;}
+.zTit{font-size:15px;font-weight:800;color:var(--sage);margin-top:6px;}
+.zSub{font-size:12.5px;color:#5F726C;margin-top:4px;}
+.zErr{font-size:12.5px;color:#B91C1C;background:#FEF2F2;border-radius:8px;padding:7px 10px;margin:4px 0;}
 .btn{background:var(--sage);color:#fff;font-weight:700;font-family:inherit;font-size:13px;border:none;border-radius:6px;padding:9px 18px;cursor:pointer;}
 .btn:hover{background:var(--sage-dark);}
 .btn.ghost{background:#fff;border:1px solid var(--warm);color:var(--sage);}
@@ -498,16 +428,20 @@ td.falta{color:var(--rose);font-weight:700;}
       <div class="autoTxt" id="autoTxt">Procesando…</div>
       <div class="autoBar"><i id="autoBar"></i></div>
     </div>
+    <div class="zona" id="zonaSubir" role="button" tabindex="0">
+      <div class="zIco">⬆</div>
+      <div class="zTit">Arrastra aquí las fichas en PDF</div>
+      <div class="zSub" id="zonaTxt">o toca para elegirlas. Se suben, se agregan al índice y sus tablas se leen solas.</div>
+      <input type="file" id="zonaArchivo" accept="application/pdf,.pdf" multiple style="display:none;">
+    </div>
+    <div id="zonaRes"></div>
     <div class="accBar">
-      <a class="btn subir" href="https://drive.google.com/drive/folders/1L0mdAy04_aSV9bLyVRl4BHVjysd5Ep7B"
-         target="_blank" rel="noopener">Abrir la carpeta del Drive</a>
       <button class="btn" id="btnMasivo" onclick="procesarPendientes(true)">Procesar todas</button>
       <button class="btn" id="btnSeguir" onclick="procesarPendientes(false)" style="display:none;">Continuar con las que faltan</button>
       <span class="accHint" id="accHint"></span>
     </div>
     <div class="pasos">
-      <b>1.</b> Arrastra tus PDF a la carpeta del Drive &nbsp;·&nbsp;
-      <b>2.</b> Vuelve aquí y toca <b>Procesar todas</b>
+      Las fichas se suben aquí mismo. Ya no hace falta la carpeta del Drive.
     </div>
     <div class="alerta" id="alertaRev" style="display:none;"></div>
     <div id="listaPend"></div>
@@ -969,6 +903,290 @@ function entrar(){
     cargarEspecs();
   });
 }
+
+/* ==========================================================================
+   SUBIDA DE FICHAS A SUPABASE (22/09/2026)
+   Luz arrastra los PDF aquí. El sistema los sube al almacén, lee el
+   encabezado con el lector aprobado (168 fichas comparadas contra el de
+   Google: tipo, estilo, versión y grupo idénticos), agrega la ficha al
+   índice y después lee la tabla de medidas como siempre. Nada que llenar.
+   ========================================================================== */
+/* ¿Es un trozo de palabra? El anterior termina en 1 a 4 letras sueltas (sin
+   espacio, sin números) y el siguiente empieza con letra. */
+function trozoDePalabra(ant, sig){
+  ant=String(ant); sig=String(sig);
+  if(/\s$/.test(ant) || /^\s/.test(sig)) return false;
+  var cola=(ant.match(/(\S+)$/)||['',''])[1];
+  return /^[A-Za-zÁÉÍÓÚÑáéíóúñ]{1,4}$/.test(cola) && /^[A-Za-zÁÉÍÓÚÑáéíóúñ]/.test(sig);
+}
+
+/* ---- texto del PDF con el lector del navegador, renglón por renglón ---- */
+function textoEncabezado(buf){
+  return pdfjsLib.getDocument({data:buf}).promise.then(function(pdf){
+    var paginas=[], n=pdf.numPages, i=1;
+    function una(){
+      if(i>n) return Promise.resolve(paginas.join('\n'));
+      return pdf.getPage(i).then(function(pg){
+        return pg.getTextContent().then(function(tc){
+          var items=tc.items.filter(function(it){ return String(it.str).trim()!==''; })
+            .map(function(it){ return {s:it.str, x:it.transform[4], y:it.transform[5], w:it.width||0}; });
+          items.sort(function(a,b){ return Math.abs(b.y-a.y)>3 ? b.y-a.y : a.x-b.x; });
+          /* Cada celda del encabezado va en su propio renglón, como en el lector de
+             Google. Si no, "CLIENTE: PAKA" y "TEMPORADA: FW26", que están lado a lado,
+             quedaban en un mismo renglón y el cliente se leía "PAKA TEMPORADA".
+             Se considera otra celda cuando el hueco entre dos textos pasa de 8 puntos. */
+          var lineas=[], act=null, yAct=null, finAnt=null;
+          items.forEach(function(it){
+            if(yAct===null || Math.abs(it.y-yAct)>3){
+              if(act) lineas.push(act.join(' '));
+              act=[it.s]; yAct=it.y;
+            }else if(finAnt!==null && it.x-finAnt > 8){
+              lineas.push(act.join(' ')); act=[it.s];
+            }else if(finAnt!==null && it.x-finAnt < 0.8 && trozoDePalabra(act[act.length-1], it.s)){
+              /* Una palabra partida en trozos: "CLI" + "ENTE" = "CLIENTE". Solo se unen
+                 fragmentos cortos de letras; una palabra completa como "24466-8D" NO se
+                 pega a la siguiente ("MOLDE"), porque eso borraba la versión. */
+              act[act.length-1] += it.s;
+            }else act.push(it.s);
+            finAnt=it.x+it.w;
+          });
+          if(act) lineas.push(act.join(' '));
+          paginas.push(lineas.join('\n'));
+          i++; return una();
+        });
+      });
+    }
+    return una();
+  });
+}
+
+
+/* ---- lector de encabezados (el mismo del Apps Script) ---- */
+function parsear_(texto, nombreArchivo){
+  var t   = (texto||'').replace(/\u00A0/g,' ');
+  var cab = t.slice(0,4000);
+  var out = {tipo:'',cliente:'',grupo:'',estilos:[],estiloCliente:'',
+             descripcion:'',tela:'',temporada:'',fechaFicha:''};
+
+  // --- TIPO DE DOCUMENTO ---
+  if(/REQUERIMIENTOS\s+DE\s+MATERIALES/i.test(cab))                     out.tipo='RM';
+  else if(/CONTROL\s+DE\s+MEDIDAS\s*:?\s*CORTE/i.test(cab))             out.tipo='CORTE';
+  else if(/ESPECIFICACIONES\s+TECNICAS\s+PARA\s+ACABADOS/i.test(cab))   out.tipo='ACABADOS';
+  else if(/ESPECIFICACIONES\s+TECNICAS\s+PARA\s+PRODUCCION/i.test(cab)) out.tipo='TECNICA';
+  else if(/\bRM[_\s-]|REQUERIMIENTO/i.test(nombreArchivo))               out.tipo='RM';
+  else if(/HOJA\s*DE\s*CORTE|CORTE/i.test(nombreArchivo))                out.tipo='CORTE';
+  else if(/ACABADOS|EMPAQUE/i.test(nombreArchivo))                       out.tipo='ACABADOS';
+  else out.tipo='TECNICA';
+
+  var mg = cab.match(/\b([A-Z]{2,5})\s*[–—-]\s*(\d{2,4})\b/) ||
+           String(nombreArchivo).match(/\b([A-Z]{2,5})\s*[–—-]\s*(\d{2,4})\b/);
+  if(mg) out.grupo = mg[1].toUpperCase()+'-'+mg[2];
+
+  // El RM trae el estilo en su título: "REQUERIMIENTOS DE MATERIALES 25193 ..."
+  if(out.tipo==='RM'){
+    var mr = cab.match(/REQUERIMIENTOS\s+DE\s+MATERIALES\s+(\d{4,6})/i);
+    if(mr){ out.estilos.push({estilo:mr[1], version:''}); }
+    var mdesc = cab.match(/Descripci[óo]n\s+([^\n\r]{4,60})/i);
+    if(mdesc) out.descripcion = mdesc[1].replace(/Orden\s*\/?\s*Grupo.*$/i,'').replace(/\s+/g,' ').trim();
+  }
+
+  var mc = cab.match(/CLIENTE\s*:?\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ0-9 .&\/]{1,30})/i);
+  if(mc) out.cliente = mc[1].split(/[–—-]/)[0]
+                        .replace(/\b(MENS|WOMENS|WOMEN|MEN|KIDS|BABY)\b/gi,'')
+                        .replace(/\s+/g,' ').trim().toUpperCase();
+
+  var mf = cab.match(/\b(\d{2})[\/\-](\d{2})[\/\-](\d{2,4})\b/);
+  if(mf) out.fechaFicha = (mf[3].length===2?'20'+mf[3]:mf[3])+'-'+mf[2]+'-'+mf[1];
+
+  var mt = cab.match(/TEMPORADA\s*:?\s*([A-Z]{2,3}\s*[´'’`]?\s*\d{2})/i);
+  if(mt) out.temporada = mt[1].replace(/\s+/g,'').toUpperCase();
+
+  var md = cab.match(/DESCRIPCI[ÓO]N\s*:?\s*([^\n\r]{2,70})/i);
+  if(md) out.descripcion = md[1].replace(/TELA\s*:.*$/i,'').replace(/\s+/g,' ').trim();
+
+  var mte = cab.match(/TELA\s*:?\s*([^\n\r]{5,110})/i);
+  if(mte) out.tela = mte[1].replace(/USUARIO\s*:.*$/i,'').replace(/\s+/g,' ').trim();
+
+  var mec = cab.match(/ESTILO\s*CLIENTE\s*:?\s*([A-Z0-9][A-Z0-9\-_.]{2,25})/i) ||
+            cab.match(/Est\.?\s*Cliente\s*:?\s*([A-Z0-9][A-Z0-9\-_. ]{2,25})/i);
+  if(mec) out.estiloCliente = mec[1].trim().toUpperCase();
+
+  var vistos = {};
+  out.estilos.forEach(function(e){ vistos[e.estilo]=true; });
+  var re = /\b(\d{4,6})\s*[-–]\s*([0-9]{1,2}[A-Za-z]|[A-Za-z]{1,2})\b/g, m;
+  while((m = re.exec(cab))!==null){
+    if(vistos[m[1]]) continue;
+    vistos[m[1]] = true;
+    out.estilos.push({estilo:m[1], version:m[2].toLowerCase()});
+  }
+  if(out.tipo==='RM' && out.estilos.length) return out;
+
+  var ml = cab.match(/Est\.?\s*Lives\s*:?\s*([0-9\s\-–—,y]+)/i);
+  if(ml) (ml[1].match(/\d{4,6}/g)||[]).forEach(function(n){
+    if(!vistos[n]){ vistos[n]=true; out.estilos.push({estilo:n,version:''}); } });
+
+  if(!out.estilos.length){
+    var rb = /ESTILO\s*LIVES\s*:?\s*(\d{4,6})/gi, m2;
+    while((m2 = rb.exec(t))!==null)
+      if(!vistos[m2[1]]){ vistos[m2[1]]=true; out.estilos.push({estilo:m2[1],version:''}); }
+  }
+  if(!out.estilos.length){
+    (String(nombreArchivo).match(/\d{4,6}/g)||[]).forEach(function(n){
+      if(!vistos[n]){ vistos[n]=true; out.estilos.push({estilo:n,version:''}); } });
+  }
+  return out;
+}
+
+
+/* ¿Es un trozo de palabra? El anterior termina en 1 a 4 letras sueltas (sin
+   espacio, sin números) y el siguiente empieza con letra. */
+function trozoDePalabra(ant, sig){
+  ant=String(ant); sig=String(sig);
+  if(/\s$/.test(ant) || /^\s/.test(sig)) return false;
+  var cola=(ant.match(/(\S+)$/)||['',''])[1];
+  return /^[A-Za-zÁÉÍÓÚÑáéíóúñ]{1,4}$/.test(cola) && /^[A-Za-zÁÉÍÓÚÑáéíóúñ]/.test(sig);
+}
+
+
+/* Limpieza después de leer: si un valor se "come" el rótulo de la celda de al
+   lado (TEMPORADA, USUARIO, FECHA, ANCHO…), se corta ahí. El lector de Google
+   los separaba solo; el del navegador a veces los junta cuando el texto se sale
+   de su celda. */
+var ROTULO_FIN=/(\S)\s+(TEMPORADA|USUARIO|FECHA|ANCHO|LARGO|P[AÁ]GINA|EST\.?\s*LIVES|EST\.?\s*CLIENTE)\b\s*:?.*$/i;
+var ROTULO_PEGADO=/(\S)(TEMPORADA|USUARIO|FECHA)\s*:.*$/;   // sin espacio, solo en mayúsculas y con dos puntos
+var ROTULO_INI=/^(ANCHO|LARGO)\s*(?:[\d.,]+\s+)?/i;
+function limpiarCampos(d){
+  ['cliente','tela','descripcion','estiloCliente','temporada'].forEach(function(k){
+    if(!d[k]) return;
+    var v=String(d[k]).replace(ROTULO_FIN,'$1').replace(ROTULO_PEGADO,'$1');
+    if(k==='cliente') v=v.replace(ROTULO_INI,'').replace(/\s+\d+(\s+CUERPO)?$/i,'');
+    d[k]=v.replace(/\s+/g,' ').trim();
+  });
+  if(d.cliente && d.estiloCliente && d.cliente.toUpperCase()===String(d.estiloCliente).toUpperCase()) d.cliente='';
+  return d;
+}
+
+/* Cliente por grupo: cada grupo pertenece siempre al mismo cliente
+   (STD → STRAIGHT DOWN, PAK → PAKA…). Si el cliente leído sale vacío o raro,
+   se toma el del grupo, aprendido del índice actual.                        */
+function prefijoGrupo(g){ var m=String(g||'').toUpperCase().match(/^([A-Z]{2,5})\s*[-–—]/); return m?m[1]:''; }
+function mapaClientes(){
+  var cuenta={};
+  (INDICE||[]).forEach(function(x){
+    var p=prefijoGrupo(x.grupo); if(!p) return;
+    var c=limpiarCampos({cliente:x.cliente}).cliente;
+    if(!c) return;
+    cuenta[p]=cuenta[p]||{}; cuenta[p][c]=(cuenta[p][c]||0)+1;
+  });
+  var m={};
+  Object.keys(cuenta).forEach(function(p){
+    var mejor='', n=0;
+    Object.keys(cuenta[p]).forEach(function(c){ if(cuenta[p][c]>n || (cuenta[p][c]===n && c.length<mejor.length)){ mejor=c; n=cuenta[p][c]; } });
+    m[p]=mejor;
+  });
+  return m;
+}
+function corregirCliente(d){
+  var c=String(d.cliente||'').trim(), m=mapaClientes()[prefijoGrupo(d.grupo)];
+  var raro = !c || /^[A-Z]{0,3}\d{3,}/.test(c) ||
+             (d.estiloCliente && c.toUpperCase()===String(d.estiloCliente).toUpperCase());
+  if(raro && m) d.cliente=m;
+  return d;
+}
+
+/* ---- escribir en Supabase (la llave de la sesión la pone el bloque) ---- */
+function sbEscribir(fn, cuerpo){
+  return fetch(SB_URL+'/rest/v1/rpc/'+fn, { method:'POST',
+      headers:{ apikey:SB_KEY, 'Content-Type':'application/json' }, body:JSON.stringify(cuerpo||{}) })
+    .then(function(r){ return r.text().then(function(t){
+      var j=null; try{ j=t?JSON.parse(t):null; }catch(e){}
+      if(!r.ok) return { ok:false, error:(j&&(j.message||j.error))||('Supabase rechazó ('+r.status+')') };
+      return j || { ok:false, error:'Supabase no respondió' };
+    }); })
+    .catch(function(){ return { ok:false, error:'Sin conexión con Supabase' }; });
+}
+
+/* ---- PDF desde el almacén de Supabase ---- */
+function pdfDelAlmacen(id){
+  if(!window.LIVES_SESION) return Promise.resolve(null);
+  return window.LIVES_SESION.llave().then(function(tk){
+    if(!tk) return null;
+    return fetch(SB_URL+'/storage/v1/object/authenticated/fichas/'+encodeURIComponent(id)+'.pdf',
+                 { headers:{ apikey:SB_KEY, Authorization:'Bearer '+tk } })
+      .then(function(r){ return r.ok ? r.arrayBuffer() : null; })
+      .then(function(b){ return b ? new Uint8Array(b) : null; });
+  }).catch(function(){ return null; });
+}
+
+/* ---- la subida ---- */
+function idNuevo(){
+  var d=new Date(), p=function(n){ return (n<10?'0':'')+n; };
+  return 'L'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+p(d.getHours())+p(d.getMinutes())+p(d.getSeconds())+
+         Math.random().toString(36).slice(2,6);
+}
+function subirUna(file){
+  var id=idNuevo(), kb=Math.round(file.size/1024), bytes;
+  return file.arrayBuffer().then(function(buf){
+    bytes=new Uint8Array(buf);
+    return window.LIVES_SESION.llave();
+  }).then(function(tk){
+    if(!tk) throw new Error('Tu sesión venció: vuelve a entrar al portal.');
+    return fetch(SB_URL+'/storage/v1/object/fichas/'+id+'.pdf', { method:'POST',
+      headers:{ apikey:SB_KEY, Authorization:'Bearer '+tk, 'Content-Type':'application/pdf', 'x-upsert':'true' },
+      body: bytes });
+  }).then(function(r){
+    if(!r.ok) throw new Error(r.status===403 ? 'No tienes permiso para subir fichas.' : 'No se pudo subir ('+r.status+').');
+    return sbEscribir('fichas_pdf_registrar', { p_file_id:id, p_ruta:id+'.pdf', p_nombre:file.name, p_kb:kb, p_origen:'pantalla' });
+  }).then(function(reg){
+    if(!reg || reg.ok===false) throw new Error((reg&&reg.error)||'No se pudo registrar.');
+    return textoEncabezado(bytes.slice(0));
+  }).then(function(texto){
+    var d=corregirCliente(limpiarCampos(parsear_(texto, file.name)));
+    return sbEscribir('fichas_indexar', { p_file_id:id, p_archivo:file.name, p_kb:kb, p_datos:{
+      tipo:d.tipo||'', cliente:d.cliente||'', grupo:d.grupo||'', estiloCliente:d.estiloCliente||'',
+      descripcion:d.descripcion||'', tela:d.tela||'', temporada:d.temporada||'', fechaFicha:d.fechaFicha||'',
+      estilos:(d.estilos||[]).map(function(e){ return { estilo:e.estilo||'', version:e.version||'' }; }) } })
+      .then(function(r){
+        if(!r || r.ok===false) throw new Error((r&&r.error)||'No se pudo agregar al índice.');
+        return { nombre:file.name, ok:true, tipo:d.tipo, estilos:(d.estilos||[]).length, reemplazo:r.reemplazadas>0 };
+      });
+  }).catch(function(e){ return { nombre:file.name, ok:false, error:String(e.message||e) }; });
+}
+var SUBIENDO=false;
+function subirFichas(lista){
+  var files=[].slice.call(lista||[]).filter(function(f){ return /\.pdf$/i.test(f.name) || f.type==='application/pdf'; });
+  var zona=document.getElementById('zonaSubir'), txtZ=document.getElementById('zonaTxt'), res=document.getElementById('zonaRes');
+  if(!files.length){ txtZ.textContent='Solo se aceptan archivos PDF.'; return; }
+  if(SUBIENDO) return;
+  SUBIENDO=true; zona.classList.add('ocupada'); res.innerHTML='';
+  var hechos=[], i=0;
+  (function sig(){
+    if(i>=files.length){
+      SUBIENDO=false; zona.classList.remove('ocupada');
+      var bien=hechos.filter(function(x){ return x.ok; }), mal=hechos.filter(function(x){ return !x.ok; });
+      txtZ.textContent = bien.length+' ficha(s) subidas'+(mal.length?' · '+mal.length+' con problema':'')+
+                         '. Ahora se leen sus tablas solas.';
+      res.innerHTML = mal.map(function(x){ return '<div class="zErr"><b>'+esc(x.nombre)+'</b>: '+esc(x.error)+'</div>'; }).join('');
+      if(bien.length){ PRIMERA=true; entrar(); }        // recarga el índice y lee las tablas nuevas
+      return;
+    }
+    var f=files[i++];
+    txtZ.textContent='Subiendo '+i+' de '+files.length+': '+f.name;
+    subirUna(f).then(function(r){ hechos.push(r); sig(); });
+  })();
+}
+function esc(s){ return String(s).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function prepararZona(){
+  var z=document.getElementById('zonaSubir'), inp=document.getElementById('zonaArchivo');
+  if(!z || z.__listo) return; z.__listo=true;
+  z.addEventListener('click', function(){ if(!SUBIENDO) inp.click(); });
+  inp.addEventListener('change', function(){ subirFichas(inp.files); inp.value=''; });
+  ['dragenter','dragover'].forEach(function(ev){ z.addEventListener(ev, function(e){ e.preventDefault(); z.classList.add('encima'); }); });
+  ['dragleave','drop'].forEach(function(ev){ z.addEventListener(ev, function(e){ e.preventDefault(); z.classList.remove('encima'); }); });
+  z.addEventListener('drop', function(e){ subirFichas(e.dataTransfer && e.dataTransfer.files); });
+}
+document.addEventListener('DOMContentLoaded', prepararZona);
+
 var PRIMERA=true;
 /* Archivos que ya tienen tabla guardada, esté vigente o no. Sin esto, un
    PDF cuya tabla perdió la marca VIGENTE (porque otro archivo del mismo
@@ -1086,6 +1304,11 @@ function bajarPdf(id, modo, cb){
   var k=claveFicha(id);
   pdfLocal(k, function(buf){
     if(buf){ cb(null, new Uint8Array(buf)); return; }
+    pdfDelAlmacen(id).then(function(arr){
+      if(arr){ pdfGuardar(k, arr.buffer.slice(0)); cb(null, arr); return; }
+      porAppsScript();
+    });
+    function porAppsScript(){
     var intentos=0;
     (function pedir(){
       intentos++;
@@ -1103,6 +1326,7 @@ function bajarPdf(id, modo, cb){
         cb(null, arr);
       });
     })();
+    }
   });
 }
 
@@ -1282,8 +1506,7 @@ function procesarPendientes(forzar){
   function paso(){
     if(i>=faltan.length){
       document.getElementById('autoTxt').textContent = ERROR_BORRADO
-        ? 'No se pudo reemplazar las tablas anteriores ('+ERROR_BORRADO+'). '+
-          'Avisa a Christian: falta publicar la versión nueva del servidor. No se guardó nada.'
+        ? 'No se pudo reemplazar las tablas anteriores ('+ERROR_BORRADO+'). No se guardó nada: vuelve a intentarlo o avisa a Christian.'
         : ok+' tabla(s) leídas y guardadas'+
           (dudosas?' · '+dudosas+' necesitan revisión':'')+
           (sinBajar?' · '+sinBajar+' no se pudieron bajar del Drive: toca "Continuar con las que faltan"':
@@ -1322,7 +1545,7 @@ function procesarPendientes(forzar){
         // Si el borrado falla (por ejemplo, si el servidor publicado es una
         // versión anterior), NO se guarda nada: si no, quedarían la tabla
         // vieja y la nueva conviviendo, las dos como vigentes.
-        post({ accion:'borrarEspecArchivo', fileId:a.d.id }, function(b){
+        sbEscribir('fichas_borrar_espec_archivo', { p_file_id:a.d.id }).then(function(b){
           if(!b || !b.ok){
             ERROR_BORRADO = (b && b.error) || 'el servidor no respondió';
             marcarRevisar(a.d.id); dudosas++; i++; pintarPendientes(); paso();
@@ -1542,12 +1765,12 @@ function guardarTabla(tabla, cab, fileId, archivo, quien, cb, titulo, pagina){
     tallas.forEach(function(t){ vals[t]= f.vals[t] ? f.vals[t].dec : null; });
     return { cod:f.cod, desc:f.desc||'', vals:vals, tol: f.vals['TOL'] ? f.vals['TOL'].dec : null };
   });
-  post({ accion:'guardarEspec', estilo:estiloBase, version:version,
+  sbEscribir('fichas_guardar_espec', { p_d:{ estilo:estiloBase, version:version,
          grupo:cab.grupo||'', tipo:tipo,
          etapa: codEtapa(titulo, tipo), combo: comboConLinea(titulo, cab, archivo),
          fileId:fileId||'', archivo:archivo||'', pagina:pagina||'',
          fechaFicha: cab.fechaFicha||'',
-         tallas:tallas, puntos:puntos, confirmadoPor:quien }, cb);
+         tallas:tallas, puntos:puntos, confirmadoPor:quien } }).then(cb);
 }
 
 
