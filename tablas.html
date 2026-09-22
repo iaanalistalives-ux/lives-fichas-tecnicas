@@ -732,7 +732,13 @@ function cabecera(texto){
   o.tipo = /CONTROL\s+DE\s+MEDIDAS\s*:\s*CORTE/i.test(t) ? 'CORTE'
          : /EN\s+PRENDA\s+TERMINADA/i.test(t) ? 'PRENDA TERMINADA' : '—';
   var m;
-  if((m=t.match(/\b([A-Z]{2,5})\s*[–—-]\s*(\d{2,4})\b/)))  o.grupo=m[1].toUpperCase()+'-'+m[2];
+  /* grupo: "THY – 1120", "STD-053". Se saltan los códigos de tela y entretela
+     (JE-2052, PQ-122, TP-213), que tienen la misma forma.                    */
+  var reGr=/\b([A-Z]{2,5})\s*[–—-]\s*(\d{2,4})\b/g, mg;
+  while((mg=reGr.exec(t))){
+    if(/^(JE|PQ|TP|RIB|EC|EM|ET|EO)$/i.test(mg[1])) continue;
+    o.grupo=mg[1].toUpperCase()+'-'+mg[2]; break;
+  }
   // El estilo puede venir como "24754-3A" o como "ESTILO: 24941 MOLDE: 24941-4AA".
   // En el segundo caso el molde NO es la versión, así que se corta antes.
   var reEst=/([0-9]{4,6})\s*[-–—]\s*([0-9A-Za-z]{1,3})\b/;
@@ -748,7 +754,14 @@ function cabecera(texto){
     var mn=seg.match(/\b(\d{4,6})\b/);
     if(mn){ o.estilo=mn[1]; break; }
   }
-  if(!o.estilo && (m=t.match(reEst))) o.estilo=m[1]+'-'+m[2].toUpperCase();
+  if(!o.estilo){
+    /* El campo ESTILO vino vacío. Se busca en el resto del texto, pero sin
+       el MOLDE: "MOLDE: 25223-2CA" no es la versión (la ficha es 2B). Si
+       solo está el molde, se toma su número de estilo, sin versión.        */
+    var sinMolde=t.replace(/MOLDE\s*:?\s*[0-9]{4,6}\s*[-–—]\s*[0-9A-Za-z]{1,4}/ig,' ');
+    if((m=sinMolde.match(reEst))) o.estilo=m[1]+'-'+m[2].toUpperCase();
+    else if((m=t.match(/MOLDE\s*:?\s*([0-9]{4,6})/i))) o.estilo=m[1];
+  }
 
   // fecha del documento: decide cuál versión es la vigente
   var mfe=t.match(/\b(\d{2})[\/\-](\d{2})[\/\-](\d{2,4})\b/);
@@ -1499,12 +1512,13 @@ function procesarPendientes(forzar){
   caja.style.display='block';
   document.getElementById('autoTxt').textContent='Preparando '+faltan.length+' ficha(s)…';
   document.getElementById('autoBar').style.width='2%';
-  var i=0, ok=0, dudosas=0, sinBajar=0;
+  var i=0, ok=0, dudosas=0, sinBajar=0, sinGuardar=0, errGuardar='';
 
   function paso(){
     if(i>=faltan.length){
-      document.getElementById('autoTxt').textContent = ERROR_BORRADO
-        ? 'No se pudo reemplazar las tablas anteriores ('+ERROR_BORRADO+'). No se guardó nada: vuelve a intentarlo o avisa a Christian.'
+      document.getElementById('autoTxt').textContent = sinGuardar
+        ? ok+' ficha(s) guardadas · '+sinGuardar+' se leyeron bien pero la base de datos no las guardó ('+
+          errGuardar+'). Quedan sin procesar: toca "Continuar con las que faltan". Si se repite, avisa a Christian con este mensaje.'
         : ok+' tabla(s) leídas y guardadas'+
           (dudosas?' · '+dudosas+' necesitan revisión':'')+
           (sinBajar?' · '+sinBajar+' no se pudieron bajar del Drive: toca "Continuar con las que faltan"':
@@ -1513,7 +1527,7 @@ function procesarPendientes(forzar){
       document.getElementById('autoBar').style.width='100%';
       document.getElementById('btnMasivo').disabled=false;
       document.getElementById('btnMasivo').textContent='Procesar todas';
-      setTimeout(function(){ if(!dudosas) caja.style.display='none'; }, 3500);
+      setTimeout(function(){ if(!dudosas && !sinGuardar) caja.style.display='none'; }, 3500);
       cargarEspecs();
       return;
     }
@@ -1545,22 +1559,23 @@ function procesarPendientes(forzar){
         // vieja y la nueva conviviendo, las dos como vigentes.
         sbEscribir('fichas_borrar_espec_archivo', { p_file_id:a.d.id }).then(function(b){
           if(!b || !b.ok){
-            ERROR_BORRADO = (b && b.error) || 'el servidor no respondió';
-            marcarRevisar(a.d.id); dudosas++; i++; pintarPendientes(); paso();
+            // la lectura salió bien: no va a revisión, queda pendiente para reintentar
+            ERROR_BORRADO = errGuardar = (b && b.error) || 'el servidor no respondió';
+            sinGuardar++; i++; pintarPendientes(); paso();
             return;
           }
           otra();
         });
         function otra(){
           if(j>=lote.length){
-            if(fallo){ marcarRevisar(a.d.id); dudosas++; }
+            if(fallo){ sinGuardar++; }               // leída bien, guardado rechazado: queda pendiente
             else { ok++; anotarArchivo(a.d.archivo); }
             i++; pintarPendientes(); paso(); return;
           }
           var x=lote[j++];
           try{
             guardarTabla(x.tabla, x.cab, a.d.id, a.d.archivo, '(automático)', function(g){
-              if(!g || !g.ok) fallo=true;
+              if(!g || !g.ok){ fallo=true; errGuardar=(g && g.error) || 'el servidor no respondió'; }
               otra();
             }, x.titulo, x.pagina);
           }catch(err){ fallo=true; otra(); }
@@ -1673,20 +1688,30 @@ function extraerDe(arr, cb, tipoIndice){
         cabDoc.tipo = tipoIndice==='CORTE' ? 'CORTE' : 'PRENDA TERMINADA';
       }
 
-      var ultEtapa='', ultCombo='';
+      var ultEtapa='', ultCombo='', codsAnt=null;
       var todas=c.map(function(x){
         var cb2=cabecera(textos[x.n-1]);
         if(!cb2.estilo)   cb2.estilo   = cabDoc.estilo;
-        if(!cb2.grupo)    cb2.grupo    = cabDoc.grupo;
+        if(cabDoc.grupo)  cb2.grupo    = cabDoc.grupo;   // el grupo es del documento, no de cada hoja
         if(!cb2.fechaFicha) cb2.fechaFicha = cabDoc.fechaFicha;
         cb2.linea = cabDoc.linea;
         cb2.tipo = tipoDoc;                       // el tipo lo manda el documento
         var ti=tituloTabla(textos[x.n-1], tipoDoc);
-        if(ti.etapa==='Medidas'){                 // página de continuación
-          ti.etapa = ultEtapa || (tipoDoc==='CORTE' ? 'Corte' : 'Prenda terminada (después de vapor)');
-          if(!ti.combo) ti.combo = ultCombo;
+        var cods=x.tabla.filas.map(function(f){ return f.cod; });
+        if(ti.etapa==='Medidas'){                 // página sin título
+          /* Si repite la mayoría de los códigos de la tabla anterior (A, B, C…),
+             no es su continuación: es otra tabla. Pasa en fichas que ponen la
+             prenda terminada al final sin título (Theory 23581-8B): antes se
+             pegaba a la tabla "antes de vapor" y se perdía.                   */
+          var rep = codsAnt ? cods.filter(function(k){ return codsAnt.indexOf(k)>=0; }).length : 0;
+          if(codsAnt && rep >= Math.max(3, Math.ceil(cods.length*0.5))){
+            ti.etapa = tipoDoc==='CORTE' ? 'Corte' : 'Prenda terminada (después de vapor)';
+          }else{                                  // continuación de la anterior
+            ti.etapa = ultEtapa || (tipoDoc==='CORTE' ? 'Corte' : 'Prenda terminada (después de vapor)');
+            if(!ti.combo) ti.combo = ultCombo;
+          }
         }
-        ultEtapa=ti.etapa; ultCombo=ti.combo;
+        codsAnt=cods; ultEtapa=ti.etapa; ultCombo=ti.combo;
         return { tabla:x.tabla, cab:cb2, titulo:ti, pagina:x.n };
       });
 
