@@ -895,8 +895,8 @@ function montarBusqueda(){
     if(!q || q.length<2) return [];
     var vistos={}, ops=[];
     baseTipo().forEach(function(d){
-      [[d.estilo,'estilo'],[d.grupo,'grupo'],[d.cliente,'cliente'],
-       [d.estiloCliente,'estilo cliente']].forEach(function(par){
+      [[d.estilo,'estilo'],[d.cliente,'cliente'],[d.estiloCliente,'estilo cliente']]
+        .concat(gruposDe(d).map(function(g){ return [g,'grupo']; })).forEach(function(par){
         var v=par[0];
         if(!v || norm(v).indexOf(q)<0) return;
         var k=par[1]+'|'+v;
@@ -976,9 +976,26 @@ function fmt(f){
 }
 /* Texto donde se busca: si un campo no se leyó bien del PDF, el nombre
    del archivo sirve de red de seguridad.                                */
+/* Grupos de una ficha. Una misma ficha puede servir a varios grupos y el
+   archivo lo dice así: "THY-1120-1121-1122-1123" o "THY-1120/1121". El
+   índice guarda solo uno, y buscar "THY-1121" no la encontraba.           */
+function gruposDe(d){
+  if(d.__grupos) return d.__grupos;
+  var out=[], re=/\b([A-Z]{2,5})\s*[-–—]\s*(\d{3,4})((?:\s*[-–—\/]\s*\d{3,4})+)/gi, m;
+  if(d.grupo) out.push(String(d.grupo).toUpperCase());
+  var txt=String(d.archivo||'');
+  while((m=re.exec(txt))){
+    var pre=m[1].toUpperCase();
+    [m[2]].concat(m[3].split(/[^0-9]+/).filter(Boolean)).forEach(function(n){
+      var g=pre+'-'+n; if(out.indexOf(g)<0) out.push(g);
+    });
+  }
+  d.__grupos=out;
+  return out;
+}
 function textoDe(d){
   if(d.__txt) return d.__txt;
-  d.__txt = norm([d.estilo, d.version, d.grupo, d.cliente, d.estiloCliente,
+  d.__txt = norm([d.estilo, d.version, gruposDe(d).join(' '), d.cliente, d.estiloCliente,
                   d.descripcion, d.tela, d.temporada, d.archivo].join(' '));
   return d.__txt;
 }
