@@ -572,6 +572,21 @@ var SES=null, PAR={}, ESPEC=null;
    que copia a Supabase en el mismo momento.                                        */
 var SB_URL='https://xxfufpddgoyhbotjmaiy.supabase.co';
 var SB_KEY='sb_publishable_1g-n6UT70EUlNAo8Lyc04w_jKR4LpXZ';
+/* ---- escribir en Supabase (la llave de la sesión la pone el bloque) ---- */
+function sbEscribir(fn, cuerpo){
+  return fetch(SB_URL+'/rest/v1/rpc/'+fn, { method:'POST',
+      headers:{ apikey:SB_KEY, 'Content-Type':'application/json' }, body:JSON.stringify(cuerpo||{}) })
+    .then(function(r){ return r.text().then(function(t){
+      var j=null; try{ j=t?JSON.parse(t):null; }catch(e){}
+      if(!r.ok) return { ok:false, error:(j&&(j.message||j.error))||('Supabase rechazó ('+r.status+')') };
+      return j || { ok:false, error:'Supabase no respondió' };
+    }); })
+    .catch(function(){ return { ok:false, error:'Sin conexión con la base de datos' }; });
+}
+function registrarAcceso(accion, fileId, estilo, detalle){
+  try{ sbEscribir('fichas_registrar_acceso', { p_accion:accion, p_file_id:fileId||'', p_estilo:estilo||'', p_detalle:detalle||'' }); }catch(e){}
+}
+
 
 /* ---- PDF desde el almacén de Supabase (22/09/2026). El Apps Script queda de
    respaldo para las fichas antiguas si el almacén no responde. ---- */
@@ -650,6 +665,10 @@ function normNombre(t){
 }
 
 function jsonpGAS(params, cb){
+  /* 22/09/2026: Fichas ya no usa el Apps Script. Todo va a Supabase; si
+     Supabase no responde, se avisa en vez de ir a una copia vieja. */
+  setTimeout(function(){ cb({ ok:false, error:'No hay conexión con la base de datos. Revisa tu señal y vuelve a intentar.' }); }, 0);
+  return;
   var fn='cb_'+Math.random().toString(36).slice(2), s=document.createElement('script');
   var to=setTimeout(function(){ fin(); cb({ok:false,error:'Tiempo de espera agotado.'}); },90000);
   function fin(){ clearTimeout(to); try{delete window[fn];}catch(e){window[fn]=undefined;} if(s.parentNode) s.parentNode.removeChild(s); }
@@ -1594,7 +1613,9 @@ function decidir(r){
 
   var enviar = MODO_DEMO
     ? function(d, cb){ setTimeout(function(){ cb({ok:true, id:'DEMO (no se guardó)', auditora:SES.auditora, taller:SES.taller}); }, 600); }
-    : post;
+    : function(d, cb){                              // directo a Supabase
+        sbEscribir('fichas_guardar_medicion', { p_cab:d.cab, p_det:d.det, p_id_envio:d.idEnvio }).then(cb);
+      };
   enviar({ accion:'guardarMedicion', idEnvio:ID_ENVIO,
          cab:{ estilo:PAR.estilo, grupo:PAR.grupo||ESPEC.grupo||'', tipo:ESPEC.tipo,
                etapa:ESPEC.etapa||ETAPA, combo:ESPEC.combo||COMBO,
