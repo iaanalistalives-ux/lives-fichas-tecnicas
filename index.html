@@ -993,10 +993,24 @@ function gruposDe(d){
   d.__grupos=out;
   return out;
 }
+/* Línea de tallas de la ficha: Missy, Plus o Petite. Un mismo estilo puede
+   tener una ficha por línea (EFI manda las dos: Missy y Plus). Si no se
+   distinguen, una tapa a la otra y solo se ve la última subida.           */
+var NOM_LINEA={MISSY:'Missy', PLUS:'Plus', PETITE:'Petite'};
+function lineaDe(d){
+  if(d.__linea!==undefined) return d.__linea;
+  var t=' '+String([d.archivo, d.descripcion, d.estiloCliente, d.version].join(' ')).toUpperCase()+' ';
+  var l='';
+  if(/\bPLUS\b|\(\s*[0-6]\s*X\s*[-–—]\s*[0-6]\s*X\s*\)|\b[1-6]X\b/.test(t))       l='PLUS';
+  else if(/\bPETITE?\b|\bPETITES\b/.test(t))                                       l='PETITE';
+  else if(/\bMISSY\b/.test(t))                                                      l='MISSY';
+  d.__linea=l;
+  return l;
+}
 function textoDe(d){
   if(d.__txt) return d.__txt;
   d.__txt = norm([d.estilo, d.version, gruposDe(d).join(' '), d.cliente, d.estiloCliente,
-                  d.descripcion, d.tela, d.temporada, d.archivo].join(' '));
+                  d.descripcion, d.tela, d.temporada, d.archivo, lineaDe(d)].join(' '));
   return d.__txt;
 }
 function buscar(){
@@ -1030,10 +1044,11 @@ function buscar(){
     return;
   }
   var g={};
-  res.forEach(function(d){ var k=d.tipo+'|'+d.grupo+'|'+d.estilo; (g[k]=g[k]||[]).push(d); });
+  res.forEach(function(d){ var k=d.tipo+'|'+d.grupo+'|'+d.estilo+'|'+lineaDe(d); (g[k]=g[k]||[]).push(d); });
   var claves=Object.keys(g).sort(function(a,b){
     var A=g[a][0],B=g[b][0];
-    return (B.estilo>A.estilo?1:B.estilo<A.estilo?-1:0)||A.tipo.localeCompare(B.tipo);
+    return (B.estilo>A.estilo?1:B.estilo<A.estilo?-1:0)||A.tipo.localeCompare(B.tipo)||
+           lineaDe(A).localeCompare(lineaDe(B));
   });
   var html='<div class="sectitle">'+res.length+' resultado(s) · '+claves.length+' estilo(s)</div>';
   claves.forEach(function(k,i){
@@ -1058,6 +1073,7 @@ function tarjeta(lista,i){
      (d.version?'<span style="font-size:14px;color:#5F726C;"> · v'+d.version+'</span>':'')+
      '<small>'+sub+'</small></div><div style="text-align:right;">'+
      '<span class="tag'+(ti.c?' '+ti.c:'')+'">'+ti.t+'</span>';
+  if(NOM_LINEA[lineaDe(d)]) h+=' <span class="tag">'+NOM_LINEA[lineaDe(d)]+'</span>';
   if(lista.length>1) h+=' <span class="tag vig">VIGENTE</span>';
   if(d.estado==='REVISAR') h+=' <span class="tag rev">REVISAR</span>';
   h+='</div></div>';
