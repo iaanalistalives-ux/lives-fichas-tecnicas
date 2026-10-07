@@ -656,10 +656,10 @@ function registrarAcceso(accion, fileId, estilo, detalle){
 /* ---- PDF desde el almacén de Supabase. Si no llega, se intenta una vez
    más antes de avisar (señal irregular en planta y talleres). ---- */
 function pdfDelAlmacen(id){
-  if(!window.LIVES_SESION || !id) return Promise.resolve(null);
+  if(!id) return Promise.resolve(null);   /* sin sesión: llave pública (lectura abierta) */
   function una(){
-    return window.LIVES_SESION.llave().then(function(tk){
-      if(!tk) return null;
+    return (window.LIVES_SESION ? window.LIVES_SESION.llave() : Promise.resolve(null)).then(function(tk){
+      tk = tk || SB_KEY;
       return fetch(SB_URL+'/storage/v1/object/authenticated/fichas/'+encodeURIComponent(id)+'.pdf',
                    { headers:{ apikey:SB_KEY, Authorization:'Bearer '+tk } })
         .then(function(r){ return r.ok ? r.arrayBuffer() : null; })
