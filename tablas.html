@@ -1034,7 +1034,7 @@ function entrar(){
     pdfLimpiar();
     document.getElementById('app').style.display='block';
     document.getElementById('salida').innerHTML =
-      INDICE.length ? '' : '<div class="vacio">No hay fichas cargadas en Drive todavía.</div>';
+      INDICE.length ? '' : '<div class="vacio">No hay fichas cargadas todavía.</div>';
     cargarEspecs();
   });
 }
@@ -1687,7 +1687,7 @@ function procesarPendientes(forzar){
           errGuardar+'). Quedan sin procesar: toca "Continuar con las que faltan". Si se repite, avisa a Christian con este mensaje.'
         : ok+' tabla(s) leídas y guardadas'+
           (dudosas?' · '+dudosas+' necesitan revisión':'')+
-          (sinBajar?' · '+sinBajar+' no se pudieron bajar del Drive: toca "Continuar con las que faltan"':
+          (sinBajar?' · '+sinBajar+' no se pudieron bajar: toca "Continuar con las que faltan"':
                     (dudosas?'':'  ·  nada pendiente'));
       verBotonContinuar();
       document.getElementById('autoBar').style.width='100%';

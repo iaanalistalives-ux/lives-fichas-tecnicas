@@ -1357,7 +1357,7 @@ function pdfLimpiar(){
    tampoco, se sigue con la siguiente ficha en vez de quedarse esperando. */
 function bajarFicha(cb){
   var id=ESPEC && ESPEC.fileId;
-  if(!id){ cb('Esta tabla no tiene la ficha guardada en el Drive.'); return; }
+  if(!id){ cb('Esta tabla no tiene la ficha guardada.'); return; }
   var k=id+'|'+(ESPEC.archivo||'');
   pdfLocal(k, function(buf){
     if(buf){ cb(null, new Uint8Array(buf)); return; }
