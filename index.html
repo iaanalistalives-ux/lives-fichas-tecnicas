@@ -496,6 +496,7 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 .verifBox.pend .vTit{color:#92400E;}
 .verifBox .vSub{font-size:12px;color:var(--stone);margin:4px 0 10px;}
 .grupoDia{font-size:12px;font-weight:800;color:var(--sage-dark);text-transform:uppercase;letter-spacing:.4px;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--warm);}
+.lsTope500{font-size:12px;color:#5F726C;text-align:center;padding:8px 0}
 .fila{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--warm-light);cursor:pointer;}
 .fila:last-child{border-bottom:none;}
 .fila .est{font-size:15px;font-weight:800;color:#333;min-width:56px;}
@@ -1330,15 +1331,20 @@ function pintarTodo(){
     return;
   }
 
+  /* Regla 500 (12/10/2026): sin filtro (Todo y Todas) se dibujan solo los 500 archivos
+     más recientes; con filtro, todos. Contadores y verificación usan todos. */
+  var porFecha=archivos.slice().sort(function(x,y){ return String(y.d.fechaSubida||'').localeCompare(String(x.d.fechaSubida||'')); });
+  var sinFiltro = FILTRO_FECHA==='todo' && !TIPO;
+  var dibujar = sinFiltro ? porFecha.slice(0,500) : porFecha;
   // agrupar por día de subida
   var dias={};
-  archivos.forEach(function(a){ (dias[diaDe(a.d)]=dias[diaDe(a.d)]||[]).push(a); });
+  dibujar.forEach(function(a){ (dias[diaDe(a.d)]=dias[diaDe(a.d)]||[]).push(a); });
   var claves=Object.keys(dias).sort().reverse();
 
   var out='';
   claves.forEach(function(k){
     out+='<div class="grupoDia">'+fechaLarga(k)+' — '+dias[k].length+' archivo(s)</div>';
-    dias[k].sort(function(x,y){ return (x.d.grupo||'').localeCompare(y.d.grupo||'','es'); });
+    dias[k].sort(function(x,y){ return String(y.d.fechaSubida||'').localeCompare(String(x.d.fechaSubida||'')) || (x.d.grupo||'').localeCompare(y.d.grupo||'','es'); });
     dias[k].forEach(function(a){
       var d=a.d, ti=TIPOS[d.tipo]||TIPOS.TECNICA;
       var ests=a.estilos.filter(function(v,i,s){ return s.indexOf(v)===i; }).join(', ');
@@ -1351,6 +1357,8 @@ function pintarTodo(){
            '</div>';
     });
   });
+  if(dibujar.length<archivos.length)
+    out+='<div class="lsTope500">Se muestran los 500 registros más recientes de '+archivos.length.toLocaleString('es-PE')+'. Usa los filtros para ver los demás.</div>';
   document.getElementById('listaTodo').innerHTML=out;
 }
 

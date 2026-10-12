@@ -448,6 +448,7 @@ input.txt:focus,select.txt:focus{outline:none;border-color:var(--sage);}
 .kpi .l{font-size:12px;color:#333;font-weight:600;margin-top:3px;}
 .kpi.mal .v{color:var(--rose);}
 
+.lsTope500{font-size:12px;color:#5F726C;text-align:center;padding:8px 0}
 .fila{background:#fff;border:1px solid var(--warm);border-left:4px solid var(--sage);border-radius:8px;padding:12px 14px;margin-bottom:9px;cursor:pointer;display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
 .fila.rech{border-left-color:var(--rose);}
 .fila .est{font-size:17px;font-weight:800;min-width:62px;}
@@ -873,8 +874,13 @@ function pintarLista(){
     out.innerHTML='<div class="vacio">No hay mediciones con esos filtros.</div>';
     return;
   }
+  /* Regla 500 (12/10/2026): sin filtros se dibujan solo las 500 mediciones más recientes;
+     con cualquier filtro, todas. Los KPI usan todas. Orden: la más reciente arriba. */
+  var orden=MEDS.slice().sort(function(a,b){ return String(b.fecha||'').localeCompare(String(a.fecha||'')); });
+  var sinFiltro=['fEstilo','fGrupo','fTaller','fAud','fDesde','fHasta'].every(function(i){ return !String(document.getElementById(i).value||'').trim(); });
+  var ver=sinFiltro ? orden.slice(0,500) : orden;
   var dias={};
-  MEDS.forEach(function(m){ (dias[String(m.fecha).slice(0,10)]=dias[String(m.fecha).slice(0,10)]||[]).push(m); });
+  ver.forEach(function(m){ (dias[String(m.fecha).slice(0,10)]=dias[String(m.fecha).slice(0,10)]||[]).push(m); });
   var h='';
   Object.keys(dias).sort().reverse().forEach(function(d){
     h+='<div class="sectitle">'+fechaLarga(d)+' — '+dias[d].length+' auditoría(s)</div>';
@@ -892,6 +898,8 @@ function pintarLista(){
          '</div>';
     });
   });
+  if(ver.length<MEDS.length)
+    h+='<div class="lsTope500">Se muestran los 500 registros más recientes de '+MEDS.length.toLocaleString('es-PE')+'. Usa los filtros para ver los demás.</div>';
   out.innerHTML=h;
 }
 function fechaLarga(iso){
