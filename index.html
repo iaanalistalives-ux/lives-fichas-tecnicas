@@ -678,6 +678,7 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 </style>
 <style id="lsLimpCss">/* lives-limpieza v1 · sin enlaces repetidos (cada pantalla tiene su entrada en el portal), sin "Cambiar archivo" y sin títulos que ya pone el portal */#quien button{display:none!important}</style>
 <style id="lsLimp2Css">/* lives-limpieza v2 · sin notas, veredictos ni paneles de título arriba */.wrap>.note{display:none!important}.lsOculto{display:none!important}#vdrive{display:none!important}</style>
+<style id="lsSinActCss">/* 12/10/2026: sin botón Actualizar propio; se usa el actualizar del portal */#btnSync{display:none!important}</style>
 </head>
 <body>
 
@@ -760,7 +761,7 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 
   <div class="note" style="margin-top:20px;">
     La ficha marcada <b>VIGENTE</b> es la de fecha más reciente según el propio documento.
-    Si Luz acaba de subir una ficha y no aparece, toca <b>Actualizar</b>.
+    Si Luz acaba de subir una ficha y no aparece, actualiza la pantalla desde el portal.
   </div>
 </div>
 
@@ -1274,7 +1275,7 @@ function buscar(){
     ult.forEach(function(d){ if(!vistos[d.id]){ vistos[d.id]=1; rec.push(d); } });
     rec=rec.slice(0,8);
     out.innerHTML='<div class="vacio">No hay fichas con <b>'+q+'</b>.<br><br>'+
-      'Revisa cómo lo escribiste o toca <b>Actualizar</b> por si acaban de subirla.</div>'+
+      'Revisa cómo lo escribiste o actualiza la pantalla desde el portal por si acaban de subirla.</div>'+
       (rec.length ? '<div class="sectitle">Últimas fichas cargadas</div>'+
         rec.map(function(d,i){ return tarjeta([d], 900+i); }).join('') : '');
     return;
