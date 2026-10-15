@@ -1293,6 +1293,8 @@ function cargarEspec(){
 function aplicarEspec(espec){
     error('');
     ESPEC=espec;
+    UNID = (espec && espec.unidad==='cm') ? 'cm' : 'pulg';   /* lo dice la ficha */
+    FRACS = pasos();
     F={ nombre:(PAR.grupo||'')+' · '+PAR.estilo,
         tipo: ESPEC.tipo==='CORTE' ? 'HOJA DE CORTE' : 'PRENDA TERMINADA',
         desc: ESPEC.archivo||'',
@@ -1309,7 +1311,20 @@ function aplicarEspec(espec){
     pintarColores();
 }
 
-/* ---------- fracciones ---------- */
+/* ---------- medidas: pulgadas o centímetros ---------- */
+/* Casi todas las fichas vienen en PULGADAS y se muestran en fracciones de
+   16avos, igual que siempre. Las que el propio documento declara en
+   CENTÍMETROS se muestran y se capturan con decimales: "54.6", nunca
+   "54 5/8". Lo decide la ficha, no la pantalla. */
+var UNID='pulg';
+function esCm(){ return UNID==='cm'; }
+function fmtMed(dec){
+  if(dec===null||dec===undefined||isNaN(dec)) return '—';
+  if(!esCm()) return aFrac(dec);
+  var neg=dec<0; dec=Math.abs(dec);
+  var s=(Math.round(dec*100)/100).toFixed(2).replace(/\.?0+$/,'');
+  return (neg?'−':'')+(s===''?'0':s);
+}
 function aFrac(dec){
   if(dec===null||dec===undefined||isNaN(dec)) return '—';
   var neg = dec<0; dec=Math.abs(dec);
@@ -1436,8 +1451,8 @@ function pintarLista(){
        '<div class="info">'+
        (p[1] ? '<div class="nombre">'+p[1]+'</div><div class="codmin">'+p[0]+'</div>'
              : '<div class="nombre">'+p[0]+'</div>')+
-       '<div class="esp">Esp. '+aFrac(esp)+' &nbsp;±'+aFrac(tol)+'</div></div>'+
-       '<div class="val">'+(d? d.txtDif+'<small>'+aFrac(d.val)+'</small>' : '<small>medir</small>')+'</div>'+
+       '<div class="esp">Esp. '+fmtMed(esp)+' &nbsp;±'+fmtMed(tol)+'</div></div>'+
+       '<div class="val">'+(d? d.txtDif+'<small>'+fmtMed(d.val)+'</small>' : '<small>medir</small>')+'</div>'+
        '</div>';
     if(i===PUNTO) h+=panelPunto(i, esp, tol);
   });
@@ -1457,16 +1472,17 @@ function panelPunto(i, esp, tol){
   var p=F.puntos[i];
   return '<div class="panelPunto" onclick="event.stopPropagation();">'+
     '<div class="tituloPunto">'+(p[1]||p[0])+(p[1]?' <b>'+p[0]+'</b>':'')+'</div>'+
-    '<div class="espLinea"><span class="espVal">'+aFrac(esp)+'</span>'+
-    '<span class="espTol">tolerancia ± '+aFrac(tol)+'</span></div>'+
+    '<div class="espLinea"><span class="espVal">'+fmtMed(esp)+'</span>'+
+    '<span class="espTol">tolerancia ± '+fmtMed(tol)+'</span></div>'+
     '<button class="exacto" onclick="exacto()">SIN DIFERENCIA &nbsp;—</button>'+
     '<div class="signo">'+
       '<button id="sgMenos" onclick="setSigno(-1)">− Menos</button>'+
       '<button id="sgMas" onclick="setSigno(1)">+ Más</button>'+
     '</div>'+
     '<div class="fracs" id="fracs"></div>'+
-    '<div class="otro"><input id="capInp" inputmode="numeric" placeholder="otra: 3 32" autocomplete="off">'+
-    '<span>numerador<br>y denominador</span></div>'+
+    '<div class="otro"><input id="capInp" inputmode="'+(esCm()?'decimal':'numeric')+'" placeholder="'+
+      (esCm()?'otra: 0.4':'otra: 3 32')+'" autocomplete="off">'+
+    '<span>'+(esCm()?'en centímetros':'numerador<br>y denominador')+'</span></div>'+
     '<div class="res neutro" id="capRes">Elige la diferencia</div>'+
     '<div class="accs">'+
       '<button class="btn ghost" onclick="cerrarPunto()">Cerrar</button>'+
@@ -1741,27 +1757,44 @@ function verBotonDibujo(){
     : 'Ver dibujo';
 }
 
-var FRACS=[[1,16],[1,8],[3,16],[1,4],[5,16],[3,8],[1,2],[5,8],[3,4],[7,8],[1,1],[0,0]];
+/* Los botones de diferencia: en pulgadas, 16avos; en centímetros, décimas.
+   Con 16avos no se puede escribir una diferencia de 0.3 cm. */
+function pasos(){
+  if(esCm()) return [{v:0.1,t:'0.1'},{v:0.2,t:'0.2'},{v:0.3,t:'0.3'},{v:0.4,t:'0.4'},
+                     {v:0.5,t:'0.5'},{v:0.7,t:'0.7'},{v:1,t:'1'},{v:1.5,t:'1.5'},
+                     {v:2,t:'2'},{v:3,t:'3'},{v:null,t:'otra'}];
+  return [[1,16],[1,8],[3,16],[1,4],[5,16],[3,8],[1,2],[5,8],[3,4],[7,8],[1,1]]
+    .map(function(f){ return {v:f[0]/f[1], t:(f[1]===1?''+f[0]:f[0]+'/'+f[1])}; })
+    .concat([{v:null,t:'otra'}]);
+}
+var FRACS=pasos();
 var SIGNO=1, DIF=null, PUNTO=null;
 
 function pintarFracs(){
   var caja=document.getElementById('fracs');
   if(!caja) return;
+  FRACS = pasos();
   caja.innerHTML = FRACS.map(function(f,i){
-    if(f[1]===0) return '<button data-i="'+i+'" onclick="elegirFrac('+i+')" style="font-size:13px;">otra</button>';
-    var t = f[1]===1 ? ''+f[0] : f[0]+'/'+f[1];
-    return '<button data-i="'+i+'" onclick="elegirFrac('+i+')">'+t+'</button>';
+    if(f.v===null) return '<button data-i="'+i+'" onclick="elegirFrac('+i+')" style="font-size:13px;">otra</button>';
+    return '<button data-i="'+i+'" onclick="elegirFrac('+i+')">'+f.t+'</button>';
   }).join('');
   setSigno(SIGNO);
   var inp=document.getElementById('capInp');
   if(inp){
     inp.addEventListener('input', function(e){
+      if(esCm()){
+        /* centímetros: un solo número con decimales (0.4) */
+        e.target.value=e.target.value.replace(',','.').replace(/[^\d.]/g,'').replace(/(\..*)\./g,'$1');
+        var v=parseFloat(e.target.value);
+        DIF = isNaN(v) ? null : v;
+      }else{
       e.target.value=e.target.value.replace(/[^\d ]/g,'').replace(/\s{2,}/g,' ');
       var ps=e.target.value.trim().split(/\s+/).filter(Boolean).map(Number);
       if(ps.length===2 && ps[1]) DIF=ps[0]/ps[1];
       else if(ps.length===1) DIF=ps[0];
       else if(ps.length===3 && ps[2]) DIF=ps[0]+ps[1]/ps[2];
       else DIF=null;
+      }
       if(e.target.value) marcarFrac(FRACS.length-1);
       evaluar();
     });
@@ -1775,7 +1808,7 @@ function pintarFracs(){
     SIGNO = d.dif<0 ? -1 : 1; setSigno(SIGNO);
     DIF = Math.abs(d.dif);
     var idx=-1;
-    FRACS.forEach(function(f,k){ if(f[1] && Math.abs(f[0]/f[1]-DIF)<1e-9) idx=k; });
+    FRACS.forEach(function(f,k){ if(f.v!==null && Math.abs(f.v-DIF)<1e-9) idx=k; });
     if(idx>=0) marcarFrac(idx);
   }
   evaluar();
@@ -1787,9 +1820,9 @@ function marcarFrac(i){
 }
 function elegirFrac(i){
   var f=FRACS[i];
-  if(f[1]===0){ marcarFrac(i); DIF=null; var e=document.getElementById('capInp'); if(e) e.focus(); evaluar(); return; }
+  if(f.v===null){ marcarFrac(i); DIF=null; var e=document.getElementById('capInp'); if(e) e.focus(); evaluar(); return; }
   var inp=document.getElementById('capInp'); if(inp) inp.value='';
-  DIF=f[0]/f[1]; marcarFrac(i); evaluar();
+  DIF=f.v; marcarFrac(i); evaluar();
 }
 function setSigno(s){
   SIGNO=s;
@@ -1822,14 +1855,14 @@ function evaluar(){
   var d=SIGNO*DIF, ok=Math.abs(d)<=tol+1e-9;
   res.className='res '+(ok?'ok':'mal');
   res.textContent=(ok?'Dentro de tolerancia  ·  ':'FUERA DE TOLERANCIA  ·  ')+
-                  (d>=0?'+':'−')+aFrac(Math.abs(d));
+                  (d>=0?'+':'−')+fmtMed(Math.abs(d));
   bg.disabled=false;
 }
 function exacto(){ if(PUNTO!==null) registrar(0,'—',true); }
 function guardarPunto(){
   if(DIF===null || isNaN(DIF)) return;
   var d=SIGNO*DIF, p=F.puntos[PUNTO];
-  registrar(d, (d>=0?'+':'−')+aFrac(Math.abs(d)), Math.abs(d)<=p[3]+1e-9);
+  registrar(d, (d>=0?'+':'−')+fmtMed(Math.abs(d)), Math.abs(d)<=p[3]+1e-9);
 }
 function registrar(dif, txtDif, ok){
   var p=F.puntos[PUNTO], t=TACT, col=F.tallas.indexOf(t);
@@ -1894,7 +1927,7 @@ function pintarResumen(){
       var nom=(pto && pto[1]) ? pto[1] : d.cod;
       h+='<div class="fuera"><b>'+nom+'</b>'+(pto&&pto[1]?' <span style="color:var(--stone);">('+d.cod+')</span>':'')+
          '<br>Talla '+d.talla+' · Prenda '+d.prenda+' — diferencia <b>'+d.txtDif+
-         '</b> (tolerancia ± '+aFrac(d.tol)+')</div>';
+         '</b> (tolerancia ± '+fmtMed(d.tol)+')</div>';
     });
   }else{
     h+='<div class="panel" style="border-left:4px solid var(--emer);"><div class="pt" style="color:var(--sage);font-size:14px;">'+
@@ -1946,7 +1979,7 @@ function decidir(r){
   enviar({ accion:'guardarMedicion', idEnvio:ID_ENVIO,
          cab:{ estilo:PAR.estilo, grupo:PAR.grupo||ESPEC.grupo||'', tipo:ESPEC.tipo,
                etapa:ESPEC.etapa||ETAPA, combo:ESPEC.combo||COMBO,
-               version:ESPEC.version||'',
+               version:ESPEC.version||'', unidad:(UNID==='cm'?'cm':'pulg'),
                cliente:PAR.cliente||'', color:COLOR, taller:SES.taller, auditora:SES.auditora,
                fileId:ESPEC.fileId||'', archivo:ESPEC.archivo||'',
                tallas:Object.keys(prendas), prendas:prendas, resultado:r, obs:'' },

@@ -957,7 +957,19 @@ function error(m){
 }
 function volverBuscador(){ location.href='index.html'; }
 
-/* ---------- fracciones ---------- */
+/* ---------- medidas: pulgadas o centímetros ---------- */
+/* La auditoría guarda en qué unidad está la ficha. En pulgadas se muestra
+   en fracciones de 16avos, como siempre; en centímetros, con decimales.
+   Las auditorías antiguas no traen unidad: son pulgadas. */
+var UNID='pulg';
+function esCm(){ return UNID==='cm'; }
+function fmtMed(dec){
+  if(dec===null||dec===undefined||isNaN(dec)) return '—';
+  if(!esCm()) return aFrac(dec);
+  var neg=dec<0; dec=Math.abs(dec);
+  var s=(Math.round(dec*100)/100).toFixed(2).replace(/\.?0+$/,'');
+  return (neg?'−':'')+(s===''?'0':s);
+}
 function aFrac(dec){
   if(dec===null||dec===undefined||isNaN(dec)) return '—';
   var neg=dec<0; dec=Math.abs(dec);
@@ -1132,6 +1144,7 @@ function verDetalle(id){
 function cerrarDet(){ document.getElementById('det').style.display='none'; }
 
 function pintarDetalle(m){
+  UNID = (m && m.unidad==='cm') ? 'cm' : 'pulg';   /* lo dice la ficha medida */
   FICHA = m.fileId ? {id:m.fileId, nombre:m.archivo||'Ficha', estilo:m.estilo} : null;
   document.getElementById('btnFicha').style.display = FICHA ? 'inline-block' : 'none';
   document.getElementById('dTit').textContent = m.estilo+' · '+(m.grupo||'');
@@ -1192,12 +1205,12 @@ function pintarDetalle(m){
       var tol = tolDe[cod];
       h+='<tr><td class="cod">'+cod+'</td>';
       if(hayDesc) h+='<td class="desc">'+(descDe[cod]||'')+'</td>';
-      h+='<td class="esp">'+aFrac(esp)+'</td><td class="tol">'+aFrac(tol)+'</td>';
+      h+='<td class="esp">'+fmtMed(esp)+'</td><td class="tol">'+fmtMed(tol)+'</td>';
       prendas.forEach(function(p){
         var d=dets.filter(function(x){ return x.cod===cod && x.prenda===p; })[0];
         if(!d){ h+='<td class="nada">·</td>'; return; }
         var txt = (d.difTxt && d.difTxt!=='—') ? d.difTxt : '—';
-        h+='<td class="dif '+(d.ok?'ok':'mal')+'" title="Medida real: '+aFrac(d.real)+'">'+txt+'</td>';
+        h+='<td class="dif '+(d.ok?'ok':'mal')+'" title="Medida real: '+fmtMed(d.real)+'">'+txt+'</td>';
       });
       h+='</tr>';
     });

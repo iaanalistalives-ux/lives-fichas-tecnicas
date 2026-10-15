@@ -815,11 +815,27 @@ var LS={
    se descartaba o se perdía esa columna.                              */
 var TALLAS = ['PP','PS','PM','PL','PXL',
               'P','XXS','XS','S','M','L','XL','XXL','2XL','XXXL','3XL','4XL','XXXXL',
-              '0X','1X','2X','3X','4X','5X','6X'];
+              '0X','1X','2X','3X','4X','5X','6X',
+              'T1','T2','T3','T4','T5','T6','T7','T8'];
 var RE_FRAC = /^\d+\/\d+$/;
 var RE_ENT  = /^\d+$/;
+var RE_DEC  = /^\d+(?:[.,]\d+)?$/;      /* centímetros: 54.6 */
 
-function aDecimal(txt){
+/* ¿En qué unidad está esta ficha? (15/10/2026)
+   Casi todos los clientes miden en PULGADAS con fracciones (16 5/8), pero
+   algunos (JAZMIN CHEBAR) miden en CENTÍMETROS con decimales (54.6). Lo
+   decide lo que dice el propio documento. Si no dice nada, queda en
+   pulgadas: así se leyeron todas las fichas hasta hoy y nada cambia. */
+function unidadDoc(textos){
+  var t=String([].concat(textos||[]).join(' ')).replace(/\s+/g,' ');
+  if(/PULGADAS?\b|\bINCHES\b/i.test(t)) return 'pulg';
+  if(/CENT[IÍ]ME?N?TROS?\b|\bEN\s+CM\b/i.test(t)) return 'cm';
+  return 'pulg';
+}
+
+/* En pulgadas solo se aceptan enteros y fracciones, igual que siempre.
+   En centímetros se aceptan además los decimales. */
+function aDecimal(txt, cm){
   txt = (txt||'').trim();
   if(!txt) return null;
   var tot = 0, ps = txt.split(/\s+/);
@@ -829,8 +845,8 @@ function aDecimal(txt){
       var ab = p.split('/');
       if(+ab[1]===0) return null;
       tot += (+ab[0])/(+ab[1]);
-    }else if(RE_ENT.test(p)){
-      tot += +p;
+    }else if(cm ? RE_DEC.test(p) : RE_ENT.test(p)){
+      tot += parseFloat(p.replace(',','.'));
     }else return null;
   }
   return tot;
@@ -953,7 +969,8 @@ function columnas(pal){
 }
 
 /* --- leer una página --- */
-function leerPagina(page){
+function leerPagina(page, cm){
+  var RE_NUM = cm ? RE_DEC : RE_ENT;
   return palabras(page).then(function(pal){
     var c = columnas(pal);
     if(!c) return null;
@@ -985,7 +1002,7 @@ function leerPagina(page){
       u.forEach(function(w){
         var t=w.t.trim();
         var cen=(w.x0+w.x1)/2;
-        if(RE_FRAC.test(t)||RE_ENT.test(t)){
+        if(RE_FRAC.test(t)||RE_NUM.test(t)){
           // los números a la izquierda de la primera talla son columnas
           // auxiliares (Nº de piezas, % de encogimiento): se ignoran
           var limIzq = (xIzq===null||xIzq===undefined) ? x0col-sep : Math.max(xIzq, x0col-sep);
@@ -995,16 +1012,22 @@ function leerPagina(page){
             var d=Math.abs(cols[o]-cen);
             if(d<dmin){ dmin=d; col=o; }
           });
-          if(col && dmin<=sep){ celdas[col].push(t); return; }
+          if(col && dmin<=sep){ celdas[col].push({t:t, d:dmin}); return; }
         }
         // texto a la izquierda de la primera talla = descripción
         if(cen < cols[orden[0]]-sep*0.6 && /[A-ZÁÉÍÓÚÑ]/i.test(t)) desc.push(t);
       });
       var vals={}, vacias=0, ilegibles=0;
       orden.forEach(function(o){
-        var txt=celdas[o].join(' ');
+        /* En pulgadas una medida son dos palabras ("16 5/8"), así que se
+           juntan. En centímetros es una sola ("54.6"): si caen dos en la
+           misma celda, una es de una columna sin encabezado (hay fichas con
+           una columna de ceros al costado) y se queda la más centrada. */
+        var txt = cm
+          ? (celdas[o].length ? celdas[o].slice().sort(function(p,q){ return p.d-q.d; })[0].t : '')
+          : celdas[o].map(function(z){ return z.t; }).join(' ');
         if(!txt){ vals[o]=null; if(o!=='TOL') vacias++; return; }
-        var d=aDecimal(txt);
+        var d=aDecimal(txt, cm);
         if(d===null) ilegibles++;
         vals[o]={txt:txt, dec:d};
       });
@@ -1056,7 +1079,12 @@ function tituloTabla(texto, tipoDoc){
       combo=limpiarCombo(v);
     }
   }
-  var etapa = /EN\s+PRENDA\s+TERMINADA/i.test(t) ? 'Prenda terminada (después de vapor)'
+  /* Hay fichas con DOS controles de prenda terminada: "ANTES DEL VAPORIZADO"
+     y "DESPUÉS DEL VAPORIZADO". Si no se distinguen, las dos quedan con la
+     misma etapa, se unen y gana la de antes: la auditora mediría la prenda
+     final contra las medidas de antes del vapor. */
+  var etapa = /ANTES\s+DEL?\s+VAPORIZADO/i.test(t) ? 'Prenda terminada (antes de vapor)'
+            : /EN\s+PRENDA\s+TERMINADA/i.test(t) ? 'Prenda terminada (después de vapor)'
             : /EN\s+COSTURA/i.test(t)             ? 'En costura (antes de vapor)'
             : /CONTROL\s+DE\s+MEDIDAS\s*:?\s*CORTE/i.test(t) ? 'Corte'
             : 'Medidas';
@@ -2027,18 +2055,26 @@ function procesar(file){
    como ficha técnica, pisando la tabla de la técnica real.            */
 function extraerDe(arr, cb, tipoIndice){
   pdfjsLib.getDocument({data:arr}).promise.then(function(doc){
-    var textos=[], tareas=[];
+    var textos=[], paginas=[], tareas=[];
     for(var i=1;i<=doc.numPages;i++){
       (function(n){
         tareas.push(doc.getPage(n).then(function(pg){
+          paginas[n-1]=pg;
           return pg.getTextContent().then(function(tc){
             textos[n-1]=tc.items.map(function(x){return x.str;}).join(' ');
-            return leerPagina(pg).then(function(tb){ return {n:n, tabla:tb}; });
           });
         }));
       })(i);
     }
-    Promise.all(tareas).then(function(res){
+    /* Primero el texto de todas las páginas: la unidad del documento decide
+       cómo se leen los números de la tabla. Recién después se leen. */
+    var unidad='pulg';
+    Promise.all(tareas).then(function(){
+      unidad = unidadDoc(textos);
+      return Promise.all(paginas.map(function(pg, k){
+        return leerPagina(pg, unidad==='cm').then(function(tb){ return {n:k+1, tabla:tb}; });
+      }));
+    }).then(function(res){
       var c=res.filter(function(r){ return r.tabla; });
       if(!c.length){ cb(null); return; }
 
@@ -2067,6 +2103,7 @@ function extraerDe(arr, cb, tipoIndice){
         if(!cb2.fechaFicha) cb2.fechaFicha = cabDoc.fechaFicha;
         cb2.linea = cabDoc.linea;
         cb2.tipo = tipoDoc;                       // el tipo lo manda el documento
+        cb2.unidad = unidad;                      // cm o pulg, del documento
         var ti=tituloTabla(textos[x.n-1], tipoDoc);
         var cods=x.tabla.filas.map(function(f){ return f.cod; });
         if(ti.etapa==='Medidas'){                 // página sin título
@@ -2103,7 +2140,8 @@ function extraerDe(arr, cb, tipoIndice){
       });
       todas=unidas;
 
-      var pref=todas.filter(function(x){ return /Prenda terminada/.test(x.titulo.etapa); });
+      var pref=todas.filter(function(x){ return /Prenda terminada/.test(x.titulo.etapa)
+                                             && !/antes de vapor/i.test(x.titulo.etapa); });
       var elegida = pref.length ? pref[0]
         : todas.slice().sort(function(a,b){ return b.tabla.filas.length-a.tabla.filas.length; })[0];
       cb({ tabla:elegida.tabla, cab:elegida.cab, titulo:elegida.titulo,
@@ -2128,8 +2166,8 @@ function lineaDe(t){
 function codEtapa(titulo, tipo){
   if(tipo==='CORTE') return 'CORTE';      // una hoja de corte solo mide corte
   var e = titulo && titulo.etapa ? String(titulo.etapa) : '';
+  if(/antes de vapor|En costura/i.test(e)) return 'ANTES_VAPOR';   // antes que TERMINADA
   if(/Prenda terminada/i.test(e)) return 'TERMINADA';
-  if(/antes de vapor|En costura/i.test(e)) return 'ANTES_VAPOR';
   if(/^Corte/i.test(e)) return 'CORTE';
   return 'TERMINADA';
 }
@@ -2163,7 +2201,7 @@ function guardarTabla(tabla, cab, fileId, archivo, quien, cb, titulo, pagina){
          grupo:cab.grupo||'', tipo:tipo,
          etapa: codEtapa(titulo, tipo), combo: comboConLinea(titulo, cab, archivo),
          fileId:fileId||'', archivo:archivo||'', pagina:pagina||'',
-         fechaFicha: cab.fechaFicha||'',
+         fechaFicha: cab.fechaFicha||'', unidad: (cab.unidad==='cm' ? 'cm' : 'pulg'),
          tallas:tallas, puntos:puntos, confirmadoPor:quien } }).then(cb);
 }
 
