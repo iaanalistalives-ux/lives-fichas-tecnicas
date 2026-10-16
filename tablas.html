@@ -969,6 +969,9 @@ function columnas(pal){
 }
 
 /* --- leer una página --- */
+/* Se enciende si alguna celda del documento trae una fracción (1/4, 5/8).
+   Una ficha con fracciones está en pulgadas, diga lo que diga su texto. */
+var VIO_FRAC = false;
 function leerPagina(page, cm){
   var RE_NUM = cm ? RE_DEC : RE_ENT;
   return palabras(page).then(function(pal){
@@ -1019,13 +1022,20 @@ function leerPagina(page, cm){
       });
       var vals={}, vacias=0, ilegibles=0;
       orden.forEach(function(o){
-        /* En pulgadas una medida son dos palabras ("16 5/8"), así que se
-           juntan. En centímetros es una sola ("54.6"): si caen dos en la
-           misma celda, una es de una columna sin encabezado (hay fichas con
-           una columna de ceros al costado) y se queda la más centrada. */
-        var txt = cm
-          ? (celdas[o].length ? celdas[o].slice().sort(function(p,q){ return p.d-q.d; })[0].t : '')
-          : celdas[o].map(function(z){ return z.t; }).join(' ');
+        /* En pulgadas una medida son dos palabras ("16 5/8") y se juntan.
+           En centímetros es una sola ("54.6"): si caen dos, una viene de una
+           columna sin encabezado (hay fichas con una columna de ceros al
+           costado) y se queda la más centrada.
+           SALVO que una de las dos sea una fracción: entonces la medida es en
+           pulgadas aunque el documento diga otra cosa, y se juntan. Sin esta
+           salvedad, "25 1/4" se guardaba como 0.25 (16/10/2026). */
+        var ws = celdas[o];
+        var hayFrac = false;
+        for(var q=0;q<ws.length;q++) if(RE_FRAC.test(ws[q].t)) hayFrac = true;
+        if(hayFrac) VIO_FRAC = true;
+        var txt = (cm && !hayFrac)
+          ? (ws.length ? ws.slice().sort(function(p,q){ return p.d-q.d; })[0].t : '')
+          : ws.map(function(z){ return z.t; }).join(' ');
         if(!txt){ vals[o]=null; if(o!=='TOL') vacias++; return; }
         var d=aDecimal(txt, cm);
         if(d===null) ilegibles++;
@@ -2069,12 +2079,16 @@ function extraerDe(arr, cb, tipoIndice){
     /* Primero el texto de todas las páginas: la unidad del documento decide
        cómo se leen los números de la tabla. Recién después se leen. */
     var unidad='pulg';
+    VIO_FRAC = false;
     Promise.all(tareas).then(function(){
       unidad = unidadDoc(textos);
       return Promise.all(paginas.map(function(pg, k){
         return leerPagina(pg, unidad==='cm').then(function(tb){ return {n:k+1, tabla:tb}; });
       }));
     }).then(function(res){
+      /* El texto dijo centímetros pero las tablas traen fracciones: la ficha
+         está en pulgadas. Manda lo que dicen los números. */
+      if(unidad==='cm' && VIO_FRAC) unidad='pulg';
       var c=res.filter(function(r){ return r.tabla; });
       if(!c.length){ cb(null); return; }
 
