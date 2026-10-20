@@ -652,6 +652,15 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 #visor .vcuerpo{flex:1;position:relative;background:#2b3532;}
 #visor .vzoom{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.4);color:#fff;
   font-family:inherit;font-size:17px;font-weight:800;border-radius:6px;width:38px;height:34px;cursor:pointer;}
+#visor .vcomp{background:var(--sage);border:1px solid var(--sage);color:#fff;font-family:inherit;
+  font-size:12.5px;font-weight:700;border-radius:6px;padding:8px 14px;cursor:pointer;white-space:nowrap;
+  min-height:34px;}
+#visor .vcomp:hover{background:var(--sage-dark);border-color:var(--sage-dark);}
+#visor .vcomp[disabled]{opacity:.45;cursor:default;}
+@media(max-width:600px){
+  #visor .vcomp{padding:8px 11px;min-height:38px;}
+  #visor .vtit{font-size:11.5px;min-width:70px;}
+}
 #visor .pgs{position:absolute;inset:0;overflow:hidden;touch-action:none;}
 #visor #lz{position:absolute;left:0;top:0;transform-origin:0 0;padding:8px 0 24px;text-align:center;}
 #visor #lz canvas{display:block;margin:0 auto 10px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.4);}
@@ -783,12 +792,15 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 
 <!-- ================= PANTALLA DE ACCESO ================= -->
 <!-- ================= VISOR DE FICHA ================= -->
-<div id="visor">
+<!-- El visor es una ventana a pantalla completa: role="dialog" hace que los
+     bloques comunes (barra de filtros, franja) no se lleven sus botones. -->
+<div id="visor" role="dialog" aria-modal="true">
   <div class="vbar">
     <button class="vvolver" onclick="cerrarVisor()">← Volver a buscar</button>
     <div class="vtit" id="vtit"></div>
     <button class="vzoom" onclick="zoomV(-1)">−</button>
     <button class="vzoom" onclick="zoomV(1)">+</button>
+    <button class="vcomp" id="vcomp" onclick="compartirFicha()">Compartir</button>
     <a class="vdrive" id="vdrive" target="_blank" rel="noopener">Drive</a>
   </div>
   <div class="vcuerpo" id="vcuerpo"></div>
@@ -1637,6 +1649,8 @@ function vprogreso(txt, pct){
 
 function abrir(id,archivo,tipo,grupo,estilo){
   document.getElementById('vtit').textContent=archivo||'';
+  PDF_ACTUAL = { bytes:null, nombre:(archivo||'ficha') };
+  botonCompartir(false);
   document.getElementById('vdrive').href='https://drive.google.com/file/d/'+id+'/view';
   document.getElementById('vdrive').style.display = /^L\d{8}/.test(id) ? 'none' : '';
   document.getElementById('visor').style.display='flex';
@@ -1677,11 +1691,18 @@ function abrir(id,archivo,tipo,grupo,estilo){
   });
 }
 
+/* El visor dibuja la ficha en pantalla y, al hacerlo, el lector se queda con
+   los bytes del PDF. Por eso aquí se guarda una copia aparte: es la que se
+   comparte o se imprime, y es el archivo original tal cual, sin recortar. */
+var PDF_ACTUAL = { bytes:null, nombre:'' };
 function dibujar(arr){
+  try{ PDF_ACTUAL.bytes = new Uint8Array(arr); }catch(e){ PDF_ACTUAL.bytes = null; }
+  botonCompartir(true);
   cargarPdfJs(function(ok){
     if(!ok){ vmsg('No se pudo cargar el visor. Revisa tu conexión.'); return; }
     var lib=window['pdfjs-dist/build/pdf'];
-    lib.getDocument({data:arr}).promise.then(function(doc){
+    var copia = PDF_ACTUAL.bytes ? new Uint8Array(PDF_ACTUAL.bytes) : arr;
+    lib.getDocument({data:copia}).promise.then(function(doc){
       PDFDOC=doc; render();
     }).catch(function(){ vmsg('No se pudo leer el PDF.'); });
   });
@@ -1790,10 +1811,57 @@ function gestos(marco){
 }
 
 function cerrarVisor(){
+  PDF_ACTUAL = { bytes:null, nombre:'' };
+  botonCompartir(false);
   document.getElementById('visor').style.display='none';
   document.getElementById('vcuerpo').innerHTML='';
   if(PDFDOC){ try{PDFDOC.destroy();}catch(e){} PDFDOC=null; }
   bloquearZoomPagina(false);
+}
+/* ---------- compartir o imprimir la ficha ---------- */
+/* En el celular abre el menú del teléfono (WhatsApp, correo, guardar).
+   En la computadora abre el PDF en otra pestaña, donde el navegador ya
+   trae imprimir y guardar; si el navegador bloquea la ventana, lo descarga. */
+function puedeCompartirArchivo(){
+  try{
+    if(!navigator.canShare || !window.File) return false;
+    return navigator.canShare({ files:[ new File([new Blob([new Uint8Array(1)])], 'x.pdf', {type:'application/pdf'}) ] });
+  }catch(e){ return false; }
+}
+function botonCompartir(listo){
+  var b=document.getElementById('vcomp');
+  if(!b) return;
+  /* En el celular el menú del teléfono ya dice "compartir"; en la computadora
+     el texto explica que abre el PDF para imprimirlo o guardarlo. En pantalla
+     chica se acorta para no comerse el nombre de la ficha. */
+  var angosta = window.matchMedia('(max-width:600px)').matches;
+  b.textContent = puedeCompartirArchivo() ? 'Compartir' : (angosta ? 'Guardar' : 'Imprimir o guardar');
+  b.disabled = !listo;
+}
+function nombrePdf(){
+  var n=String(PDF_ACTUAL.nombre||'ficha').replace(/[\\/:*?"<>|]+/g,'-').trim() || 'ficha';
+  return /\.pdf$/i.test(n) ? n : n+'.pdf';
+}
+function compartirFicha(){
+  if(!PDF_ACTUAL.bytes){ vmsg('Espera a que termine de abrirse la ficha.'); return; }
+  var nombre=nombrePdf();
+  var blob=new Blob([PDF_ACTUAL.bytes], {type:'application/pdf'});
+  if(puedeCompartirArchivo()){
+    try{
+      var f=new File([blob], nombre, {type:'application/pdf'});
+      navigator.share({ files:[f], title:nombre }).catch(function(){});
+      return;
+    }catch(e){}
+  }
+  var url=URL.createObjectURL(blob);
+  var w=null;
+  try{ w=window.open(url,'_blank'); }catch(e){ w=null; }
+  if(!w){
+    var a=document.createElement('a');
+    a.href=url; a.download=nombre;
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+  setTimeout(function(){ try{ URL.revokeObjectURL(url); }catch(e){} }, 60000);
 }
 function bloquearZoomPagina(bloquear){
   var m=document.getElementById('vp');
