@@ -713,12 +713,9 @@ input.txt:focus,select.txt:focus{outline:none;border-color:var(--sage);}
   .tallaTit{ break-after:avoid; page-break-after:avoid; margin-top:10px!important; }
   .tw{ overflow:visible!important; }
   .leyenda{ font-size:9px; }
-  .firmas{ display:flex!important; }
   .soloweb{ display:none!important; }
   #acceso,#visor{ display:none!important; }
 }
-.firmas{display:none;gap:40px;margin-top:26px;padding-top:6px;}
-.firmas div{flex:1;border-top:1px solid #666;padding-top:5px;font-size:10px;color:#333;text-align:center;}
 
 /* ---- visor de la ficha ---- */
 
@@ -1244,9 +1241,6 @@ function pintarDetalle(m){
        '«—» es sin diferencia. En rojo, lo que se pasó de tolerancia.'+
        '<span class="soloweb"> Pasa el cursor sobre un valor para ver la medida real.</span></div></div>';
   });
-
-  h+='<div class="firmas"><div>Auditora: '+(m.auditora||'')+'</div>'+
-     '<div>Supervisor de Calidad</div><div>Jefe de Planta</div></div>';
 
   document.getElementById('dCuerpo').innerHTML=h;
   document.getElementById('mSub').textContent =
