@@ -40,6 +40,7 @@ Según las entradas por el portal de los últimos 30 días al 21/10/2026: 23 per
 
 ## Quién puede guardar
 - Medir: quien figura como auditora activa en `cat_personal`. Lo comprueba `fichas_guardar_medicion`, que corre con permisos propios (security definer).
+  - Christian (usuario `ctalepcio`) siempre puede medir y probar (desde el 28/10/2026), sin estar en `cat_personal`: lo permiten `fichas_guardar_medicion` y `fichas_quien`. Rodrigo no guarda. Respaldo de las versiones anteriores: tabla `respaldo_fichas_funciones_20261028`.
   - Sin modo demostración desde el 21/10/2026: la lista `DEMO` está vacía, así que todos ven la pantalla tal como es.
 - Subir, indexar, confirmar o quitar fichas: lo decide la función de permiso `fichas_puede_subir`. Hoy lo hace la verificadora, que tiene el permiso "Confirmación de Fichas Técnicas" del portal.
 - A Sistemas: `fichas_puede_subir` es la pieza que reemplazan con su seguridad.
