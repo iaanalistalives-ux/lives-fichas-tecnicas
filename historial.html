@@ -751,6 +751,7 @@ td.desc{text-align:left;font-size:11.5px;color:var(--stone);min-width:190px;}
 td.esp{font-weight:700;}
 td.tol{color:var(--slate);}
 td.dif{font-weight:800;}
+td.dif .pct{display:block;font-size:10px;font-weight:600;opacity:.85;}
 td.dif.ok{color:var(--sage);}
 td.dif.mal{color:var(--rose);background:#FEF2F2;}
 td.nada{color:#C8D3CF;}
@@ -1232,13 +1233,19 @@ function pintarDetalle(m){
         var d=dets.filter(function(x){ return x.cod===cod && x.prenda===p; })[0];
         if(!d){ h+='<td class="nada">·</td>'; return; }
         var txt = (d.difTxt && d.difTxt!=='—') ? d.difTxt : '—';
-        h+='<td class="dif '+(d.ok?'ok':'mal')+'" title="Medida real: '+fmtMed(d.real)+'">'+txt+'</td>';
+        var base=(d.esp!=null&&!isNaN(d.esp))?+d.esp:esp;   /* esperado de la ficha, mismo en pulgadas o cm */
+        var pct='';
+        if(txt!=='—' && d.dif!=null && base>0){
+          var pp=Math.round(d.dif/base*1000)/10;
+          pct='<span class="pct">'+(pp>0?'+':pp<0?'−':'')+Math.abs(pp).toFixed(1)+'%</span>';
+        }
+        h+='<td class="dif '+(d.ok?'ok':'mal')+'" title="Medida real: '+fmtMed(d.real)+'">'+txt+pct+'</td>';
       });
       h+='</tr>';
     });
     h+='</tbody></table></div>'+
        '<div class="leyenda">Se muestra la <b>diferencia</b> respecto a la medida de ficha. '+
-       '«—» es sin diferencia. En rojo, lo que se pasó de tolerancia.'+
+       '«—» es sin diferencia. El porcentaje es la diferencia sobre la medida de ficha. En rojo, lo que se pasó de tolerancia.'+
        '<span class="soloweb"> Pasa el cursor sobre un valor para ver la medida real.</span></div></div>';
   });
 
