@@ -15,6 +15,7 @@ Buscador de fichas técnicas en PDF y control de medidas contra la ficha, desde 
   - Se anota la diferencia contra la ficha, prenda por prenda y talla por talla, y se termina con "Aprobar y guardar" o "Rechazar y guardar".
   - Solo se abre desde el buscador (`?estilo=&tipo=`).
 - `historial.html` — **consulta** "Mediciones realizadas": filtros, indicadores, la hoja imprimible de cada auditoría de medidas y Excel LIVES.
+  - La hoja abre con "Ver figura" (dibujo de la prenda de la ficha, con zoom y cambio de página, como "Ver dibujo" del formulario) y con "Ver ficha" (PDF completo). La hoja impresa no lleva firmas (28/10/2026).
 - `tablas.html` — **administración** de la verificadora. Sirve para:
   - subir fichas en PDF;
   - leer las tablas de medidas automáticamente;
@@ -29,6 +30,7 @@ Todo pasa por funciones; las pantallas no leen tablas directo.
   - `fichas_mediciones` y `fichas_medicion` leen `fichas_mediciones` y `fichas_mediciones_detalle`.
   - `fichas_quien` lee `cat_personal`.
 - Guardar mediciones (`medidas.html`): `fichas_guardar_medicion`, que escribe en `fichas_mediciones` y `fichas_mediciones_detalle`. El `p_id_envio` evita duplicados si se reintenta.
+  - Desde el 28/10/2026 rechaza el guardado sin color y, si la ficha no trae cliente, lo saca del prefijo del grupo en `cat_clientes` (ej. COY-004 da COYUCHI; si el prefijo no está en el catálogo queda vacío). Respaldo de la versión anterior: tabla `respaldo_fichas_guardar_medicion_20261028`.
 - Administrar fichas (`tablas.html`): `fichas_pdf_registrar` (tabla `fichas_pdf`), `fichas_indexar` (`fichas_indice`), `fichas_guardar_espec` y `fichas_borrar_espec_archivo` (`fichas_especificaciones`), y `fichas_quitar`.
 - Registro de aperturas: `fichas_registrar_acceso`, en la tabla `fichas_accesos`.
 - PDFs: bucket privado `fichas`, con la ruta `<id>.pdf`. Los PDFs también se guardan en el equipo, en IndexedDB `lives_fichas_pdf`.
