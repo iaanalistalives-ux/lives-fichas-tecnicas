@@ -708,6 +708,7 @@ input.txt:focus,select.txt:focus{outline:none;border-color:var(--sage);}
   th{ background:#EEE!important; }
   td.cod{ background:#F5F5F5!important; }
   td.dif.mal{ background:#FFE4E4!important; color:#B00!important; }
+  .panel.pTabla{ break-inside:auto; page-break-inside:auto; }   /* la tabla se parte entre hojas; el encabezado se repite y las filas no se cortan */
   tr{ break-inside:avoid; page-break-inside:avoid; }
   thead{ display:table-header-group; }
   .tallaTit{ break-after:avoid; page-break-after:avoid; margin-top:10px!important; }
@@ -1217,7 +1218,7 @@ function pintarDetalle(m){
     var hayDesc = orden.some(function(c){ return descDe[c] && descDe[c].length>3; });
 
     h+='<div class="tallaTit">Talla '+t+' — '+prendas.length+' prenda(s)</div>';
-    h+='<div class="panel" style="padding:12px 14px;"><div class="tw"><table><thead><tr>'+
+    h+='<div class="panel pTabla" style="padding:12px 14px;"><div class="tw"><table><thead><tr>'+
        '<th>Cód.</th>'+(hayDesc?'<th style="text-align:left;">Descripción</th>':'')+
        '<th>Esperado</th><th>Tol. ±</th>'+
        prendas.map(function(p){ return '<th>Prenda '+p+'</th>'; }).join('')+

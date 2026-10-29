@@ -17,6 +17,7 @@ Buscador de fichas técnicas en PDF y control de medidas contra la ficha, desde 
 - `historial.html` — **consulta** "Mediciones realizadas": filtros, indicadores, la hoja imprimible de cada auditoría de medidas y Excel LIVES.
   - La hoja abre con "Ver figura" (dibujo de la prenda de la ficha, con zoom y cambio de página, como "Ver dibujo" del formulario) y con "Ver ficha" (PDF completo). La hoja impresa no lleva firmas (28/10/2026).
   - Bajo cada diferencia de la hoja sale su porcentaje (diferencia ÷ medida de ficha, con 1 decimal; 28/10/2026). Se calcula en la pantalla con `esp` y `dif`, que ya vienen en decimales en `fichas_mediciones_detalle`; no depende de la unidad (pulgadas o cm). La columna Tol. ± también lleva su porcentaje (tolerancia ÷ medida de ficha), y `medidas.html` lo muestra en cada punto (esperado ± tolerancia, diferencia anotada y resultado al elegirla) y en la lista de puntos fuera de tolerancia. El Excel no cambia: trae una fila por auditoría, sin medidas sueltas.
+  - Al imprimir o sacar el PDF de la hoja, la tabla de cada talla puede partirse entre hojas (clase `pTabla`): sigue justo después de los datos, el encabezado se repite en cada hoja y ninguna fila se corta (29/10/2026).
 - `tablas.html` — **administración** de la verificadora. Sirve para:
   - subir fichas en PDF;
   - leer las tablas de medidas automáticamente;
