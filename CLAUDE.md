@@ -11,7 +11,8 @@ Buscador de fichas técnicas en PDF y control de medidas contra la ficha, desde 
   - Solo la verificadora ve el panel "Ver todo lo cargado" y el acceso a `tablas.html`.
   - Tiene Excel LIVES.
 - `medidas.html` — **formulario** "Control de medidas".
-  - Se elige el taller, la etapa (Prenda terminada, Antes de vapor o Corte), el combo (Missy, Plus o Petite) y el color.
+  - Se elige el taller, qué medir (Corte, Antes de vapor o Prenda terminada, con cuántas tablas trae cada una) y su combo o línea (Missy, Plus, Petite o color) y el color.
+  - Desde el 29/10/2026 ofrece TODAS las tablas del estilo, entre en la tarjeta que entre: el botón Medir manda el tipo de la tarjeta solo para saber cuál se abre primero, y el formulario trae las variantes de todos los tipos (`accion=variantes` sin tipo). La tabla se pide con el tipo que le toca a la etapa (Corte → CORTE; las demás → TECNICA) y al guardar se usa el tipo de la tabla elegida.
   - Se anota la diferencia contra la ficha, prenda por prenda y talla por talla, y se termina con "Aprobar y guardar" o "Rechazar y guardar".
   - Solo se abre desde el buscador (`?estilo=&tipo=`).
 - `historial.html` — **consulta** "Mediciones realizadas": filtros, indicadores, la hoja imprimible de cada auditoría de medidas y Excel LIVES.

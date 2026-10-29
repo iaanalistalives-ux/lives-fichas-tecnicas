@@ -1067,7 +1067,14 @@ function arrancar(){
     VARIANTES=r.variantes;
     PRECARGA=r.espec||null;
     pintarHistorial(r.mediciones||[]);
-    pintarEtapas();
+    /* Medir ofrece todo lo que tiene la ficha del estilo (corte, antes de vapor, prenda terminada),
+       no solo el tipo de la tarjeta desde donde se entró. Si falla, queda lo del tipo de la tarjeta. */
+    jsonp('accion=variantes&clave='+encodeURIComponent(SES.clave)+
+          '&estilo='+encodeURIComponent(PAR.estilo)+'&tipo=', function(t){
+      if(t && t.ok && (t.variantes||[]).length) VARIANTES=t.variantes;
+      if(PAR.tipo==='CORTE') ETAPA='CORTE';
+      pintarEtapas();
+    });
   });
 }
 var PRECARGA=null;
@@ -1156,16 +1163,22 @@ var TACT='', PACT=1, DATOS={};
 var VARIANTES=[], ETAPA='', COMBO='';
 var NOM_ETAPA={ TERMINADA:'Prenda terminada', ANTES_VAPOR:'Antes de vapor', CORTE:'Corte' };
 
+var ORDEN_ETAPA=['CORTE','ANTES_VAPOR','TERMINADA'];   // orden del trabajo; cualquier otra etapa va al final
 function pintarEtapas(){
   var etapas=[];
   VARIANTES.forEach(function(v){ if(etapas.indexOf(v.etapa)<0) etapas.push(v.etapa); });
+  etapas.sort(function(a,b){
+    var i=ORDEN_ETAPA.indexOf(a), j=ORDEN_ETAPA.indexOf(b);
+    return (i<0?9:i)-(j<0?9:j);
+  });
   if(!ETAPA || etapas.indexOf(ETAPA)<0)
     ETAPA = etapas.indexOf('TERMINADA')>=0 ? 'TERMINADA' : etapas[0];
   if(etapas.length>1){
     document.getElementById('selEtapa').style.display='block';
     document.getElementById('pEtapa').innerHTML = etapas.map(function(e){
+      var n=VARIANTES.filter(function(v){ return v.etapa===e; }).length;
       return '<button class="pill'+(e===ETAPA?' on':'')+'" onclick="elegirEtapa(\''+e+'\')">'+
-             (NOM_ETAPA[e]||e)+'</button>';
+             (NOM_ETAPA[e]||e)+(n>1?' · '+n+' tablas':'')+'</button>';
     }).join('');
   }
   pintarCombos();
@@ -1285,7 +1298,7 @@ function cargarEspec(){
   }
   txt('fichaTit','Cargando tabla…');
   jsonp('accion=espec&clave='+encodeURIComponent(SES.clave)+
-        '&estilo='+encodeURIComponent(PAR.estilo)+'&tipo='+encodeURIComponent(PAR.tipo)+
+        '&estilo='+encodeURIComponent(PAR.estilo)+'&tipo='+encodeURIComponent(ETAPA==='CORTE'?'CORTE':'TECNICA')+
         '&etapa='+encodeURIComponent(ETAPA)+'&combo='+encodeURIComponent(COMBO), function(r){
     if(!r || !r.ok || !r.espec){ error('No se pudo cargar la tabla.'); return; }
     aplicarEspec(r.espec);
