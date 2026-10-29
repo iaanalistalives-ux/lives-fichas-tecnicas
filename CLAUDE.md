@@ -21,7 +21,7 @@ Buscador de fichas técnicas en PDF y control de medidas contra la ficha, desde 
   - Al imprimir o sacar el PDF de la hoja, la tabla de cada talla puede partirse entre hojas (clase `pTabla`): sigue justo después de los datos, el encabezado se repite en cada hoja y ninguna fila se corta (29/10/2026).
 - `tablas.html` — **administración** de la verificadora. Sirve para:
   - subir fichas en PDF;
-  - leer las tablas de medidas automáticamente;
+  - leer las tablas de medidas automáticamente (desde el 29/10/2026, si dos tablas de la misma etapa repiten las mismas medidas pero declaran colores distintos en "COLORES:", son tablas distintas y cada una lleva sus colores como combo; antes la segunda se descartaba);
   - corregirlas a mano y confirmar "La tabla es correcta";
   - quitar fichas.
 
