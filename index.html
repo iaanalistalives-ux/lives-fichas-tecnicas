@@ -1435,9 +1435,12 @@ function tarjeta(lista,i){
      esc(d.tipo)+'\',\''+esc(d.grupo)+'\',\''+esc(d.estilo)+'\')">Ver ficha</button>';
   if(d.tipo==='TECNICA' || d.tipo==='CORTE'){
     var base=String(d.estilo||'').split('-')[0];
-    var lista=ESPECS.some(function(e){ return String(e.estilo)===base && e.tipo===d.tipo; });
+    /* Medir se activa si el estilo tiene cualquier tabla (técnica o de corte): el formulario ofrece todas */
+    var lista=ESPECS.some(function(e){ return String(e.estilo)===base && (e.tipo==='TECNICA' || e.tipo==='CORTE'); });
+    var tipoMedir=ESPECS.some(function(e){ return String(e.estilo)===base && e.tipo===d.tipo; })
+      ? d.tipo : (d.tipo==='CORTE' ? 'TECNICA' : 'CORTE');
     h+= lista
-      ? '<button class="btn medir" onclick="medir(\''+esc(base)+'\',\''+esc(d.tipo)+'\',\''+
+      ? '<button class="btn medir" onclick="medir(\''+esc(base)+'\',\''+esc(tipoMedir)+'\',\''+
         esc(d.grupo)+'\',\''+esc(d.cliente)+'\')">Medir</button>'
       : '<button class="btn ghost" disabled title="Tabla de medidas aún no disponible">Medir</button>';
   }
