@@ -1,4 +1,4 @@
-# CLAUDE.md — Fichas Técnicas (lives-fichas-tecnicas)
+﻿# CLAUDE.md — Fichas Técnicas (lives-fichas-tecnicas)
 
 Las reglas generales de trabajo están en el repo privado `lives-instrucciones` (CLAUDE.md). Este archivo solo describe esta herramienta.
 
@@ -22,6 +22,7 @@ Buscador de fichas técnicas en PDF y control de medidas contra la ficha, desde 
 - `tablas.html` — **administración** de la verificadora. Sirve para:
   - subir fichas en PDF;
   - leer las tablas de medidas automáticamente (desde el 29/10/2026, si dos tablas de la misma etapa repiten las mismas medidas pero declaran colores distintos en "COLORES:", son tablas distintas y cada una lleva sus colores como combo; antes la segunda se descartaba);
+  - la unidad (cm o pulgadas) la decide el texto de la ficha; desde el 29/10/2026 "Puntadas por Pulgada" no cuenta como unidad (antes una ficha en cm con esa frase se leía en pulgadas y perdía los decimales);
   - corregirlas a mano y confirmar "La tabla es correcta";
   - quitar fichas.
 

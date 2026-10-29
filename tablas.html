@@ -828,6 +828,8 @@ var RE_DEC  = /^\d+(?:[.,]\d+)?$/;      /* centímetros: 54.6 */
    pulgadas: así se leyeron todas las fichas hasta hoy y nada cambia. */
 function unidadDoc(textos){
   var t=String([].concat(textos||[]).join(' ')).replace(/\s+/g,' ');
+  /* "Puntadas por Pulgada" es el largo de la puntada, no la unidad de las medidas (29/10/2026). */
+  t=t.replace(/\b(?:POR|X|\/)\s*PULGADAS?\b/ig,' ');
   if(/PULGADAS?\b|\bINCHES\b/i.test(t)) return 'pulg';
   if(/CENT[IÍ]ME?N?TROS?\b|\bEN\s+CM\b/i.test(t)) return 'cm';
   return 'pulg';
