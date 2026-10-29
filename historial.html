@@ -751,7 +751,7 @@ td.desc{text-align:left;font-size:11.5px;color:var(--stone);min-width:190px;}
 td.esp{font-weight:700;}
 td.tol{color:var(--slate);}
 td.dif{font-weight:800;}
-td.dif .pct{display:block;font-size:10px;font-weight:600;opacity:.85;}
+td.tol .pct,td.dif .pct{display:block;font-size:10px;font-weight:600;opacity:.85;}
 td.dif.ok{color:var(--sage);}
 td.dif.mal{color:var(--rose);background:#FEF2F2;}
 td.nada{color:#C8D3CF;}
@@ -1228,7 +1228,7 @@ function pintarDetalle(m){
       var tol = tolDe[cod];
       h+='<tr><td class="cod">'+cod+'</td>';
       if(hayDesc) h+='<td class="desc">'+(descDe[cod]||'')+'</td>';
-      h+='<td class="esp">'+fmtMed(esp)+'</td><td class="tol">'+fmtMed(tol)+'</td>';
+      h+='<td class="esp">'+fmtMed(esp)+'</td><td class="tol">'+fmtMed(tol)+((tol>0&&esp>0)?'<span class="pct">±'+(Math.round(tol/esp*1000)/10).toFixed(1)+'%</span>':'')+'</td>';
       prendas.forEach(function(p){
         var d=dets.filter(function(x){ return x.cod===cod && x.prenda===p; })[0];
         if(!d){ h+='<td class="nada">·</td>'; return; }

@@ -681,6 +681,7 @@ input.txt:focus{outline:none;border-color:var(--sage);}
 .pt-item.ok .val{color:var(--sage);}
 .pt-item.mal{border-left-color:var(--rose);background:#FFF5F5;}
 .pt-item.mal .val{color:var(--rose);}
+.pt-item .esp .pctMin{font-weight:600;color:var(--stone);font-size:11.5px;}
 .pt-item .val small{display:block;font-size:11px;font-weight:600;color:var(--stone);}
 
 /* ---- despliegue dentro de la fila ---- */
@@ -1318,6 +1319,11 @@ function aplicarEspec(espec){
    "54 5/8". Lo decide la ficha, no la pantalla. */
 var UNID='pulg';
 function esCm(){ return UNID==='cm'; }
+function fmtPct(x,base,conSigno){
+  if(x===null||x===undefined||isNaN(x)||!(base>0)) return '';
+  var pp=Math.round(x/base*1000)/10;
+  return (conSigno?(pp>0?'+':pp<0?'−':''):'')+Math.abs(pp).toFixed(1)+'%';
+}
 function fmtMed(dec){
   if(dec===null||dec===undefined||isNaN(dec)) return '—';
   if(!esCm()) return aFrac(dec);
@@ -1451,8 +1457,8 @@ function pintarLista(){
        '<div class="info">'+
        (p[1] ? '<div class="nombre">'+p[1]+'</div><div class="codmin">'+p[0]+'</div>'
              : '<div class="nombre">'+p[0]+'</div>')+
-       '<div class="esp">Esp. '+fmtMed(esp)+' &nbsp;±'+fmtMed(tol)+'</div></div>'+
-       '<div class="val">'+(d? d.txtDif+'<small>'+fmtMed(d.val)+'</small>' : '<small>medir</small>')+'</div>'+
+       '<div class="esp">Esp. '+fmtMed(esp)+' &nbsp;±'+fmtMed(tol)+(tol>0?' <span class="pctMin">(±'+fmtPct(tol,esp)+')</span>':'')+'</div></div>'+
+       '<div class="val">'+(d? d.txtDif+'<small>'+fmtMed(d.val)+'</small>'+(d.dif?'<small>'+fmtPct(d.dif,d.esp,true)+'</small>':'') : '<small>medir</small>')+'</div>'+
        '</div>';
     if(i===PUNTO) h+=panelPunto(i, esp, tol);
   });
@@ -1473,7 +1479,7 @@ function panelPunto(i, esp, tol){
   return '<div class="panelPunto" onclick="event.stopPropagation();">'+
     '<div class="tituloPunto">'+(p[1]||p[0])+(p[1]?' <b>'+p[0]+'</b>':'')+'</div>'+
     '<div class="espLinea"><span class="espVal">'+fmtMed(esp)+'</span>'+
-    '<span class="espTol">tolerancia ± '+fmtMed(tol)+'</span></div>'+
+    '<span class="espTol">tolerancia ± '+fmtMed(tol)+(tol>0?' (±'+fmtPct(tol,esp)+')':'')+'</span></div>'+
     '<button class="exacto" onclick="exacto()">OK</button>'+
     '<div class="signo">'+
       '<button id="sgMenos" onclick="setSigno(-1)">− Menos</button>'+
@@ -1845,7 +1851,7 @@ function cerrarPunto(){ PUNTO=null; DIF=null; pintarLista(); }
 
 function evaluar(){
   if(PUNTO===null) return;
-  var p=F.puntos[PUNTO], tol=p[3];
+  var p=F.puntos[PUNTO], tol=p[3], espP=p[2][F.tallas.indexOf(TACT)];
   var res=document.getElementById('capRes'), bg=document.getElementById('btnGuardar');
   if(!res||!bg) return;
   if(DIF===null || isNaN(DIF)){
@@ -1855,7 +1861,7 @@ function evaluar(){
   var d=SIGNO*DIF, ok=Math.abs(d)<=tol+1e-9;
   res.className='res '+(ok?'ok':'mal');
   res.textContent=(ok?'Dentro de tolerancia  ·  ':'FUERA DE TOLERANCIA  ·  ')+
-                  (d>=0?'+':'−')+fmtMed(Math.abs(d));
+                  (d>=0?'+':'−')+fmtMed(Math.abs(d))+(d?'  ('+fmtPct(d,espP,true)+')':'');
   bg.disabled=false;
 }
 function exacto(){ if(PUNTO!==null) registrar(0,'—',true); }
@@ -1927,7 +1933,7 @@ function pintarResumen(){
       var nom=(pto && pto[1]) ? pto[1] : d.cod;
       h+='<div class="fuera"><b>'+nom+'</b>'+(pto&&pto[1]?' <span style="color:var(--stone);">('+d.cod+')</span>':'')+
          '<br>Talla '+d.talla+' · Prenda '+d.prenda+' — diferencia <b>'+d.txtDif+
-         '</b> (tolerancia ± '+fmtMed(d.tol)+')</div>';
+         '</b>'+(d.dif?' ('+fmtPct(d.dif,d.esp,true)+')':'')+' (tolerancia ± '+fmtMed(d.tol)+(d.tol>0?', '+fmtPct(d.tol,d.esp):'')+')</div>';
     });
   }else{
     h+='<div class="panel" style="border-left:4px solid var(--emer);"><div class="pt" style="color:var(--sage);font-size:14px;">'+
