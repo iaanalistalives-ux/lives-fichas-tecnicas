@@ -1100,6 +1100,16 @@ function tituloTabla(texto, tipoDoc){
             : 'Medidas';
   return { etapa:etapa, combo:combo };
 }
+/* Colores que declara la hoja ("COLORES: Rye -//- Plaster"). Hay fichas que no traen "COMBO:" y
+   ponen un juego de colores por tabla, con medidas distintas. Solo se usa para separar tablas que
+   de otro modo se confundirían (ver el paso de unir tablas en extraerDe). */
+function coloresDe(texto){
+  var t=String(texto||'').replace(/\u00A0/g,' ');
+  var m=t.match(/COLORES\s*:\s*(.{2,120})/i);
+  if(!m) return '';
+  var v=m[1].split(/\bCOLOR\b\s*:|\bMEDIDAS\b|\bFECHA\b|\bORDEN\b|\bPARTIDA\b|\bMODELISTA\b|\bCOD\b|\s\d+(?:\.\d+)?\s/i)[0];
+  return limpiarCombo(v);
+}
 function cabecera(texto){
   var t=(texto||'').replace(/\u00A0/g,' ');
   var o={};
@@ -2139,6 +2149,35 @@ function extraerDe(arr, cb, tipoIndice){
 
       // Una misma tabla puede continuar en la página siguiente: se unen
       // las que comparten etapa y combo, sin repetir códigos.
+      /* Dos tablas de la misma etapa y combo que repiten las mismas medidas (A, B, C…) no son una
+         continuación: son tablas distintas (ej. otros colores). Antes la segunda se descartaba y la
+         auditora medía contra la tabla de otros colores. Si sus colores difieren, cada una lleva los suyos. */
+      var porClave={};
+      todas.forEach(function(x){
+        var k=x.titulo.etapa+'|'+(x.titulo.combo||'');
+        (porClave[k]=porClave[k]||[]).push(x);
+      });
+      Object.keys(porClave).forEach(function(k){
+        var g=porClave[k];
+        if(g.length<2) return;
+        var base=g[0], cb=coloresDe(textos[base.pagina-1]), separa=false;
+        g.slice(1).forEach(function(x){
+          var rep=x.tabla.filas.filter(function(f){
+            return base.tabla.filas.some(function(b){ return b.cod===f.cod; });
+          }).length;
+          var otra = rep>=Math.max(3, Math.ceil(x.tabla.filas.length*0.5));
+          var cx=coloresDe(textos[x.pagina-1]);
+          if(otra && cx && cb && cx!==cb) separa=true;
+        });
+        if(!separa) return;
+        var ult='';
+        g.forEach(function(x){
+          var c=coloresDe(textos[x.pagina-1]) || ult;   // una página sin colores sigue a la anterior
+          ult=c;
+          if(c && !x.titulo.combo) x.titulo.combo=c;
+        });
+      });
+
       var mapa={}, unidas=[];
       todas.forEach(function(x){
         var k2=x.titulo.etapa+'|'+(x.titulo.combo||'');

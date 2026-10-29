@@ -19,7 +19,7 @@ Buscador de fichas técnicas en PDF y control de medidas contra la ficha, desde 
   - Bajo cada diferencia de la hoja sale su porcentaje (diferencia ÷ medida de ficha, con 1 decimal; 28/10/2026). Se calcula en la pantalla con `esp` y `dif`, que ya vienen en decimales en `fichas_mediciones_detalle`; no depende de la unidad (pulgadas o cm). La columna Tol. ± también lleva su porcentaje (tolerancia ÷ medida de ficha), y `medidas.html` lo muestra en cada punto (esperado ± tolerancia, diferencia anotada y resultado al elegirla) y en la lista de puntos fuera de tolerancia. El Excel no cambia: trae una fila por auditoría, sin medidas sueltas.
 - `tablas.html` — **administración** de la verificadora. Sirve para:
   - subir fichas en PDF;
-  - leer las tablas de medidas automáticamente;
+  - leer las tablas de medidas automáticamente (desde el 29/10/2026, si dos tablas de la misma etapa repiten las mismas medidas pero declaran colores distintos en "COLORES:", son tablas distintas y cada una lleva sus colores como combo; antes la segunda se descartaba);
   - corregirlas a mano y confirmar "La tabla es correcta";
   - quitar fichas.
 
