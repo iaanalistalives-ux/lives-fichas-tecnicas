@@ -1073,11 +1073,42 @@ function arrancar(){
           '&estilo='+encodeURIComponent(PAR.estilo)+'&tipo=', function(t){
       if(t && t.ok && (t.variantes||[]).length) VARIANTES=t.variantes;
       if(PAR.tipo==='CORTE') ETAPA='CORTE';
+      borradorLeer();
       pintarEtapas();
     });
   });
 }
 var PRECARGA=null;
+
+/* ---------- borrador: lo medido sobrevive si se sale de la pantalla (ver un reporte, recargar) ---------- */
+var BORR=null;
+function borradorClave(){ return 'lives_medidas_borrador|'+(SES&&SES.auditora||'')+'|'+(PAR.estilo||''); }
+function borradorGuardar(){
+  if(!F || !Object.keys(DATOS).length) return;
+  try{
+    LS.set(borradorClave(), JSON.stringify({ ts:Date.now(), etapa:ETAPA, combo:COMBO, color:COLOR,
+      taller:SES.taller, datos:DATOS, prendas:PRENDAS, tact:TACT, pact:PACT, idEnvio:ID_ENVIO }));
+  }catch(e){}
+}
+function borradorBorrar(){ BORR=null; LS.del(borradorClave()); }
+function borradorLeer(){
+  var b=null; try{ b=JSON.parse(LS.get(borradorClave())||'null'); }catch(e){}
+  if(!b || !b.datos || !Object.keys(b.datos).length || Date.now()-b.ts>36*3600*1000){ if(b) LS.del(borradorClave()); return; }
+  BORR=b; ETAPA=b.etapa||ETAPA; COMBO=b.combo||''; COLOR=b.color||''; LINEA_OK=true;
+  if(b.taller && !SES.taller){ SES.taller=b.taller; }
+}
+function borradorReanudar(){
+  var b=BORR; BORR=null;
+  if(!b || !F) return;
+  DATOS=b.datos; PRENDAS=b.prendas||{}; ID_ENVIO=b.idEnvio||'';
+  F.tallas.forEach(function(t){ if(!PRENDAS[t]) PRENDAS[t]=1; });
+  TACT=(F.tallas.indexOf(b.tact)>=0)?b.tact:F.tallas[0]; PACT=b.pact||1; PUNTO=null;
+  if(PACT>PRENDAS[TACT]) PACT=1;
+  document.getElementById('config').style.display='none';
+  document.querySelector('.header').style.display='none';
+  document.getElementById('medir').style.display='block';
+  pintarSelectores(); pintarLista(); ajustarTope(); verBotonDibujo();
+}
 
 /* ---------- taller y auditora ---------- */
 var TALLER_PLANTA='LIVES (planta propia)';
@@ -1323,6 +1354,7 @@ function aplicarEspec(espec){
       (ESPEC.version?' · versión '+ESPEC.version:'')+
       ' · '+F.puntos.length+' puntos · tallas '+F.tallas.join(', '));
     pintarColores();
+    if(BORR) borradorReanudar();
 }
 
 /* ---------- medidas: pulgadas o centímetros ---------- */
@@ -1393,6 +1425,7 @@ function empezar(){
   DATOS={}; PRENDAS={}; ID_ENVIO='';
   F.tallas.forEach(function(t){ PRENDAS[t]=1; });
   TACT=F.tallas[0]; PACT=1;
+  borradorBorrar();
   document.getElementById('config').style.display='none';
   document.querySelector('.header').style.display='none';
   document.getElementById('medir').style.display='block';
@@ -1433,21 +1466,21 @@ function ajustarTope(){
 window.addEventListener('resize', ajustarTope);
 
 function irTalla(t){
-  TACT=t;
+  TACT=t; borradorGuardar();
   if(!PRENDAS[t]) PRENDAS[t]=1;
   if(PACT>PRENDAS[t]) PACT=PRENDAS[t];
   pintarSelectores(); pintarLista(); window.scrollTo(0,0);
 }
-function irPrenda(p){ PACT=p; pintarSelectores(); pintarLista(); window.scrollTo(0,0); }
+function irPrenda(p){ PACT=p; borradorGuardar(); pintarSelectores(); pintarLista(); window.scrollTo(0,0); }
 function masPrenda(){
   PRENDAS[TACT]=Math.min(20,PRENDAS[TACT]+1);
-  PACT=PRENDAS[TACT];
+  PACT=PRENDAS[TACT]; borradorGuardar();
   pintarSelectores(); pintarLista(); window.scrollTo(0,0);
 }
 function menosPrenda(){
   if(PRENDAS[TACT]<=1) return;
   if(medidasDe(TACT,PRENDAS[TACT])>0) return;
-  PRENDAS[TACT]--;
+  PRENDAS[TACT]--; borradorGuardar();
   if(PACT>PRENDAS[TACT]) PACT=PRENDAS[TACT];
   pintarSelectores(); pintarLista();
 }
@@ -1502,10 +1535,9 @@ function panelPunto(i, esp, tol){
     '<div class="otro"><input id="capInp" inputmode="'+(esCm()?'decimal':'numeric')+'" placeholder="'+
       (esCm()?'otra: 0.4':'otra: 3 32')+'" autocomplete="off">'+
     '<span>'+(esCm()?'en centímetros':'numerador<br>y denominador')+'</span></div>'+
-    '<div class="res neutro" id="capRes">Elige la diferencia</div>'+
+    '<div class="res neutro" id="capRes">Elige la diferencia: se anota al tocarla</div>'+
     '<div class="accs">'+
       '<button class="btn ghost" onclick="cerrarPunto()">Cerrar</button>'+
-      '<button class="btn" id="btnGuardar" onclick="guardarPunto()" disabled>Guardar</button>'+
     '</div></div>';
 }
 
@@ -1817,6 +1849,7 @@ function pintarFracs(){
       if(e.target.value) marcarFrac(FRACS.length-1);
       evaluar();
     });
+    inp.addEventListener('change', function(){ if(DIF!==null && !isNaN(DIF)) guardarPunto(); });
     inp.addEventListener('keydown', function(e){
       if(e.key==='Enter'){ e.preventDefault(); guardarPunto(); }
     });
@@ -1841,7 +1874,7 @@ function elegirFrac(i){
   var f=FRACS[i];
   if(f.v===null){ marcarFrac(i); DIF=null; var e=document.getElementById('capInp'); if(e) e.focus(); evaluar(); return; }
   var inp=document.getElementById('capInp'); if(inp) inp.value='';
-  DIF=f.v; marcarFrac(i); evaluar();
+  DIF=f.v; marcarFrac(i); evaluar(); guardarPunto();   /* se anota al tocar; el guardado en la base es solo al final */
 }
 function setSigno(s){
   SIGNO=s;
@@ -1865,8 +1898,8 @@ function cerrarPunto(){ PUNTO=null; DIF=null; pintarLista(); }
 function evaluar(){
   if(PUNTO===null) return;
   var p=F.puntos[PUNTO], tol=p[3], espP=p[2][F.tallas.indexOf(TACT)];
-  var res=document.getElementById('capRes'), bg=document.getElementById('btnGuardar');
-  if(!res||!bg) return;
+  var res=document.getElementById('capRes'), bg={};
+  if(!res) return;
   if(DIF===null || isNaN(DIF)){
     res.className='res neutro'; res.textContent='Elige la diferencia';
     bg.disabled=true; return;
@@ -1889,6 +1922,7 @@ function registrar(dif, txtDif, ok){
       esp:p[2][col], val:p[2][col]+dif, tol:p[3], cod:p[0], talla:t, prenda:PACT};
   var pos=PUNTO;
   PUNTO=null; DIF=null;
+  borradorGuardar();
   pintarSelectores(); pintarLista();
   setTimeout(function(){
     var el=document.querySelectorAll('#lista .pt-item')[pos];
@@ -1989,6 +2023,7 @@ function decidir(r){
 
   // el mismo identificador en cada reintento: el servidor no duplica
   if(!ID_ENVIO) ID_ENVIO=nuevoIdEnvio();
+  borradorGuardar();
 
   var enviar = MODO_DEMO
     ? function(d, cb){ setTimeout(function(){ cb({ok:true, id:'DEMO (no se guardó)', auditora:SES.auditora, taller:SES.taller}); }, 600); }
@@ -2012,7 +2047,7 @@ function decidir(r){
           'vuelve a tocar el botón cuando tengas señal.</div>';
         return;
       }
-      ID_ENVIO='';
+      ID_ENVIO=''; borradorBorrar();
       document.getElementById('medir').innerHTML=
         '<div class="wrap"><div class="ok" style="font-size:16px;">Auditoría guardada como <b>'+r+'</b>'+
         '<span class="codigo">Código: '+(res.id||'—')+'</span></div>'+

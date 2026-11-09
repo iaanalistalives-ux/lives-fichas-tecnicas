@@ -13,7 +13,8 @@ Buscador de fichas técnicas en PDF y control de medidas contra la ficha, desde 
 - `medidas.html` — **formulario** "Control de medidas".
   - Se elige el taller, qué medir (Corte, Antes de vapor o Prenda terminada, con cuántas tablas trae cada una) y su combo o línea (Missy, Plus, Petite o color) y el color.
   - Desde el 29/10/2026 ofrece TODAS las tablas del estilo, entre en la tarjeta que entre: el botón Medir manda el tipo de la tarjeta solo para saber cuál se abre primero, y el formulario trae las variantes de todos los tipos (`accion=variantes` sin tipo). La tabla se pide con el tipo que le toca a la etapa (Corte → CORTE; las demás → TECNICA) y al guardar se usa el tipo de la tabla elegida.
-  - Se anota la diferencia contra la ficha, prenda por prenda y talla por talla, y se termina con "Aprobar y guardar" o "Rechazar y guardar".
+  - Se anota la diferencia contra la ficha, prenda por prenda y talla por talla, ; cada diferencia se anota al tocarla (sin botón Guardar por punto) y se termina con "Aprobar y guardar" o "Rechazar y guardar".
+  - Borrador (09/11/2026): lo medido se guarda en el equipo (`lives_medidas_borrador|usuario|estilo`, 36 h) y, si la auditora sale a ver un reporte o la pantalla se recarga, al volver a abrir el mismo estilo retoma donde estaba (etapa, combo, color, taller, prendas y medidas). Se borra al guardar la auditoría o al empezar de nuevo.
   - Solo se abre desde el buscador (`?estilo=&tipo=`).
 - `historial.html` — **consulta** "Mediciones realizadas": filtros, indicadores, la hoja imprimible de cada auditoría de medidas y Excel LIVES.
   - La hoja abre con "Ver figura" (dibujo de la prenda de la ficha, con zoom y cambio de página, como "Ver dibujo" del formulario) y con "Ver ficha" (PDF completo). La hoja impresa no lleva firmas (28/10/2026).
