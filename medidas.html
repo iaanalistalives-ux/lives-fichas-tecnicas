@@ -684,7 +684,52 @@ input.txt:focus{outline:none;border-color:var(--sage);}
 .pt-item .esp .pctMin{font-weight:600;color:var(--stone);font-size:11.5px;}
 .pt-item .val small{display:block;font-size:11px;font-weight:600;color:var(--stone);}
 
-/* ---- despliegue dentro de la fila ---- */
+/* ---- hoja de medidas en cuadrícula (10/11/2026): puntos en filas, una columna por prenda ---- */
+.hojaBox{background:#fff;border:1px solid var(--warm);border-radius:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;width:max-content;max-width:100%;}
+.hojaT{border-collapse:separate;border-spacing:0;width:max-content;}
+.hojaT th,.hojaT td{border-bottom:1px solid var(--warm);border-right:1px solid var(--warm);padding:0;text-align:center;}
+.hojaT th{background:var(--warm-light);font-size:11.5px;font-weight:800;color:var(--stone);padding:8px 4px;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;}
+.hojaT tr:last-child td{border-bottom:0;}
+.hojaT th:last-child,.hojaT td:last-child{border-right:0;}
+.hojaT .hPto{position:sticky;left:0;z-index:2;background:#fff;text-align:left;min-width:150px;max-width:150px;padding:7px 8px;box-shadow:1px 0 0 var(--warm);}
+.hojaT th.hPto{background:var(--warm-light);z-index:3;}
+.hojaT .hPto b{display:block;font-size:13.5px;font-weight:700;color:#333;line-height:1.2;overflow-wrap:anywhere;}
+.hojaT .hPto b em{font-style:normal;color:var(--sage);font-weight:800;margin-right:5px;}
+.hojaT .hPto small{display:block;margin-top:3px;font-size:12px;color:var(--stone);font-weight:600;line-height:1.25;}
+.hojaT .hPto small span{color:#333;font-weight:800;}
+.hojaT .hPto small i{font-style:normal;font-weight:800;color:var(--sage);letter-spacing:.02em;}
+.hojaT td.hc{width:68px;min-width:68px;height:54px;}
+.hojaT td.hc button{display:block;width:100%;height:100%;border:0;background:transparent;font-family:inherit;font-size:15px;font-weight:800;color:#333;padding:0;cursor:pointer;}
+.hojaT td.hc button.vacio{color:#9AA9A4;font-weight:400;font-size:22px;}
+.hojaT td.hc.ok button{background:#E3F2EC;color:var(--sage);}
+.hojaT td.hc.mal button{background:#FDE8E7;color:var(--rose);}
+.hojaT td.hc.sel button{outline:3px solid #D9A400;outline-offset:-3px;background:#FFF6D6;color:#333;}
+.hojaT th.hAdd,.hojaT td.hAdd{min-width:54px;width:54px;}
+.hojaT th.hAdd button{border:0;background:transparent;color:var(--sage);font-size:22px;font-weight:800;width:100%;padding:0 8px;cursor:pointer;}
+.hojaT th .hQuita{border:0;background:transparent;color:var(--rose);font-size:15px;font-weight:800;padding:0 0 0 4px;cursor:pointer;}
+body.capAbierta #btnDib{display:none!important;}
+#capa .hojaCap{position:fixed;left:0;right:0;bottom:0;z-index:70;background:#fff;border:0;border-radius:16px 16px 0 0;box-shadow:0 -8px 30px rgba(0,0,0,.28);
+  margin:0;padding:12px 14px calc(14px + env(safe-area-inset-bottom,0px));max-height:66vh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+#capa .capCab{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+#capa .capCab .t{flex:1;min-width:0;}
+#capa .capCab .t b{display:block;font-size:15px;font-weight:800;color:#333;overflow-wrap:anywhere;line-height:1.2;}
+#capa .capCab .t span{font-size:12.5px;color:var(--stone);}
+#capa .capCab button{border:1px solid var(--warm);background:var(--warm-light);color:#333;border-radius:9px;min-width:44px;min-height:44px;font-family:inherit;font-size:18px;font-weight:800;cursor:pointer;}
+#capa .capCab button.dib{font-size:12px;padding:0 8px;}
+#capa .espLinea{padding-bottom:8px;margin-bottom:10px;}
+#capa .espTol b{color:var(--sage);letter-spacing:.02em;}
+#capa .signo{margin-bottom:8px;}
+#capa .signo button{padding:11px;}
+#capa .fracs{grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:8px;}
+#capa .fracs button{padding:12px 2px;font-size:15px;}
+#capa .capAcc{display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-bottom:8px;}
+#capa .capAcc .exacto{margin-bottom:0;padding:13px;}
+#capa .capAcc .borrar{background:var(--warm-light);border:1.5px solid var(--warm);border-radius:10px;color:var(--stone);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;}
+#capa .otro{margin-bottom:8px;}
+#capa .res{min-height:40px;padding:8px;margin-bottom:6px;}
+#capa .res.neutro{display:none;}
+@media(min-width:700px){#capa .hojaCap{max-width:560px;left:0;right:0;margin:0 auto;bottom:12px;border-radius:16px;}}
+/* ---- despliegue dentro de la fila (ya no se usa: la captura va en el panel de abajo) ---- */
 .pt-item{transition:none;}
 .pt-item.abierto{border-left-color:var(--sage);background:#F7FBFA;}
 .panelPunto{background:#fff;border:1px solid var(--sage);border-top:none;border-radius:0 0 8px 8px;
@@ -864,14 +909,13 @@ input.txt:focus{outline:none;border-color:var(--sage);}
       <div class="sel" id="selTalla"></div>
     </div>
     <div class="avFila" style="margin-top:3px;">
-      <div class="sel-lbl">Prenda</div>
-      <div class="sel" id="selPrenda"></div>
-      <div class="s" id="avSub" style="margin-left:auto;">0 de 20 puntos</div>
+      <div class="s" id="avSub">0 de 20 medidas</div>
     </div>
     <div class="barra" style="flex-basis:100%;"><i id="avBar" style="width:0%"></i></div>
   </div>
   <div class="wrap">
     <div id="lista"></div>
+    <div id="capa"></div>
     <div class="pieacc" id="pieacc">
       <div id="finBox"></div>
     </div>
@@ -1445,17 +1489,6 @@ function pintarSelectores(){
     return '<button class="'+(t===TACT?'on':'')+(n?' hecho':'')+'" onclick="irTalla(\''+t+'\')">'+t+
            '<i>'+(n? PRENDAS[t]+' prenda'+(PRENDAS[t]>1?'s':'')+' · '+n+' med.' : 'sin medir')+'</i></button>';
   }).join('');
-
-  var h='';
-  for(var p=1;p<=PRENDAS[TACT];p++){
-    var n=medidasDe(TACT,p);
-    h+='<button class="'+(p===PACT?'on':'')+'" onclick="irPrenda('+p+')">'+p+
-       '<i>'+(n?n+' med.':'sin medir')+'</i></button>';
-  }
-  h+='<button class="add" onclick="masPrenda()">+ prenda</button>';
-  if(PRENDAS[TACT]>1 && medidasDe(TACT,PRENDAS[TACT])===0)
-    h+='<button class="add" onclick="menosPrenda()" title="quitar">−</button>';
-  document.getElementById('selPrenda').innerHTML=h;
   setTimeout(ajustarTope,0);
 }
 function ajustarTope(){
@@ -1466,50 +1499,64 @@ function ajustarTope(){
 window.addEventListener('resize', ajustarTope);
 
 function irTalla(t){
-  TACT=t; borradorGuardar();
+  TACT=t; borradorGuardar(); PUNTO=null; DIF=null;
   if(!PRENDAS[t]) PRENDAS[t]=1;
   if(PACT>PRENDAS[t]) PACT=PRENDAS[t];
   pintarSelectores(); pintarLista(); window.scrollTo(0,0);
 }
-function irPrenda(p){ PACT=p; borradorGuardar(); pintarSelectores(); pintarLista(); window.scrollTo(0,0); }
 function masPrenda(){
   PRENDAS[TACT]=Math.min(20,PRENDAS[TACT]+1);
-  PACT=PRENDAS[TACT]; borradorGuardar();
-  pintarSelectores(); pintarLista(); window.scrollTo(0,0);
+  PACT=PRENDAS[TACT]; PUNTO=null; DIF=null; borradorGuardar();
+  pintarSelectores(); pintarLista();
+  var bx=document.querySelector('.hojaBox'); if(bx) bx.scrollLeft=bx.scrollWidth;
 }
 function menosPrenda(){
   if(PRENDAS[TACT]<=1) return;
   if(medidasDe(TACT,PRENDAS[TACT])>0) return;
-  PRENDAS[TACT]--; borradorGuardar();
+  PRENDAS[TACT]--; PUNTO=null; DIF=null; borradorGuardar();
   if(PACT>PRENDAS[TACT]) PACT=PRENDAS[TACT];
   pintarSelectores(); pintarLista();
 }
 
 function pintarLista(){
-  var t=TACT;
-  var hechos=medidasDe(t,PACT);
-  document.getElementById('avSub').textContent=
-    'Talla '+t+' · Prenda '+PACT+'  —  '+hechos+' de '+F.puntos.length+' puntos medidos';
-  document.getElementById('avBar').style.width=(hechos/F.puntos.length*100)+'%';
+  var t=TACT, col=F.tallas.indexOf(t), np=PRENDAS[t]||1, tot=0;
+  for(var q=1;q<=np;q++) tot+=medidasDe(t,q);
+  document.getElementById('avSub').textContent='Talla '+t+'  —  '+tot+' de '+(F.puntos.length*np)+' medidas';
+  document.getElementById('avBar').style.width=(tot/(F.puntos.length*np)*100)+'%';
 
-  var col=F.tallas.indexOf(t);
-  var h='';
-  F.puntos.forEach(function(p,i){
-    var d=DATOS[clave(t,PACT,p[0])];
-    var esp=p[2][col], tol=p[3];
-    var cls = d ? (d.ok?'ok':'mal') : '';
-    if(i===PUNTO) cls+=' abierto';
-    h+='<div class="pt-item '+cls+'" onclick="tocarPunto('+i+')">'+
-       '<div class="info">'+
-       (p[1] ? '<div class="nombre">'+p[1]+'</div><div class="codmin">'+p[0]+'</div>'
-             : '<div class="nombre">'+p[0]+'</div>')+
-       '<div class="esp">Esp. '+fmtMed(esp)+' &nbsp;±'+fmtMed(tol)+(tol>0?' <span class="pctMin">(±'+fmtPct(tol,esp)+')</span>':'')+'</div></div>'+
-       '<div class="val">'+(d? d.txtDif+'<small>'+fmtMed(d.val)+'</small>'+(d.dif?'<small>'+fmtPct(d.dif,d.esp,true)+'</small>':'') : '<small>medir</small>')+'</div>'+
-       '</div>';
-    if(i===PUNTO) h+=panelPunto(i, esp, tol);
+  var h='<div class="hojaBox"><table class="hojaT"><thead><tr><th class="hPto">Punto · Ficha · TOL</th>';
+  for(var p=1;p<=np;p++){
+    h+='<th>Prenda '+p+((p===np && np>1 && medidasDe(t,p)===0)?'<button class="hQuita" onclick="menosPrenda()" aria-label="Quitar la última prenda" title="Quitar prenda">×</button>':'')+'</th>';
+  }
+  h+='<th class="hAdd"><button onclick="masPrenda()" aria-label="Agregar prenda" title="Agregar prenda">+</button></th></tr></thead><tbody>';
+  F.puntos.forEach(function(pt,i){
+    var esp=pt[2][col], tol=pt[3];
+    h+='<tr id="f_'+i+'"><td class="hPto"><b>'+(pt[1]?'<em>'+pt[0]+'</em>'+pt[1]:pt[0])+'</b>'+
+       '<small>Ficha <span>'+fmtMed(esp)+'</span><br><i>TOL</i> ± '+fmtMed(tol)+(tol>0?' (±'+fmtPct(tol,esp)+')':'')+'</small></td>';
+    for(var p2=1;p2<=np;p2++){
+      var d=DATOS[clave(t,p2,pt[0])], cls='hc';
+      if(d) cls+=d.ok?' ok':' mal';
+      if(PUNTO===i && PACT===p2) cls+=' sel';
+      h+='<td class="'+cls+'" id="c_'+p2+'_'+i+'"><button type="button" class="'+(d?'':'vacio')+'" onclick="tocarCelda('+p2+','+i+')">'+
+         (d?(d.dif===0?'=':d.txtDif):'·')+'</button></td>';
+    }
+    h+='<td class="hAdd"></td></tr>';
   });
+  h+='</tbody></table></div>';
+  var bx=document.querySelector('.hojaBox'), sl=bx?bx.scrollLeft:0;
   document.getElementById('lista').innerHTML=h;
-  if(PUNTO!==null) pintarFracs();
+  var bx2=document.querySelector('.hojaBox'); if(bx2) bx2.scrollLeft=sl;
+
+  var capa=document.getElementById('capa');
+  if(PUNTO!==null){
+    capa.innerHTML=panelPunto(PUNTO, F.puntos[PUNTO][2][col], F.puntos[PUNTO][3]);
+    document.body.classList.add('capAbierta');
+    pintarFracs();
+    var cc=capa.firstChild; if(cc) document.querySelector('#medir .wrap').style.paddingBottom=(cc.offsetHeight+30)+'px';
+  }else{
+    capa.innerHTML=''; document.body.classList.remove('capAbierta');
+    document.querySelector('#medir .wrap').style.paddingBottom='';
+  }
   pintarResumen();
   verBotonDibujo();
   if(DIB.pdf && document.getElementById('dibujo').style.display==='flex' && PUNTO!==null){
@@ -1518,27 +1565,41 @@ function pintarLista(){
     irAlPunto();
   }
 }
+/* Lleva la fila del punto bajo la barra de arriba, para que el panel de abajo no la tape. */
+function scrollAPunto(i,p){
+  setTimeout(function(){
+    var tr=document.getElementById('f_'+i); if(!tr) return;
+    var av=document.querySelector('.avance'), tope=(av?av.offsetHeight:70)+46;
+    var y=tr.getBoundingClientRect().top+(window.pageYOffset||0)-tope;
+    window.scrollTo({top:Math.max(0,y), behavior:'smooth'});
+    var bx=document.querySelector('.hojaBox'), td=document.getElementById('c_'+p+'_'+i);
+    if(bx&&td){ var r=td.getBoundingClientRect(), b=bx.getBoundingClientRect();
+      if(r.right>b.right||r.left<b.left+150) bx.scrollLeft+= (r.right>b.right ? r.right-b.right+10 : r.left-(b.left+150)-10); }
+  },60);
+}
 
-/* ---------- panel que se despliega dentro de la lista ---------- */
 function panelPunto(i, esp, tol){
-  var p=F.puntos[i];
-  return '<div class="panelPunto" onclick="event.stopPropagation();">'+
-    '<div class="tituloPunto">'+(p[1]||p[0])+(p[1]?' <b>'+p[0]+'</b>':'')+'</div>'+
+  var p=F.puntos[i], d=DATOS[clave(TACT,PACT,p[0])];
+  return '<div class="hojaCap panelPunto" role="dialog" aria-label="Anotar medida" onclick="event.stopPropagation();">'+
+    '<div class="capCab"><button type="button" onclick="irPunto(-1)" aria-label="Punto anterior"'+(i===0?' disabled':'')+'>‹</button>'+
+    '<div class="t"><b>'+(p[1]||p[0])+(p[1]?' ('+p[0]+')':'')+'</b><span>Talla '+TACT+' · Prenda '+PACT+'</span></div>'+
+    '<button type="button" onclick="irPunto(1)" aria-label="Punto siguiente"'+(i===F.puntos.length-1?' disabled':'')+'>›</button>'+
+    ((ESPEC&&ESPEC.fileId)?'<button type="button" class="dib" onclick="abrirDibujo()">Dibujo</button>':'')+
+    '<button type="button" onclick="cerrarPunto()" aria-label="Cerrar">✕</button></div>'+
     '<div class="espLinea"><span class="espVal">'+fmtMed(esp)+'</span>'+
-    '<span class="espTol">tolerancia ± '+fmtMed(tol)+(tol>0?' (±'+fmtPct(tol,esp)+')':'')+'</span></div>'+
-    '<button class="exacto" onclick="exacto()">OK</button>'+
+    '<span class="espTol"><b>Tolerancia</b> ± '+fmtMed(tol)+(tol>0?' (±'+fmtPct(tol,esp)+')':'')+'</span></div>'+
     '<div class="signo">'+
       '<button id="sgMenos" onclick="setSigno(-1)">− Menos</button>'+
       '<button id="sgMas" onclick="setSigno(1)">+ Más</button>'+
     '</div>'+
     '<div class="fracs" id="fracs"></div>'+
+    '<div class="capAcc"><button class="exacto" onclick="exacto()">OK · exacto</button>'+
+    '<button class="borrar" onclick="borrarPunto()"'+(d?'':' disabled')+'>Borrar</button></div>'+
     '<div class="otro"><input id="capInp" inputmode="'+(esCm()?'decimal':'numeric')+'" placeholder="'+
       (esCm()?'otra: 0.4':'otra: 3 32')+'" autocomplete="off">'+
     '<span>'+(esCm()?'en centímetros':'numerador<br>y denominador')+'</span></div>'+
-    '<div class="res neutro" id="capRes">Elige la diferencia: se anota al tocarla</div>'+
-    '<div class="accs">'+
-      '<button class="btn ghost" onclick="cerrarPunto()">Cerrar</button>'+
-    '</div></div>';
+    '<div class="res neutro" id="capRes">Toca la diferencia: se anota y pasa al siguiente punto</div>'+
+    '</div>';
 }
 
 /* ==========================================================
@@ -1884,14 +1945,20 @@ function setSigno(s){
   evaluar();
 }
 
-function tocarPunto(i){
-  if(PUNTO===i){ cerrarPunto(); return; }
-  PUNTO=i; DIF=null; SIGNO=1;
-  pintarLista();
-  setTimeout(function(){
-    var el=document.querySelectorAll('#lista .pt-item')[i];
-    if(el) el.scrollIntoView({block:'start', behavior:'smooth'});
-  },40);
+function tocarCelda(p,i){
+  if(PUNTO===i && PACT===p){ cerrarPunto(); return; }
+  PACT=p; PUNTO=i; DIF=null;          /* el signo elegido se conserva de un punto al siguiente */
+  borradorGuardar();
+  pintarLista(); scrollAPunto(i,p);
+}
+function irPunto(n){
+  var i=PUNTO+n; if(PUNTO===null || i<0 || i>=F.puntos.length) return;
+  PUNTO=i; DIF=null; pintarLista(); scrollAPunto(i,PACT);
+}
+function borrarPunto(){
+  if(PUNTO===null) return;
+  delete DATOS[clave(TACT,PACT,F.puntos[PUNTO][0])];
+  DIF=null; borradorGuardar(); pintarSelectores(); pintarLista();
 }
 function cerrarPunto(){ PUNTO=null; DIF=null; pintarLista(); }
 
@@ -1921,13 +1988,12 @@ function registrar(dif, txtDif, ok){
   DATOS[clave(t,PACT,p[0])] = {dif:dif, txtDif:txtDif, ok:ok,
       esp:p[2][col], val:p[2][col]+dif, tol:p[3], cod:p[0], talla:t, prenda:PACT};
   var pos=PUNTO;
-  PUNTO=null; DIF=null;
+  DIF=null;
   borradorGuardar();
+  /* como en la hoja de papel: se anota y se pasa al punto siguiente de la misma prenda */
+  PUNTO=(pos<F.puntos.length-1) ? pos+1 : null;
   pintarSelectores(); pintarLista();
-  setTimeout(function(){
-    var el=document.querySelectorAll('#lista .pt-item')[pos];
-    if(el) el.scrollIntoView({block:'center', behavior:'smooth'});
-  },50);
+  if(PUNTO!==null) scrollAPunto(PUNTO,PACT);
 }
 
 /* ---------- resumen siempre visible al pie ---------- */
@@ -1958,7 +2024,7 @@ function pintarResumen(){
   if(!caja) return;
   var todos=Object.keys(DATOS).map(function(k){ return DATOS[k]; });
   if(!todos.length){
-    caja.innerHTML='<div class="note" style="margin:0;">Toca un punto de la lista para registrar su diferencia. '+
+    caja.innerHTML='<div class="note" style="margin:0;">Toca el cuadro de un punto y una prenda para registrar su diferencia. '+
       'El resumen aparecerá aquí conforme vayas midiendo.</div>';
     return;
   }
