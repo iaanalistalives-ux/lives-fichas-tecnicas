@@ -830,7 +830,7 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
     </div>
 
     <div class="fld buscafld">
-      <input id="fTodo" autocomplete="off" placeholder="Estilo, grupo, cliente o nombre del archivo">
+      <input id="fTodo" autocomplete="off" placeholder="Estilo">
       <div class="sug" id="sTodo"></div>
     </div>
 
@@ -1341,8 +1341,7 @@ function lineaDe(d){
 }
 function textoDe(d){
   if(d.__txt) return d.__txt;
-  d.__txt = norm([d.estilo, d.version, gruposDe(d).join(' '), d.cliente, d.estiloCliente,
-                  d.descripcion, d.tela, d.temporada, d.archivo, lineaDe(d)].join(' '));
+  d.__txt = norm([d.estilo, d.version, d.estiloCliente].join(' '));
   return d.__txt;
 }
 function buscar(){
@@ -1357,8 +1356,7 @@ function buscar(){
   });
   var out=document.getElementById('salida');
   if(!partes.length){
-    out.innerHTML='<div class="vacio">Escribe el <b>estilo</b>, el <b>grupo</b> o el <b>cliente</b>.<br>'+
-      '<span style="font-size:12px;">También sirve parte del nombre del archivo.</span></div>';
+    out.innerHTML='<div class="vacio">Escribe el <b>estilo</b>.</div>';
     return;
   }
   if(!res.length){
