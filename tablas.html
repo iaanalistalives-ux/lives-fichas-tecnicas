@@ -1098,7 +1098,11 @@ function tituloTabla(texto, tipoDoc){
      final contra las medidas de antes del vapor. */
   var etapa = /ANTES\s+DEL?\s+VAPORIZADO/i.test(t) ? 'Prenda terminada (antes de vapor)'
             : /EN\s+PRENDA\s+TERMINADA/i.test(t) ? 'Prenda terminada (después de vapor)'
-            : /EN\s+COSTURA/i.test(t)             ? 'En costura (antes de vapor)'
+            /* "EN COSTURA" solo cuenta si es el encabezado de la tabla. Antes bastaba que apareciera en
+               cualquier punto ("sisa curva en COSTURA", "Escote en Costura total"): las fichas de una sola
+               tabla (Theory, "5. MEDIDAS DE PRENDA TERMINADA") se leían como ANTES de vapor y a la
+               auditora nunca le salía "Prenda terminada" (22562 y 22786, 10/11/2026). */
+            : /(CONTROL|TABLA)\s+DE\s+MEDIDAS[^\n]{0,60}EN\s+COSTURA|EN\s+COSTURA\s*\(?\s*ANTES|ANTES\s+DE?L?\s+VAPOR\w*\s+EN\s+COSTURA|EN\s+COSTURA\s+ANTES/i.test(t) ? 'En costura (antes de vapor)'
             : /CONTROL\s+DE\s+MEDIDAS\s*:?\s*CORTE/i.test(t) ? 'Corte'
             : 'Medidas';
   return { etapa:etapa, combo:combo };
