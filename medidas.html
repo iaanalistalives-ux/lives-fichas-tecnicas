@@ -708,6 +708,7 @@ input.txt:focus{outline:none;border-color:var(--sage);}
 .hojaT th.hAdd button{border:0;background:transparent;color:var(--sage);font-size:22px;font-weight:800;width:100%;padding:0 8px;cursor:pointer;}
 .hojaT th .hQuita{border:0;background:transparent;color:var(--rose);font-size:15px;font-weight:800;padding:0 0 0 4px;cursor:pointer;}
 body.capAbierta #btnDib{display:none!important;}
+#btnAtras{flex:0 0 auto;}
 #capa .hojaCap{position:fixed;left:0;right:0;bottom:0;z-index:70;background:#fff;border:0;border-radius:16px 16px 0 0;box-shadow:0 -8px 30px rgba(0,0,0,.28);
   margin:0;padding:12px 14px calc(14px + env(safe-area-inset-bottom,0px));max-height:66vh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 #capa .capCab{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
@@ -909,6 +910,7 @@ body.capAbierta #btnDib{display:none!important;}
       <div class="sel" id="selTalla"></div>
     </div>
     <div class="avFila" style="margin-top:3px;">
+      <button type="button" id="btnAtras" onclick="atrasMedir()" aria-label="Volver a la búsqueda">‹ Buscar</button>
       <div class="s" id="avSub">0 de 20 medidas</div>
     </div>
     <div class="barra" style="flex-basis:100%;"><i id="avBar" style="width:0%"></i></div>
@@ -1060,6 +1062,31 @@ function error(m){
   var e=document.getElementById('err');
   e.style.display=m?'block':'none'; e.textContent=m||'';
 }
+/* Atrás durante la medición (10/11/2026): cierra el panel abierto y, si no hay panel, vuelve a la
+   búsqueda. Lo medido queda en el borrador del equipo, así que no se pierde. Vale también para el
+   botón atrás del celular: se deja una entrada en el historial para que ese botón no saque a la
+   persona de la herramienta. */
+var MED_PUSH=false;
+function medirVisible(){ var m=document.getElementById('medir'); return !!m && m.style.display==='block'; }
+function marcarHistorialMedir(){
+  if(MED_PUSH) return;
+  try{ history.pushState({medir:1},''); MED_PUSH=true; }catch(e){}
+}
+function atrasMedir(){
+  if(typeof PUNTO!=='undefined' && PUNTO!==null){ cerrarPunto(); return; }
+  salirDeMedir();
+}
+function salirDeMedir(){
+  if(MED_PUSH){ MED_PUSH=false; window.__salirMedir=true; history.back(); }
+  else volverBuscador();
+}
+window.addEventListener('popstate', function(){
+  if(window.__salirMedir){ window.__salirMedir=false; volverBuscador(); return; }
+  if(!medirVisible()) return;
+  MED_PUSH=false;
+  if(typeof PUNTO!=='undefined' && PUNTO!==null){ cerrarPunto(); marcarHistorialMedir(); return; }
+  volverBuscador();
+});
 function volverBuscador(){
   // si venimos del buscador, volver por el historial es instantáneo
   if(document.referrer && document.referrer.indexOf('index.html')>=0) history.back();
@@ -1151,6 +1178,7 @@ function borradorReanudar(){
   document.getElementById('config').style.display='none';
   document.querySelector('.header').style.display='none';
   document.getElementById('medir').style.display='block';
+  marcarHistorialMedir();
   pintarSelectores(); pintarLista(); ajustarTope(); verBotonDibujo();
 }
 
@@ -1473,6 +1501,7 @@ function empezar(){
   document.getElementById('config').style.display='none';
   document.querySelector('.header').style.display='none';
   document.getElementById('medir').style.display='block';
+  marcarHistorialMedir();
   pintarSelectores(); pintarLista(); ajustarTope();
   verBotonDibujo();
 }
@@ -1581,9 +1610,8 @@ function scrollAPunto(i,p){
 function panelPunto(i, esp, tol){
   var p=F.puntos[i], d=DATOS[clave(TACT,PACT,p[0])];
   return '<div class="hojaCap panelPunto" role="dialog" aria-label="Anotar medida" onclick="event.stopPropagation();">'+
-    '<div class="capCab"><button type="button" onclick="irPunto(-1)" aria-label="Punto anterior"'+(i===0?' disabled':'')+'>‹</button>'+
+    '<div class="capCab">'+
     '<div class="t"><b>'+(p[1]||p[0])+(p[1]?' ('+p[0]+')':'')+'</b><span>Talla '+TACT+' · Prenda '+PACT+'</span></div>'+
-    '<button type="button" onclick="irPunto(1)" aria-label="Punto siguiente"'+(i===F.puntos.length-1?' disabled':'')+'>›</button>'+
     ((ESPEC&&ESPEC.fileId)?'<button type="button" class="dib" onclick="abrirDibujo()">Dibujo</button>':'')+
     '<button type="button" onclick="cerrarPunto()" aria-label="Cerrar">✕</button></div>'+
     '<div class="espLinea"><span class="espVal">'+fmtMed(esp)+'</span>'+
@@ -1598,7 +1626,7 @@ function panelPunto(i, esp, tol){
     '<div class="otro"><input id="capInp" inputmode="'+(esCm()?'decimal':'numeric')+'" placeholder="'+
       (esCm()?'otra: 0.4':'otra: 3 32')+'" autocomplete="off">'+
     '<span>'+(esCm()?'en centímetros':'numerador<br>y denominador')+'</span></div>'+
-    '<div class="res neutro" id="capRes">Toca la diferencia: se anota y pasa al siguiente punto</div>'+
+    '<div class="res neutro" id="capRes">Toca la diferencia: se anota y el panel se cierra</div>'+
     '</div>';
 }
 
@@ -1951,10 +1979,6 @@ function tocarCelda(p,i){
   borradorGuardar();
   pintarLista(); scrollAPunto(i,p);
 }
-function irPunto(n){
-  var i=PUNTO+n; if(PUNTO===null || i<0 || i>=F.puntos.length) return;
-  PUNTO=i; DIF=null; pintarLista(); scrollAPunto(i,PACT);
-}
 function borrarPunto(){
   if(PUNTO===null) return;
   delete DATOS[clave(TACT,PACT,F.puntos[PUNTO][0])];
@@ -1990,10 +2014,9 @@ function registrar(dif, txtDif, ok){
   var pos=PUNTO;
   DIF=null;
   borradorGuardar();
-  /* como en la hoja de papel: se anota y se pasa al punto siguiente de la misma prenda */
-  PUNTO=(pos<F.puntos.length-1) ? pos+1 : null;
+  /* el panel se esconde: la auditora elige sola el siguiente punto que va a medir */
+  PUNTO=null;
   pintarSelectores(); pintarLista();
-  if(PUNTO!==null) scrollAPunto(PUNTO,PACT);
 }
 
 /* ---------- resumen siempre visible al pie ---------- */
