@@ -858,13 +858,11 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
         <input type="date" id="fechaDia" onchange="setDia()">
         <button class="btn ghost" onclick="limpiarFecha()">Quitar</button>
       </div>
-      <div class="kpis" id="kpisTodo" style="margin:14px 0 12px;"></div>
       <div id="verif" style="display:none;"></div>
       <div id="listaTodo"></div>
     </div>
   </div>
 
-  <div class="kpis" id="kpis" style="display:none;"></div>
   <div id="salida"><div class="cargando">Cargando…</div></div>
 
   <div class="note" style="margin-top:20px;">
@@ -1300,20 +1298,9 @@ function limpiar(){
   document.getElementById('salida').innerHTML=
     '<div class="vacio">Escribe el <b>estilo</b>, el <b>grupo</b> o el <b>cliente</b>.</div>';
 }
-function pintarKpis(){
-  var pdfs={},tec={},aca={},est={};
-  DATOS.forEach(function(d){
-    pdfs[d.id]=1;
-    if(d.tipo==='ACABADOS') aca[d.id]=1; else tec[d.id]=1;
-    if(d.estilo) est[d.tipo+'|'+d.estilo]=1;
-  });
-  var k=document.getElementById('kpis'); k.style.display='flex';
-  k.innerHTML=
-   '<div class="kpi"><div class="v">'+Object.keys(pdfs).length+'</div><div class="l">Fichas</div><div class="s">archivos</div></div>'+
-   '<div class="kpi"><div class="v">'+Object.keys(tec).length+'</div><div class="l">Técnicas</div><div class="s">producción</div></div>'+
-   '<div class="kpi"><div class="v">'+Object.keys(aca).length+'</div><div class="l">Acabados</div><div class="s">empaque</div></div>'+
-   '<div class="kpi"><div class="v">'+Object.keys(est).length+'</div><div class="l">Estilos</div><div class="s">indexados</div></div>';
-}
+/* Los cuadros de cantidades (KPI) se quitaron el 10/11/2026: no se usaban. La función se queda
+   porque otras partes de la pantalla la buscan. */
+function pintarKpis(){}
 function fmt(f){
   if(!f) return '—';
   var p=String(f).split('-');
@@ -1527,16 +1514,6 @@ function pintarTodo(){
     if(d.estilo) porArch[d.id].estilos.push(d.estilo);
   });
   var archivos=Object.keys(porArch).map(function(k){ return porArch[k]; });
-
-  // contadores
-  var c={TECNICA:0,ACABADOS:0,CORTE:0,RM:0};
-  archivos.forEach(function(a){ if(c[a.d.tipo]!==undefined) c[a.d.tipo]++; });
-  document.getElementById('kpisTodo').innerHTML=
-    '<div class="kpi"><div class="v">'+archivos.length+'</div><div class="l">Archivos</div><div class="s">en el período</div></div>'+
-    '<div class="kpi"><div class="v">'+c.TECNICA+'</div><div class="l">Técnica</div></div>'+
-    '<div class="kpi"><div class="v">'+c.ACABADOS+'</div><div class="l">Acabados</div></div>'+
-    '<div class="kpi"><div class="v">'+c.CORTE+'</div><div class="l">Corte</div></div>'+
-    '<div class="kpi"><div class="v">'+c.RM+'</div><div class="l">RM</div></div>';
 
   document.getElementById('todoSub').textContent =
     archivos.length+' archivo(s)'+(FILTRO_FECHA==='todo'?' cargados':' en el período elegido');

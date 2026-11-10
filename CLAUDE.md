@@ -8,6 +8,7 @@ Buscador de fichas técnicas en PDF y control de medidas contra la ficha, desde 
   - Busca por estilo, grupo, cliente o archivo, y filtra por tipo (Técnica, Acabados, Corte, RM).
   - Muestra la ficha vigente con sus versiones y la abre en un visor propio (pdf.js).
   - El botón "Medir" lleva a `medidas.html`.
+  - Sin cuadros de cantidades (KPI) arriba ni en "Ver todo lo cargado" (quitados el 10/11/2026: no se usaban). El botón "Mediciones" abre `historial.html`, que tiene "‹ Buscar fichas" para volver.
   - Solo la verificadora ve el panel "Ver todo lo cargado" y el acceso a `tablas.html`.
   - Tiene Excel LIVES.
 - `medidas.html` — **formulario** "Control de medidas".
