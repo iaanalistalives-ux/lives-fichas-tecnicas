@@ -1176,7 +1176,7 @@ function borradorBorrar(){ BORR=null; LS.del(borradorClave()); }
 function borradorLeer(){
   var b=null; try{ b=JSON.parse(LS.get(borradorClave())||'null'); }catch(e){}
   if(!b || !b.datos || !Object.keys(b.datos).length || Date.now()-b.ts>36*3600*1000){ if(b) LS.del(borradorClave()); return; }
-  BORR=b;   /* la persona decide en pantalla: continuar o descartar (11/11/2026) */
+  BORR=b;   /* la persona decide en pantalla: continuar o descartar (10/11/2026) */
   if(b.taller && !SES.taller){ SES.taller=b.taller; }
 }
 var RETOMAR=false;
