@@ -847,6 +847,13 @@ body.capAbierta #btnDib{display:none!important;}
     <div class="ph" id="fichaInfo"></div>
   </div>
 
+  <div class="panel" id="pBorr" style="display:none;">
+    <div class="pt">Medición sin terminar</div>
+    <div class="ph" id="borrInfo"></div>
+    <button class="btn full" onclick="borradorContinuar()">Continuar esa medición</button>
+    <button class="btn ghost full" style="margin-top:8px;" onclick="borradorDescartar()">Descartar y empezar otra</button>
+  </div>
+
   <div class="panel" id="pHist" style="display:none;">
     <div class="pt" id="histTit">Mediciones anteriores</div>
     <div class="ph">Este estilo ya fue medido antes.</div>
@@ -914,6 +921,7 @@ body.capAbierta #btnDib{display:none!important;}
     <div class="avFila" style="margin-top:3px;">
       <button type="button" id="btnAtras" onclick="atrasMedir()" aria-label="Volver a la búsqueda">‹ Buscar</button>
       <div class="s" id="avSub">0 de 20 medidas</div>
+      <button type="button" id="btnDescartar" onclick="descartarMedicion()" style="margin-left:auto;">Descartar</button>
     </div>
     <div class="barra" style="flex-basis:100%;"><i id="avBar" style="width:0%"></i></div>
   </div>
@@ -1083,6 +1091,7 @@ function salirDeMedir(){
   else volverBuscador();
 }
 window.addEventListener('popstate', function(){
+  if(window.__descartando){ window.__descartando=false; return; }
   if(window.__salirMedir){ window.__salirMedir=false; volverBuscador(); return; }
   if(!medirVisible()) return;
   MED_PUSH=false;
@@ -1167,8 +1176,43 @@ function borradorBorrar(){ BORR=null; LS.del(borradorClave()); }
 function borradorLeer(){
   var b=null; try{ b=JSON.parse(LS.get(borradorClave())||'null'); }catch(e){}
   if(!b || !b.datos || !Object.keys(b.datos).length || Date.now()-b.ts>36*3600*1000){ if(b) LS.del(borradorClave()); return; }
-  BORR=b; ETAPA=b.etapa||ETAPA; COMBO=b.combo||''; COLOR=b.color||''; LINEA_OK=true;
+  BORR=b;   /* la persona decide en pantalla: continuar o descartar (10/11/2026) */
   if(b.taller && !SES.taller){ SES.taller=b.taller; }
+}
+var RETOMAR=false;
+function pintarBorrador(){
+  var c=document.getElementById('pBorr'); if(!c) return;
+  if(!BORR){ c.style.display='none'; return; }
+  var n=Object.keys(BORR.datos||{}).length;
+  txt('borrInfo',(NOM_ETAPA[BORR.etapa]||BORR.etapa||'')+(BORR.color?' · '+BORR.color:'')+
+      ' · '+n+' medida'+(n===1?'':'s')+' anotada'+(n===1?'':'s')+'. Si vas a medir otro color, descártala primero.');
+  c.style.display='block';
+}
+function borradorContinuar(){
+  if(!BORR) return;
+  ETAPA=BORR.etapa||ETAPA; COMBO=BORR.combo||''; COLOR=BORR.color||''; LINEA_OK=true;
+  RETOMAR=true; pintarEtapas();
+}
+function borradorDescartar(){
+  if(!confirm('¿Descartar la medición sin terminar? Se pierden las medidas anotadas.')) return;
+  borradorBorrar(); reiniciarElecciones(); pintarBorrador();
+}
+function reiniciarElecciones(){
+  COLOR=''; var o=document.getElementById('colorOtro'); if(o) o.value='';
+  pintarColores();
+}
+/* Descartar mientras se mide: borra lo anotado y vuelve a elegir (color, etapa, línea) */
+function descartarMedicion(){
+  if(!confirm('¿Descartar esta medición? Se pierden las medidas anotadas y podrás elegir otro color.')) return;
+  borradorBorrar(); DATOS={}; PRENDAS={}; ID_ENVIO=''; PUNTO=null; DIF=null;
+  var capa=document.getElementById('capa'); if(capa) capa.innerHTML='';
+  document.body.classList.remove('capAbierta');
+  document.getElementById('medir').style.display='none';
+  document.getElementById('config').style.display='';
+  var h=document.querySelector('.header'); if(h) h.style.display='';
+  reiniciarElecciones(); pintarBorrador(); verBotonDibujo();
+  if(MED_PUSH){ MED_PUSH=false; window.__descartando=true; history.back(); }
+  window.scrollTo(0,0);
 }
 function borradorReanudar(){
   var b=BORR; BORR=null;
@@ -1428,7 +1472,8 @@ function aplicarEspec(espec){
       (ESPEC.version?' · versión '+ESPEC.version:'')+
       ' · '+F.puntos.length+' puntos · tallas '+F.tallas.join(', '));
     pintarColores();
-    if(BORR) borradorReanudar();
+    if(RETOMAR){ RETOMAR=false; if(BORR) borradorReanudar(); }
+    else pintarBorrador();
 }
 
 /* ---------- medidas: pulgadas o centímetros ---------- */
@@ -1496,10 +1541,11 @@ function empezar(){
     alert('Elige el taller donde estás midiendo.');
     return;
   }
+  if(BORR && !confirm('Hay una medición sin terminar. ¿Descartarla y empezar esta nueva?')) return;
   DATOS={}; PRENDAS={}; ID_ENVIO='';
   F.tallas.forEach(function(t){ PRENDAS[t]=1; });
   TACT=F.tallas[0]; PACT=1;
-  borradorBorrar();
+  borradorBorrar(); pintarBorrador();
   document.getElementById('config').style.display='none';
   document.querySelector('.header').style.display='none';
   document.getElementById('medir').style.display='block';
