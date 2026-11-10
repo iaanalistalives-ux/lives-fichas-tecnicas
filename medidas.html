@@ -818,7 +818,9 @@ body.capAbierta #btnDib{display:none!important;}
 #dibujo{position:fixed;inset:0;z-index:80;background:rgba(14,59,54,.94);display:none;flex-direction:column;}
 #dibujo .dTop{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--petrol);
   border-bottom:3px solid var(--emer);color:#fff;}
-#dibujo .dTit{font-size:14px;font-weight:700;flex:1;min-width:0;overflow-wrap:anywhere;}
+#dibujo .dTop{flex-wrap:wrap;}
+#dibujo .dTit{font-size:14px;font-weight:700;flex:1 1 100%;min-width:0;overflow-wrap:anywhere;}
+#dibujo .dTop button:first-of-type{margin-right:auto;}
 #dibujo .dTop button{min-height:40px;min-width:44px;border:0;border-radius:8px;background:#ffffff22;color:#fff;
   font:inherit;font-size:16px;font-weight:700;}
 #dibujo .dCaja{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;background:#fff;}
@@ -1523,7 +1525,15 @@ function pintarSelectores(){
 function ajustarTope(){
   var b=document.querySelector('.avance');
   var w=document.querySelector('#medir .wrap');
-  if(b&&w) w.style.paddingTop=(b.offsetHeight+10)+'px';
+  var m=document.getElementById('medir');
+  /* El botón de modo oscuro (lives-tema) queda antes de la medición y, con la barra fija arriba,
+     metía un hueco grande sobre la tabla y quedaba tapado: se lleva al final de la página. */
+  var t=document.querySelector('.lsTemaPie');
+  if(t && m && medirVisible() && (t.compareDocumentPosition(m) & 4)) document.body.appendChild(t);
+  if(b&&w&&m){
+    var arriba=m.getBoundingClientRect().top+(window.pageYOffset||0);   /* lo que ya ocupan los bloques de arriba */
+    w.style.paddingTop=Math.max(14, b.offsetHeight+10-arriba)+'px';
+  }
 }
 window.addEventListener('resize', ajustarTope);
 
