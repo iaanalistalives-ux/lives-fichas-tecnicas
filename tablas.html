@@ -2099,9 +2099,24 @@ function extraerDe(arr, cb, tipoIndice){
     VIO_FRAC = false;
     Promise.all(tareas).then(function(){
       unidad = unidadDoc(textos);
-      return Promise.all(paginas.map(function(pg, k){
-        return leerPagina(pg, unidad==='cm').then(function(tb){ return {n:k+1, tabla:tb}; });
-      }));
+      var leer=function(cm){
+        return Promise.all(paginas.map(function(pg, k){
+          return leerPagina(pg, cm).then(function(tb){ return {n:k+1, tabla:tb}; });
+        }));
+      };
+      return leer(unidad==='cm').then(function(res){
+        /* El texto dijo pulgadas pero ninguna tabla se pudo leer: los números
+           traen decimales (49.8). Pasa en fichas que rotulan "MEDIDAS EN PULGADAS"
+           con las cifras en centímetros (Theory 24323-4A, 10/11/2026). Manda lo
+           que dicen los números: se lee de nuevo en centímetros. */
+        if(unidad==='pulg' && !res.some(function(r){ return r.tabla; })){
+          return leer(true).then(function(r2){
+            if(r2.some(function(r){ return r.tabla; }) && !VIO_FRAC) unidad='cm';
+            return r2;
+          });
+        }
+        return res;
+      });
     }).then(function(res){
       /* El texto dijo centímetros pero las tablas traen fracciones: la ficha
          está en pulgadas. Manda lo que dicen los números. */
@@ -2130,6 +2145,10 @@ function extraerDe(arr, cb, tipoIndice){
       var todas=c.map(function(x){
         var cb2=cabecera(textos[x.n-1]);
         if(!cb2.estilo)   cb2.estilo   = cabDoc.estilo;
+        /* La hoja de medidas de THY-1118 no trae "ESTILO - VERSIÓN" y se leía el
+           número de la tela (JE-1836) como estilo. Si la hoja no trae versión y el
+           documento sí, manda el estilo del documento (10/11/2026). */
+        else if(cabDoc.estilo && cabDoc.estilo.indexOf('-')>=0 && cb2.estilo.indexOf('-')<0) cb2.estilo = cabDoc.estilo;
         if(cabDoc.grupo)  cb2.grupo    = cabDoc.grupo;   // el grupo es del documento, no de cada hoja
         if(!cb2.fechaFicha) cb2.fechaFicha = cabDoc.fechaFicha;
         cb2.linea = cabDoc.linea;
