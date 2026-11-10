@@ -796,7 +796,6 @@ td.nada{color:#C8D3CF;}
     </div>
   </div>
 
-  <div class="kpis" id="kpis" style="display:none;"></div>
   <div id="salida"><div class="cargando">Cargando…</div></div>
 </div>
 
@@ -1093,21 +1092,7 @@ function buscar(){
   });
 }
 
-function pintarKpis(){
-  var k=document.getElementById('kpis');
-  if(!MEDS.length){ k.style.display='none'; return; }
-  var rech=MEDS.filter(function(m){ return m.resultado==='RECHAZADO'; }).length;
-  var medidas=MEDS.reduce(function(a,m){ return a+(+m.nMedidas||0); },0);
-  var fuera=MEDS.reduce(function(a,m){ return a+(+m.nFuera||0); },0);
-  var est={}; MEDS.forEach(function(m){ est[m.estilo]=1; });
-  k.style.display='flex';
-  k.innerHTML=
-   '<div class="kpi"><div class="v">'+MEDS.length+'</div><div class="l">Auditorías</div></div>'+
-   '<div class="kpi'+(rech?' mal':'')+'"><div class="v">'+rech+'</div><div class="l">Rechazadas</div></div>'+
-   '<div class="kpi"><div class="v">'+Object.keys(est).length+'</div><div class="l">Estilos</div></div>'+
-   '<div class="kpi"><div class="v">'+medidas+'</div><div class="l">Medidas tomadas</div></div>'+
-   '<div class="kpi'+(fuera?' mal':'')+'"><div class="v">'+fuera+'</div><div class="l">Fuera de tolerancia</div></div>';
-}
+function pintarKpis(){ /* sin KPI en pantalla (pedido de Christian, 10/11/2026); se conserva la función porque el bloque de Excel la detecta */ }
 
 function pintarLista(){
   var out=document.getElementById('salida');
