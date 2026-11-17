@@ -5,7 +5,8 @@ Las reglas generales de trabajo están en el repo privado `lives-instrucciones` 
 ## Qué hace
 Buscador de fichas técnicas en PDF y control de medidas contra la ficha, desde el portal LIVES. Cuatro pantallas:
 - `index.html` — **consulta** "Buscador de Fichas Técnicas".
-  - Busca por estilo, grupo, cliente o archivo, y filtra por tipo (Técnica, Acabados, Corte, RM).
+  - Busca por estilo (casilla de texto) y filtra por tipo (Técnica, Acabados, Corte, RM) y por grupo.
+  - Filtro de grupo en cascada (17/11/2026): la lista «Grupo» trae solo los grupos de las fichas que coinciden con el estilo escrito y el tipo elegido; sin estilo trae todos, y elegir un grupo sin estilo muestra sus fichas. Si se cambia el estilo y el grupo elegido ya no corresponde, vuelve a «Grupo: todos». El Excel sale con el mismo filtro.
   - Muestra la ficha vigente con sus versiones y la abre en un visor propio (pdf.js).
   - El botón "Medir" lleva a `medidas.html`.
   - Sin cuadros de cantidades (KPI) arriba ni en "Ver todo lo cargado" (quitados el 10/11/2026: no se usaban). El botón "Mediciones" abre `historial.html`, que tiene "‹ Buscar fichas" para volver.

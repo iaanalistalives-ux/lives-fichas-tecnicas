@@ -638,6 +638,12 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 .modesel .mbtn.active{background:var(--sage);color:#fff;}
 
 .buscafld input{font-size:17px!important;padding:13px 14px!important;}
+/* estilo + grupo en una fila; el grupo se llena con los grupos del estilo escrito */
+.buscafila{display:flex;gap:10px;align-items:stretch;}
+.buscafila .buscafld{flex:1 1 auto;min-width:0;}
+.buscafila select{flex:0 0 230px;max-width:100%;font-family:inherit;font-size:16px;padding:10px 11px;border:1.5px solid var(--warm);border-radius:6px;background:#fff;color:#333;cursor:pointer;}
+.buscafila select:focus{outline:none;border-color:var(--sage);}
+@media(max-width:700px){.buscafila{flex-direction:column;}.buscafila select{flex:0 0 auto;width:100%;padding:13px 11px;}}
 
 /* ---- visor de la ficha ---- */
 #visor{position:fixed;inset:0;z-index:300;background:#1c2320;display:none;flex-direction:column;}
@@ -829,9 +835,12 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
       <button class="mbtn" data-tipo="RM" onclick="setTipo(this)">RM</button>
     </div>
 
-    <div class="fld buscafld">
-      <input id="fTodo" autocomplete="off" placeholder="Estilo">
-      <div class="sug" id="sTodo"></div>
+    <div class="buscafila">
+      <div class="fld buscafld">
+        <input id="fTodo" autocomplete="off" placeholder="Estilo">
+        <div class="sug" id="sTodo"></div>
+      </div>
+      <select id="fGrupo" aria-label="Grupo" onchange="buscar()"><option value="">Grupo: todos</option></select>
     </div>
 
     <div class="acciones">
@@ -1295,8 +1304,32 @@ function setTipo(b){
 }
 function limpiar(){
   document.getElementById('fTodo').value='';
+  document.getElementById('fGrupo').value='';
   document.getElementById('salida').innerHTML=
-    '<div class="vacio">Escribe el <b>estilo</b>, el <b>grupo</b> o el <b>cliente</b>.</div>';
+    '<div class="vacio">Escribe el <b>estilo</b> o elige el <b>grupo</b>.</div>';
+  buscar();
+}
+/* Filtro de grupo en cascada: la lista trae solo los grupos de las fichas que
+   coinciden con el estilo escrito (y con el tipo elegido). Sin estilo, todos.
+   Si el grupo elegido ya no está en la lista, el filtro vuelve a "todos".   */
+function fichasPorTexto(partes){
+  return baseTipo().filter(function(d){
+    var t=textoDe(d);
+    return partes.every(function(p){ return t.indexOf(p)>=0; });
+  });
+}
+function llenarGrupos(lista){
+  var sel=document.getElementById('fGrupo'), act=sel.value, vistos={}, gs=[];
+  lista.forEach(function(d){ gruposDe(d).forEach(function(g){ if(g && !vistos[g]){ vistos[g]=1; gs.push(g); } }); });
+  gs.sort(function(a,b){ return a.localeCompare(b,'es',{numeric:true}); });
+  var firma=gs.join('|');
+  if(sel.__firma!==firma){
+    sel.innerHTML='<option value="">Grupo: todos</option>';
+    gs.forEach(function(g){ var o=document.createElement('option'); o.value=g; o.textContent=g; sel.appendChild(o); });
+    sel.__firma=firma;
+  }
+  sel.value = vistos[act] ? act : '';
+  return sel.value;
 }
 /* Los cuadros de cantidades (KPI) se quitaron el 10/11/2026: no se usaban. La función se queda
    porque otras partes de la pantalla la buscan. */
@@ -1350,13 +1383,12 @@ function buscar(){
   var partes=q.split(/\s+/).filter(Boolean).map(norm).filter(Boolean);
   var base=baseTipo();
   // deben aparecer todas las palabras escritas, en cualquier campo
-  var res=base.filter(function(d){
-    var t=textoDe(d);
-    return partes.every(function(p){ return t.indexOf(p)>=0; });
-  });
+  var res=fichasPorTexto(partes);
+  var grupo=llenarGrupos(res);
+  if(grupo) res=res.filter(function(d){ return gruposDe(d).indexOf(grupo)>=0; });
   var out=document.getElementById('salida');
-  if(!partes.length){
-    out.innerHTML='<div class="vacio">Escribe el <b>estilo</b>.</div>';
+  if(!partes.length && !grupo){
+    out.innerHTML='<div class="vacio">Escribe el <b>estilo</b> o elige el <b>grupo</b>.</div>';
     return;
   }
   if(!res.length){
@@ -3693,15 +3725,16 @@ var FIB={
     if(!DATOS.length)throw new Error('todavía no cargan las fichas');
     var q=document.getElementById('fTodo').value.trim(),partes=q.split(/\s+/).filter(Boolean).map(norm).filter(Boolean);
     var base=baseTipo(),V=base.filter(function(d){var t=textoDe(d);return partes.every(function(p){return t.indexOf(p)>=0;});});
+    var gSel=(document.getElementById('fGrupo')||{}).value||'';if(gSel)V=V.filter(function(d){return gruposDe(d).indexOf(gSel)>=0;});
     var NT0={TECNICA:'Técnica',ACABADOS:'Acabados',CORTE:'Corte',RM:'RM'},tipoLbl=TIPO?(NT0[TIPO]||TIPO):'Todas';
     var arch={},est={};V.forEach(function(d){arch[d.id]=d.tipo;if(d.estilo)est[d.tipo+'|'+d.estilo]=1;});
     var porTipo={};Object.keys(arch).forEach(function(id){var t=arch[id];porTipo[t]=(porTipo[t]||0)+1;});
     var NT={TECNICA:'Técnica',ACABADOS:'Acabados',CORTE:'Corte',RM:'RM'};
-    var res=[{titulo:'Búsqueda',columnas:[{campo:'k',titulo:'Dato',tipo:'texto'},{campo:'v',titulo:'Valor',tipo:'texto'}],filas:[{k:'Tipo de ficha',v:tipoLbl},{k:'Texto buscado',v:q||'(sin texto: todas)'},{k:'Archivos',v:String(Object.keys(arch).length)},{k:'Estilos',v:String(Object.keys(est).length)}]},
+    var res=[{titulo:'Búsqueda',columnas:[{campo:'k',titulo:'Dato',tipo:'texto'},{campo:'v',titulo:'Valor',tipo:'texto'}],filas:[{k:'Tipo de ficha',v:tipoLbl},{k:'Texto buscado',v:q||'(sin texto: todas)'},{k:'Grupo',v:gSel||'Todos'},{k:'Archivos',v:String(Object.keys(arch).length)},{k:'Estilos',v:String(Object.keys(est).length)}]},
       {titulo:'Archivos por tipo',columnas:[{campo:'k',titulo:'Tipo',tipo:'texto'},{campo:'n',titulo:'Archivos',tipo:'entero'}],filas:Object.keys(porTipo).map(function(k){return {k:NT[k]||k,n:porTipo[k]};}).concat([{k:'Total',n:Object.keys(arch).length,__total:true}])}];
     var det=V.slice().sort(function(a,b){return String(a.grupo||'').localeCompare(String(b.grupo||''))||String(a.estilo||'').localeCompare(String(b.estilo||''));}).map(function(d){
       return {t:NT[d.tipo]||d.tipo,g:gruposDe(d).join(', ')||d.grupo||'',e:d.estilo||'',ec:d.estiloCliente||'',cl:d.cliente||'',li:NOM_LINEA[lineaDe(d)]||'',de:d.descripcion||'',te:d.tela||'',tm:d.temporada||'',ve:d.version||'',ff:fechaLocal(d.fechaFicha),fs:fechaLocal(String(d.fechaSubida||'').slice(0,10)),ar:d.archivo||''};});
-    return libro({titulo:'Buscador de Fichas Técnicas',sub:tipoLbl+(q?' · "'+q+'"':''),formula:'Fichas que coinciden con la búsqueda (todas las palabras escritas, en cualquier campo).',origen:'Buscador de Fichas Técnicas',resumen:res,
+    return libro({titulo:'Buscador de Fichas Técnicas',sub:tipoLbl+(q?' · "'+q+'"':'')+(gSel?' · Grupo '+gSel:''),formula:'Fichas que coinciden con la búsqueda (todas las palabras escritas, en cualquier campo).',origen:'Buscador de Fichas Técnicas',resumen:res,
       detalle:{congelarCols:1,nota:'Una fila por ficha y estilo.',filas:det,columnas:[{campo:'t',titulo:'Tipo',tipo:'texto'},{campo:'g',titulo:'Grupo',tipo:'alfanumerico'},{campo:'e',titulo:'Estilo',tipo:'alfanumerico'},{campo:'ec',titulo:'Estilo cliente',tipo:'alfanumerico'},
         {campo:'cl',titulo:'Cliente',tipo:'texto'},{campo:'li',titulo:'Línea',tipo:'texto'},{campo:'de',titulo:'Descripción',tipo:'texto'},{campo:'te',titulo:'Tela',tipo:'texto'},{campo:'tm',titulo:'Temporada',tipo:'texto'},{campo:'ve',titulo:'Versión',tipo:'alfanumerico'},
         {campo:'ff',titulo:'Fecha de la ficha',tipo:'fecha'},{campo:'fs',titulo:'Fecha de subida',tipo:'fecha'},{campo:'ar',titulo:'Archivo',tipo:'texto'}]}});
