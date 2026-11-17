@@ -638,12 +638,12 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 .modesel .mbtn.active{background:var(--sage);color:#fff;}
 
 .buscafld input{font-size:17px!important;padding:13px 14px!important;}
-/* estilo + grupo en una fila; el grupo se llena con los grupos del estilo escrito */
+/* estilo + grupo en una fila: dos casillas que filtran mientras se escribe, y cada una
+   propone solo lo que existe con lo escrito en la otra */
 .buscafila{display:flex;gap:10px;align-items:stretch;}
 .buscafila .buscafld{flex:1 1 auto;min-width:0;}
-.buscafila select{flex:0 0 230px;max-width:100%;font-family:inherit;font-size:16px;padding:10px 11px;border:1.5px solid var(--warm);border-radius:6px;background:#fff;color:#333;cursor:pointer;}
-.buscafila select:focus{outline:none;border-color:var(--sage);}
-@media(max-width:700px){.buscafila{flex-direction:column;}.buscafila select{flex:0 0 auto;width:100%;padding:13px 11px;}}
+.buscafila .grupofld{flex:0 0 260px;}
+@media(max-width:700px){.buscafila{flex-direction:column;}.buscafila .grupofld{flex:0 0 auto;width:100%;}}
 
 /* ---- visor de la ficha ---- */
 #visor{position:fixed;inset:0;z-index:300;background:#1c2320;display:none;flex-direction:column;}
@@ -840,7 +840,10 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
         <input id="fTodo" autocomplete="off" placeholder="Estilo">
         <div class="sug" id="sTodo"></div>
       </div>
-      <select id="fGrupo" aria-label="Grupo" onchange="buscar()"><option value="">Grupo: todos</option></select>
+      <div class="fld buscafld grupofld">
+        <input id="fGrupo" autocomplete="off" placeholder="Grupo" aria-label="Grupo">
+        <div class="sug" id="sGrupo"></div>
+      </div>
     </div>
 
     <div class="acciones">
@@ -1245,8 +1248,8 @@ function montarBusqueda(){
   function opciones(){
     var q=norm(inp.value);
     if(!q || q.length<2) return [];
-    var vistos={}, ops=[];
-    baseTipo().forEach(function(d){
+    var vistos={}, ops=[], dentro=fichasPorGrupo(baseTipo());
+    dentro.forEach(function(d){
       [[d.estilo,'estilo'],[d.cliente,'cliente'],[d.estiloCliente,'estilo cliente']]
         .concat(gruposDe(d).map(function(g){ return [g,'grupo']; })).forEach(function(par){
         var v=par[0];
@@ -1257,7 +1260,7 @@ function montarBusqueda(){
       });
     });
     ops.forEach(function(o){
-      o.n = baseTipo().filter(function(d){ return textoDe(d).indexOf(norm(o.v))>=0; }).length;
+      o.n = dentro.filter(function(d){ return textoDe(d).indexOf(norm(o.v))>=0; }).length;
     });
     var orden={estilo:0, grupo:1, cliente:2, 'estilo cliente':3};
     ops.sort(function(a,b){ return (orden[a.tipo]-orden[b.tipo]) || a.v.localeCompare(b.v,'es'); });
@@ -1269,6 +1272,50 @@ function montarBusqueda(){
     box.innerHTML=ops.map(function(o){
       return '<div data-v="'+o.v+'">'+o.v+
              '<span class="cnt">'+o.tipo+' · '+o.n+'</span></div>';
+    }).join('');
+    box.style.display='block'; idx=-1;
+    Array.prototype.forEach.call(box.children,function(el){
+      el.onmousedown=function(ev){ ev.preventDefault(); inp.value=el.dataset.v; box.style.display='none'; buscar(); };
+    });
+  }
+  inp.addEventListener('focus',abrir);
+  inp.addEventListener('input',function(){ abrir(); buscar(); });
+  inp.addEventListener('blur',function(){ setTimeout(function(){ box.style.display='none'; },160); });
+  inp.addEventListener('keydown',function(e){
+    var its=box.children;
+    if(box.style.display!=='block'||!its.length){ if(e.key==='Enter') buscar(); return; }
+    if(e.key==='ArrowDown'){ e.preventDefault(); idx=Math.min(idx+1,its.length-1); }
+    else if(e.key==='ArrowUp'){ e.preventDefault(); idx=Math.max(idx-1,0); }
+    else if(e.key==='Enter'){ e.preventDefault(); if(idx>=0) inp.value=its[idx].dataset.v; box.style.display='none'; buscar(); return; }
+    else if(e.key==='Escape'){ box.style.display='none'; return; }
+    else return;
+    Array.prototype.forEach.call(its,function(x){x.classList.remove('hi');});
+    if(idx>=0){ its[idx].classList.add('hi'); its[idx].scrollIntoView({block:'nearest'}); }
+  });
+}
+
+/* Casilla de grupo: filtra mientras se escribe, igual que la de estilo. Propone
+   solo los grupos de las fichas que coinciden con el estilo escrito (y el tipo);
+   sin estilo, todos. Al entrar a la casilla ya muestra los que hay.            */
+function montarGrupo(){
+  var inp=document.getElementById('fGrupo'), box=document.getElementById('sGrupo'), idx=-1;
+  function opciones(){
+    var q=norm(inp.value), cuenta={}, gs=[];
+    fichasPorTexto(partesEstilo()).forEach(function(d){
+      gruposDe(d).forEach(function(g){
+        if(!g || (q && norm(g).indexOf(q)<0)) return;
+        if(!cuenta[g]){ cuenta[g]=0; gs.push(g); }
+        cuenta[g]++;
+      });
+    });
+    gs.sort(function(a,b){ return a.localeCompare(b,'es',{numeric:true}); });
+    return gs.slice(0,80).map(function(g){ return {v:g, n:cuenta[g]}; });
+  }
+  function abrir(){
+    var ops=opciones();
+    if(!ops.length){ box.style.display='none'; return; }
+    box.innerHTML=ops.map(function(o){
+      return '<div data-v="'+o.v+'">'+o.v+'<span class="cnt">'+o.n+'</span></div>';
     }).join('');
     box.style.display='block'; idx=-1;
     Array.prototype.forEach.call(box.children,function(el){
@@ -1306,30 +1353,26 @@ function limpiar(){
   document.getElementById('fTodo').value='';
   document.getElementById('fGrupo').value='';
   document.getElementById('salida').innerHTML=
-    '<div class="vacio">Escribe el <b>estilo</b> o elige el <b>grupo</b>.</div>';
+    '<div class="vacio">Escribe el <b>estilo</b> o el <b>grupo</b>.</div>';
   buscar();
 }
-/* Filtro de grupo en cascada: la lista trae solo los grupos de las fichas que
-   coinciden con el estilo escrito (y con el tipo elegido). Sin estilo, todos.
-   Si el grupo elegido ya no está en la lista, el filtro vuelve a "todos".   */
+/* Estilo y grupo en cascada, en los dos sentidos: cada casilla filtra las fichas
+   y además limita lo que propone la otra. Se pueden usar una, la otra o las dos. */
+function partesEstilo(){
+  return document.getElementById('fTodo').value.trim().split(/\s+/).filter(Boolean).map(norm).filter(Boolean);
+}
+function fichasPorGrupo(lista){
+  var gq=norm(document.getElementById('fGrupo').value);
+  if(!gq) return lista;
+  return lista.filter(function(d){
+    return gruposDe(d).some(function(g){ return norm(g).indexOf(gq)>=0; });
+  });
+}
 function fichasPorTexto(partes){
   return baseTipo().filter(function(d){
     var t=textoDe(d);
     return partes.every(function(p){ return t.indexOf(p)>=0; });
   });
-}
-function llenarGrupos(lista){
-  var sel=document.getElementById('fGrupo'), act=sel.value, vistos={}, gs=[];
-  lista.forEach(function(d){ gruposDe(d).forEach(function(g){ if(g && !vistos[g]){ vistos[g]=1; gs.push(g); } }); });
-  gs.sort(function(a,b){ return a.localeCompare(b,'es',{numeric:true}); });
-  var firma=gs.join('|');
-  if(sel.__firma!==firma){
-    sel.innerHTML='<option value="">Grupo: todos</option>';
-    gs.forEach(function(g){ var o=document.createElement('option'); o.value=g; o.textContent=g; sel.appendChild(o); });
-    sel.__firma=firma;
-  }
-  sel.value = vistos[act] ? act : '';
-  return sel.value;
 }
 /* Los cuadros de cantidades (KPI) se quitaron el 10/11/2026: no se usaban. La función se queda
    porque otras partes de la pantalla la buscan. */
@@ -1396,11 +1439,11 @@ function buscar(){
   var base=baseTipo();
   // deben aparecer todas las palabras escritas, en cualquier campo
   var res=fichasPorTexto(partes);
-  var grupo=llenarGrupos(res);
-  if(grupo) res=res.filter(function(d){ return gruposDe(d).indexOf(grupo)>=0; });
+  var grupo=document.getElementById('fGrupo').value.trim();
+  res=fichasPorGrupo(res);
   var out=document.getElementById('salida');
   if(!partes.length && !grupo){
-    out.innerHTML='<div class="vacio">Escribe el <b>estilo</b> o elige el <b>grupo</b>.</div>';
+    out.innerHTML='<div class="vacio">Escribe el <b>estilo</b> o el <b>grupo</b>.</div>';
     return;
   }
   if(!res.length){
@@ -1411,7 +1454,7 @@ function buscar(){
     var vistos={}, rec=[];
     ult.forEach(function(d){ if(!vistos[d.id]){ vistos[d.id]=1; rec.push(d); } });
     rec=rec.slice(0,8);
-    out.innerHTML='<div class="vacio">No hay fichas con <b>'+q+'</b>.<br><br>'+
+    out.innerHTML='<div class="vacio">No hay fichas con <b>'+[q,grupo].filter(Boolean).join(' · ').replace(/</g,'&lt;')+'</b>.<br><br>'+
       'Revisa cómo lo escribiste o actualiza la pantalla desde el portal por si acaban de subirla.</div>'+
       (rec.length ? '<div class="sectitle">Últimas fichas cargadas</div>'+
         rec.map(function(d,i){ return tarjeta([d], 900+i); }).join('') : '');
@@ -1893,6 +1936,7 @@ function bloquearZoomPagina(bloquear){
    ============================================================ */
 
 montarBusqueda();
+montarGrupo();
 
 // el botón "atrás" del teléfono cierra la ficha en vez de salir del sistema
 window.addEventListener('popstate', function(){
@@ -3762,7 +3806,7 @@ var FIB={
     if(!DATOS.length)throw new Error('todavía no cargan las fichas');
     var q=document.getElementById('fTodo').value.trim(),partes=q.split(/\s+/).filter(Boolean).map(norm).filter(Boolean);
     var base=baseTipo(),V=base.filter(function(d){var t=textoDe(d);return partes.every(function(p){return t.indexOf(p)>=0;});});
-    var gSel=(document.getElementById('fGrupo')||{}).value||'';if(gSel)V=V.filter(function(d){return gruposDe(d).indexOf(gSel)>=0;});
+    var gSel=((document.getElementById('fGrupo')||{}).value||'').trim();if(gSel&&typeof fichasPorGrupo==='function')V=fichasPorGrupo(V);
     var NT0={TECNICA:'Técnica',ACABADOS:'Acabados',CORTE:'Corte',RM:'RM'},tipoLbl=TIPO?(NT0[TIPO]||TIPO):'Todas';
     var arch={},est={};V.forEach(function(d){arch[d.id]=d.tipo;if(d.estilo)est[d.tipo+'|'+d.estilo]=1;});
     var porTipo={};Object.keys(arch).forEach(function(id){var t=arch[id];porTipo[t]=(porTipo[t]||0)+1;});
