@@ -1696,7 +1696,7 @@ function panelPunto(i, esp, tol){
    el sistema no puede señalarlas solo; sí sabe en qué página están.
    ========================================================== */
 var DIB={ pdf:null, fileId:null, escala:null, pagina:1, paginas:null, cod:'', soloDibujo:true,
-           z:1, base:null, pint:null, mem:{}, turno:0, espera:null, esperaId:null, pre:null };
+           z:1, base:null, pint:null, mem:{}, turno:0, espera:null, esperaId:null };
 
 function pdfjsListo(cb){
   if(window.pdfjsLib){ cb(true); return; }
@@ -1843,8 +1843,9 @@ function paginaDe(cod, info){
   return p>0 ? p : 1;
 }
 
-/* Deja la ficha abierta en el visor. Si se pide dos veces a la vez (la
-   bajada adelantada y el botón), las dos esperan la misma bajada.       */
+/* Deja la ficha abierta en el visor. La ficha se baja recién al abrir el
+   dibujo (decisión de Christian, 17/11/2026: no gastar datos si no lo
+   abren). Si se pide dos veces a la vez, las dos esperan la misma bajada. */
 function asegurarPdf(cb){
   var id=ESPEC && ESPEC.fileId;
   if(DIB.pdf && DIB.fileId===id){ cb(null); return; }
@@ -1862,15 +1863,6 @@ function asegurarPdf(cb){
     });
   });
 }
-/* La ficha se baja apenas empieza la medición, para que el primer
-   "Ver dibujo" abra de inmediato. Queda guardada en el equipo.          */
-function precargarDibujo(){
-  var id=ESPEC && ESPEC.fileId;
-  if(!id || DIB.pre===id) return;
-  DIB.pre=id;
-  setTimeout(function(){ if(ESPEC && ESPEC.fileId===id) asegurarPdf(function(){}); }, 1200);
-}
-
 function abrirDibujo(reintento){
   var caja=document.getElementById('dibCaja'), id=ESPEC && ESPEC.fileId;
   DIB.cod = (PUNTO!==null && F && F.puntos[PUNTO]) ? String(F.puntos[PUNTO][0]).toUpperCase() : '';
@@ -2069,7 +2061,6 @@ function verBotonDibujo(){
   if(!b) return;
   var midiendo = document.getElementById('medir').style.display==='block';
   b.style.display = (midiendo && ESPEC && ESPEC.fileId) ? 'inline-flex' : 'none';
-  if(midiendo && ESPEC && ESPEC.fileId) precargarDibujo();
   b.textContent = (PUNTO!==null && F && F.puntos[PUNTO])
     ? 'Ver ' + F.puntos[PUNTO][0] + ' en el dibujo'
     : 'Ver dibujo';
