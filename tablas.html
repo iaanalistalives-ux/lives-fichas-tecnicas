@@ -975,11 +975,19 @@ function columnas(pal){
 /* Se enciende si alguna celda del documento trae una fracción (1/4, 5/8).
    Una ficha con fracciones está en pulgadas, diga lo que diga su texto. */
 var VIO_FRAC = false;
-function leerPagina(page, cm){
+/* hered = columnas de la hoja anterior. Hay hojas de corte cuya tabla sigue en la
+   hoja 2 SIN repetir la fila de tallas (T1 T2 T3): esa hoja se saltaba entera y
+   se perdían sus puntos (25336 JAZ-007 perdía B1 a B17; 17/11/2026). Si la hoja
+   no trae fila de tallas, se lee con las columnas de la hoja anterior, desde
+   arriba de la página. */
+function leerPagina(page, cm, hered){
   var RE_NUM = cm ? RE_DEC : RE_ENT;
   return palabras(page).then(function(pal){
     var c = columnas(pal);
-    if(!c) return null;
+    if(!c){
+      if(!hered) return null;
+      c = {cols:hered.cols, y:Infinity, xIzq:hered.xIzq};
+    }
     var cols=c.cols, yCab=c.y, xIzq=c.xIzq;
     var orden = Object.keys(cols).filter(function(t){ return t!=='TOL'; })
                       .sort(function(a,b){ return cols[a]-cols[b]; });   // de izquierda a derecha
@@ -1052,7 +1060,7 @@ function leerPagina(page, cm){
                   vals:vals, vacias:vacias, ilegibles:ilegibles});
     });
     if(filas.length<3) return null;
-    return {orden:orden, filas:filas};
+    return {orden:orden, filas:filas, ref:{cols:cols, xIzq:xIzq}};
   });
 }
 
@@ -2131,7 +2139,19 @@ function extraerDe(arr, cb, tipoIndice){
       var leer=function(cm){
         return Promise.all(paginas.map(function(pg, k){
           return leerPagina(pg, cm).then(function(tb){ return {n:k+1, tabla:tb}; });
-        }));
+        })).then(function(res){
+          /* Hojas sin fila de tallas: se vuelven a leer con las columnas de la
+             última hoja anterior que sí la trae (la tabla continúa). */
+          var cad=Promise.resolve(), ref=null;
+          res.forEach(function(r, k){
+            cad=cad.then(function(){
+              if(r.tabla){ ref=r.tabla.ref; return; }
+              if(!ref) return;
+              return leerPagina(paginas[k], cm, ref).then(function(tb){ if(tb) r.tabla=tb; });
+            });
+          });
+          return cad.then(function(){ return res; });
+        });
       };
       return leer(unidad==='cm').then(function(res){
         /* El texto dijo pulgadas pero ninguna tabla se pudo leer: los números
