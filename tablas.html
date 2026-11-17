@@ -1127,6 +1127,9 @@ function cabecera(texto){
      (JE-2052, PQ-122, TP-213), que tienen la misma forma.                    */
   var reGr=/\b([A-Z]{2,5})\s*[–—-]\s*(\d{2,4})\b/g, mg;
   while((mg=reGr.exec(t))){
+    /* "DP-002" es el código del formato de las fichas de Eileen Fisher, no un grupo: esas fichas no
+       traen el grupo en la hoja; al guardar se toma el de la ficha en el índice (17/11/2026) */
+    if(/^DP$/i.test(mg[1])) break;
     if(/^(JE|PQ|TP|RIB|EC|EM|ET|EO)$/i.test(mg[1])) continue;
     o.grupo=mg[1].toUpperCase()+'-'+mg[2]; break;
   }
@@ -1356,6 +1359,28 @@ function textoEncabezado(buf){
 }
 
 
+/* Grupo según el nombre del archivo: primero el que va al final ("… - EFI-136.pdf"), si no el
+   primero que aparezca. "DP-002" es el código del formato, no un grupo (17/11/2026).          */
+function grupoDeNombre(nombre){
+  var n=String(nombre||'');
+  var m=n.match(/([A-Za-z]{2,5})\s*[-–—]\s*(\d{2,4})[\s.]*\.pdf$/i);
+  if(m && !/^DP$/i.test(m[1])) return m[1].toUpperCase()+'-'+m[2];
+  var re=/\b([A-Z]{2,5})\s*[–—-]\s*(\d{2,4})\b/g, x;
+  while((x=re.exec(n))){ if(!/^DP$/i.test(x[1])) return x[1].toUpperCase()+'-'+x[2]; }
+  return '';
+}
+/* Grupo de una ficha cuando su hoja de medidas no lo trae: el que ya tiene en el índice y, si no,
+   el del nombre del archivo. Así la tabla queda con el mismo grupo que su ficha en el buscador. */
+function grupoDeArchivo(fileId, archivo){
+  var g='';
+  try{
+    if(fileId && typeof INDICE!=='undefined'){
+      INDICE.some(function(d){ if(d.id===fileId && d.grupo && !/^DP-/i.test(d.grupo)){ g=String(d.grupo).toUpperCase(); return true; } return false; });
+    }
+  }catch(e){}
+  return g || grupoDeNombre(archivo);
+}
+
 /* ---- lector de encabezados (el mismo del Apps Script) ---- */
 function parsear_(texto, nombreArchivo){
   var t   = (texto||'').replace(/\u00A0/g,' ');
@@ -1373,9 +1398,13 @@ function parsear_(texto, nombreArchivo){
   else if(/ACABADOS|EMPAQUE/i.test(nombreArchivo))                       out.tipo='ACABADOS';
   else out.tipo='TECNICA';
 
-  var mg = cab.match(/\b([A-Z]{2,5})\s*[–—-]\s*(\d{2,4})\b/) ||
-           String(nombreArchivo).match(/\b([A-Z]{2,5})\s*[–—-]\s*(\d{2,4})\b/);
+  /* "DP-002" es el código del formato de las fichas de Eileen Fisher, no un grupo: se salta y se
+     sigue buscando; si el documento no trae otro, vale el del nombre del archivo (17/11/2026).
+     Antes todas esas fichas quedaban con grupo "DP-002" y las de un grupo tapaban a las de otro. */
+  var mg = cab.match(/\b([A-Z]{2,5})\s*[–—-]\s*(\d{2,4})\b/);
+  if(mg && /^DP$/i.test(mg[1])) mg = null;
   if(mg) out.grupo = mg[1].toUpperCase()+'-'+mg[2];
+  else   out.grupo = grupoDeNombre(nombreArchivo);
 
   // El RM trae el estilo en su título: "REQUERIMIENTOS DE MATERIALES 25193 ..."
   if(out.tipo==='RM'){
@@ -2277,7 +2306,7 @@ function guardarTabla(tabla, cab, fileId, archivo, quien, cb, titulo, pagina){
     return { cod:f.cod, desc:f.desc||'', vals:vals, tol: f.vals['TOL'] ? f.vals['TOL'].dec : null };
   });
   sbEscribir('fichas_guardar_espec', { p_d:{ estilo:estiloBase, version:version,
-         grupo:cab.grupo||'', tipo:tipo,
+         grupo:cab.grupo||grupoDeArchivo(fileId, archivo)||'', tipo:tipo,
          etapa: codEtapa(titulo, tipo), combo: comboConLinea(titulo, cab, archivo),
          fileId:fileId||'', archivo:archivo||'', pagina:pagina||'',
          fechaFicha: cab.fechaFicha||'', unidad: (cab.unidad==='cm' ? 'cm' : 'pulg'),
@@ -2335,7 +2364,7 @@ function pintar(pag, total){
   h+='<div class="panel"><div class="pt">Ficha identificada</div>'+
      '<div class="ph">Datos leídos del encabezado de esa página</div><div class="datos">'+
      dato('Tabla',(CAB.titulo?CAB.titulo.etapa:'')+(comboConLinea(CAB.titulo,CAB,ARCH?ARCH.nombre:'')?' · '+comboConLinea(CAB.titulo,CAB,ARCH?ARCH.nombre:''):''))+
-     dato('Estilo',CAB.estilo)+dato('Grupo',CAB.grupo)+
+     dato('Estilo',CAB.estilo)+dato('Grupo',CAB.grupo||grupoDeArchivo(ARCH?ARCH.id:'',ARCH?ARCH.nombre:''))+
      dato('Cliente',CAB.cliente)+dato('Color',CAB.color)+dato('O. Corte',CAB.ocorte)+
      '</div></div>';
 

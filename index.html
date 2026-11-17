@@ -1159,7 +1159,7 @@ function cargar(forzar, primera){
     }
     document.getElementById('panelTodo').style.display = esDigitadora() ? 'block' : 'none';
     error('');
-    DATOS=r.datos||[];
+    DATOS=grupoReal(r.datos||[]);
     if(r.especs) ESPECS=r.especs;
     if(r.talleres){
       TALL_RAW=r.talleres;
@@ -1344,6 +1344,18 @@ function fmt(f){
 /* Grupos de una ficha. Una misma ficha puede servir a varios grupos y el
    archivo lo dice así: "THY-1120-1121-1122-1123" o "THY-1120/1121". El
    índice guarda solo uno, y buscar "THY-1121" no la encontraba.           */
+/* "DP-002" es el código del formato de las fichas de Eileen Fisher, no un grupo. Si una ficha
+   llega con ese código como grupo, vale el grupo del nombre del archivo ("… - EFI-136.pdf").
+   Sin esto, las fichas de todos los grupos de un estilo se juntaban en una sola tarjeta y solo
+   se veía la más reciente (17/11/2026).                                                       */
+function grupoReal(lista){
+  (lista||[]).forEach(function(d){
+    if(!d || !/^DP-\d+$/i.test(String(d.grupo||''))) return;
+    var m=String(d.archivo||'').match(/([A-Za-z]{2,5})\s*[-–—]\s*(\d{2,4})[\s.]*\.pdf$/i);
+    if(m && !/^DP$/i.test(m[1])) d.grupo=m[1].toUpperCase()+'-'+m[2];
+  });
+  return lista||[];
+}
 function gruposDe(d){
   if(d.__grupos) return d.__grupos;
   var out=[], re=/\b([A-Z]{2,5})\s*[-–—]\s*(\d{3,4})((?:\s*[-–—\/]\s*\d{3,4})+)/gi, m;
@@ -1896,7 +1908,7 @@ window.addEventListener('popstate', function(){
     SES=s; pintarQuien();
     var c=leerCache();
     if(c){
-      DATOS=c.datos; ESPECS=c.especs||[];
+      DATOS=grupoReal(c.datos); ESPECS=c.especs||[];
       pintarKpis(); buscar();
       document.getElementById('sync').textContent='Actualizando…';
     }
