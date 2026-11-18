@@ -12,7 +12,7 @@ Buscador de fichas técnicas en PDF y control de medidas contra la ficha, desde 
   - El botón "Medir" lleva a `medidas.html`.
   - Sin cuadros de cantidades (KPI) arriba ni en "Ver todo lo cargado" (quitados el 10/11/2026: no se usaban). El botón "Mediciones" abre `historial.html`, que tiene "‹ Buscar fichas" para volver.
   - Solo la verificadora ve el panel "Ver todo lo cargado" y el acceso a `tablas.html`.
-  - Tiene Excel LIVES.
+  - Sin botón «Descargar Excel» (quitado el 18/11/2026, pedido de Christian): el bloque lives-excel-reporte sigue en la pantalla, pero el estilo `fichasSinExcel` esconde su botón. Para devolverlo basta quitar ese estilo.
 - `medidas.html` — **formulario** "Control de medidas".
   - Se elige el taller, qué medir (Corte, Antes de vapor o Prenda terminada, con cuántas tablas trae cada una) y su combo o línea (Missy, Plus, Petite o color) y el color.
   - Desde el 29/10/2026 ofrece TODAS las tablas del estilo, entre en la tarjeta que entre: el botón Medir manda el tipo de la tarjeta solo para saber cuál se abre primero, y el formulario trae las variantes de todos los tipos (`accion=variantes` sin tipo). La tabla se pide con el tipo que le toca a la etapa (Corte → CORTE; las demás → TECNICA) y al guardar se usa el tipo de la tabla elegida.
@@ -24,7 +24,7 @@ Buscador de fichas técnicas en PDF y control de medidas contra la ficha, desde 
   - Fila de tallas (18/11/2026): más baja, solo la talla; la que ya tiene medidas lleva un numerito chico arriba a la derecha (cuántas medidas anotadas), como una notificación. Ya no dice «sin medir» ni «1 prenda · n med.».
   - En el cuadro, debajo de la diferencia anotada sale su porcentaje (diferencia ÷ medida de ficha, con signo); si es exacta («=») no lleva.
   - Solo se abre desde el buscador (`?estilo=&tipo=`).
-- `historial.html` — **consulta** "Mediciones realizadas": filtros, indicadores, la hoja imprimible de cada auditoría de medidas y Excel LIVES.
+- `historial.html` — **consulta** "Mediciones realizadas": filtros y la hoja imprimible de cada auditoría de medidas. Sin botón «Descargar Excel» (quitado el 18/11/2026, pedido de Christian; lo esconde el estilo `fichasSinExcel`, el bloque sigue). El Excel de medidas queda solo en el Dashboard.
   - La hoja abre con "Ver figura" (dibujo de la prenda de la ficha, con zoom y cambio de página, como "Ver dibujo" del formulario) y con "Ver ficha" (PDF completo). La hoja impresa no lleva firmas (28/10/2026).
   - Bajo cada diferencia de la hoja sale su porcentaje (diferencia ÷ medida de ficha, con 1 decimal; 28/10/2026). Se calcula en la pantalla con `esp` y `dif`, que ya vienen en decimales en `fichas_mediciones_detalle`; no depende de la unidad (pulgadas o cm). La columna Tol. ± también lleva su porcentaje (tolerancia ÷ medida de ficha), y `medidas.html` lo muestra en cada punto (esperado ± tolerancia, diferencia anotada y resultado al elegirla) y en la lista de puntos fuera de tolerancia. El Excel no cambia: trae una fila por auditoría, sin medidas sueltas.
   - Al imprimir o sacar el PDF de la hoja, la tabla de cada talla puede partirse entre hojas (clase `pTabla`): sigue justo después de los datos, el encabezado se repite en cada hoja y ninguna fila se corta (29/10/2026).
