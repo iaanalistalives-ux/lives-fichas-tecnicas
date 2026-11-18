@@ -700,6 +700,7 @@ input.txt:focus{outline:none;border-color:var(--sage);}
 .hojaT .hPto small i{font-style:normal;font-weight:800;color:var(--sage);letter-spacing:.02em;}
 .hojaT td.hc{width:68px;min-width:68px;height:54px;}
 .hojaT td.hc button{display:block;width:100%;height:100%;border:0;background:transparent;font-family:inherit;font-size:15px;font-weight:800;color:#333;padding:0;cursor:pointer;}
+.hojaT td.hc button small{display:block;margin-top:1px;font-size:10.5px;font-weight:700;line-height:1.1;opacity:.85;}
 .hojaT td.hc button.vacio{color:#9AA9A4;font-weight:400;font-size:22px;}
 .hojaT td.hc.ok button{background:#E3F2EC;color:var(--sage);}
 .hojaT td.hc.mal button{background:#FDE8E7;color:var(--rose);}
@@ -802,10 +803,12 @@ body.capAbierta #btnDib{display:none!important;}
 .sel{display:flex;gap:5px;flex-wrap:wrap;}
 .avFila{display:flex;align-items:center;gap:8px;flex-basis:100%;}
 .avFila .sel-lbl{margin:0;flex:0 0 auto;min-width:44px;}
-.sel button{background:rgba(255,255,255,.13);border:1.5px solid rgba(255,255,255,.3);color:#fff;font-family:inherit;font-size:13.5px;font-weight:800;border-radius:16px;padding:4px 11px;cursor:pointer;line-height:1.15;min-height:34px;}
+.sel button{position:relative;background:rgba(255,255,255,.13);border:1.5px solid rgba(255,255,255,.3);color:#fff;font-family:inherit;font-size:13.5px;font-weight:800;border-radius:14px;padding:2px 12px;cursor:pointer;line-height:1.15;min-height:28px;}
 .sel button.on{background:var(--emer);border-color:var(--emer);color:#04231F;}
 .sel button.hecho{border-color:var(--emer);}
-.sel button.hecho i{color:#7FE3C0;opacity:1;}
+/* tallas ya medidas: numerito chico arriba a la derecha, como una notificación (18/11/2026) */
+.sel button u{position:absolute;top:-6px;right:-5px;min-width:16px;height:16px;padding:0 4px;box-sizing:border-box;border-radius:8px;background:#F5B301;color:#04231F;font-size:9.5px;font-weight:800;line-height:16px;text-align:center;text-decoration:none;box-shadow:0 0 0 1.5px var(--petrol);}
+#selTalla{padding-top:3px;gap:7px;}
 .sel button.add{background:transparent;border-style:dashed;font-weight:700;}
 .sel button i{font-style:normal;font-size:9px;font-weight:700;display:block;opacity:.75;}
 .sel-lbl{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#9FC9BE;margin-bottom:3px;}
@@ -820,7 +823,7 @@ body.capAbierta #btnDib{display:none!important;}
   border-bottom:3px solid var(--emer);color:#fff;}
 #dibujo .dTop{flex-wrap:wrap;}
 #dibujo .dTit{font-size:14px;font-weight:700;flex:1 1 100%;min-width:0;overflow-wrap:anywhere;}
-#dibujo .dTop button:first-of-type{margin-right:auto;}
+#dibujo .dTop{justify-content:flex-end;}
 #dibujo .dTop button{min-height:40px;min-width:44px;border:0;border-radius:8px;background:#ffffff22;color:#fff;
   font:inherit;font-size:16px;font-weight:700;}
 #dibujo .dCaja{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;background:#fff;touch-action:pan-x pan-y;overscroll-behavior:contain;}
@@ -905,9 +908,8 @@ body.capAbierta #btnDib{display:none!important;}
 <div id="dibujo">
   <div class="dTop">
     <div class="dTit" id="dibTit">Dibujo de la ficha</div>
-    <button id="btnHoja" onclick="alternarHoja()" style="font-size:12px;font-weight:700;">Ver hoja completa</button>
-    <button onclick="pasarDib(-1)" aria-label="Página anterior">‹</button>
-    <button onclick="pasarDib(1)" aria-label="Página siguiente">›</button>
+    <button id="btnDibAnt" onclick="pasarDib(-1)" aria-label="Dibujo anterior">‹</button>
+    <button id="btnDibSig" onclick="pasarDib(1)" aria-label="Dibujo siguiente">›</button>
     <button onclick="zoomDib(-1)" aria-label="Alejar">−</button>
     <button onclick="zoomDib(1)" aria-label="Acercar">+</button>
     <button onclick="cerrarDibujo()" aria-label="Cerrar">✕</button>
@@ -1663,7 +1665,7 @@ function pintarSelectores(){
   document.getElementById('selTalla').innerHTML = F.tallas.map(function(t){
     var n=0; for(var p=1;p<=(PRENDAS[t]||1);p++) n+=medidasDe(t,p);
     return '<button class="'+(t===TACT?'on':'')+(n?' hecho':'')+'" onclick="irTalla(\''+t+'\')">'+t+
-           '<i>'+(n? PRENDAS[t]+' prenda'+(PRENDAS[t]>1?'s':'')+' · '+n+' med.' : 'sin medir')+'</i></button>';
+           (n? '<u aria-label="'+n+' medidas anotadas">'+n+'</u>' : '')+'</button>';
   }).join('');
   setTimeout(ajustarTope,0);
 }
@@ -1722,7 +1724,7 @@ function pintarLista(){
       if(d) cls+=d.ok?' ok':' mal';
       if(PUNTO===i && PACT===p2) cls+=' sel';
       h+='<td class="'+cls+'" id="c_'+p2+'_'+i+'"><button type="button" class="'+(d?'':'vacio')+'" onclick="tocarCelda('+p2+','+i+')">'+
-         (d?(d.dif===0?'=':d.txtDif):'·')+'</button></td>';
+         (d?(d.dif===0?'=':d.txtDif+'<small>'+fmtPct(d.dif,esp,true)+'</small>'):'·')+'</button></td>';
     }
     h+='<td class="hAdd"></td></tr>';
   });
@@ -1789,12 +1791,16 @@ function panelPunto(i, esp, tol){
    DIBUJO DE LA FICHA (v3 · 17/09/2026)
    En las hojas de corte los puntos son solo códigos (A1, B7…), así que
    el dibujo es la única forma de saber qué se mide. El PDF se baja una
-   vez y queda guardado en el celular; el botón abre la página del
-   dibujo ajustada a la pantalla, con zoom y cambio de página.
+   vez y queda guardado en el celular; el botón abre los dibujos
+   ajustados a la pantalla, con zoom.
    Nota: las letras del dibujo son parte de la imagen, no texto, así que
    el sistema no puede señalarlas solo; sí sabe en qué página están.
+   18/11/2026 (pedido de Christian): salen TODOS los dibujos de la ficha,
+   uno debajo del otro (antes solo una página: en la hoja de corte 25361
+   se veía el cuerpo y no la manga, que está en la hoja 2). Ya no existe
+   la opción «Ver hoja completa»: siempre se ve solo el dibujo.
    ========================================================== */
-var DIB={ pdf:null, fileId:null, escala:null, pagina:1, paginas:null, cod:'', soloDibujo:true,
+var DIB={ pdf:null, fileId:null, escala:null, paginas:null, cod:'', codVisto:'', puesta:false,
            z:1, base:null, pint:null, mem:{}, turno:0, espera:null, esperaId:null };
 
 function pdfjsListo(cb){
@@ -1902,23 +1908,43 @@ function leerPaginas(cb){
       pdf.getPage(n).then(function(pg){
         return pg.getTextContent().then(function(tc){
           var cods={}, txtPag='', vp=pg.getViewport({scale:1});
-          var yCuadro=null, yTitulo=null, yTextoArriba=null;
+          var yCuadro=null, yTitulo=null, yTextoArriba=null, yRotulos=null, marcas=[];
           tc.items.forEach(function(it){
             var t=String(it.str||'').trim();
             txtPag += ' '+t;
             var u=t.toUpperCase();
             var y=vp.height-it.transform[5];        // desde arriba
-            if(codigos[u]){ cods[u]=1; if(yCuadro===null || y>yCuadro) yCuadro=y; }
+            if(codigos[u]){ cods[u]=1; marcas.push({ x:it.transform[4], y:y, c:u }); }
             if(/TOMA\s+DE\s+MEDIDAS/i.test(t) && yTitulo===null) yTitulo=y;
             // texto de la mitad superior: cuadros, notas y observaciones
             if(t && y < vp.height*0.45 && (yTextoArriba===null || y>yTextoArriba)) yTextoArriba=y;
           });
-          info[n]={ cods:cods, dibujo:/TOMA\s+DE\s+MEDIDAS/i.test(txtPag),
-                    yCuadro:yCuadro, yTitulo:yTitulo, yTextoArriba:yTextoArriba, alto:vp.height };
+          /* Los códigos salen dos veces: en la primera columna del cuadro y, si el dibujo trae
+             letras de texto, también sobre el dibujo. El cuadro termina en la última fila de su
+             columna (los códigos más a la izquierda, tres o más); los demás son rótulos del dibujo
+             y dicen dónde empieza. Antes se tomaba el código más bajo de la hoja, que era un
+             rótulo: el recorte cortaba el dibujo (25361, 18/11/2026). */
+          /* la columna del cuadro: donde más códigos quedan alineados uno debajo del otro (tres o más) */
+          var col=[];
+          marcas.forEach(function(a){
+            var g=marcas.filter(function(m){ return Math.abs(m.x-a.x)<=8; });
+            if(g.length>col.length || (g.length===col.length && col.length && a.x<col[0].x-8)) col=g;
+          });
+          if(col.length<3) col=[];
+          var esToma=/TOMA\s+DE\s+MEDIDAS/i.test(txtPag);
+          var tabla={};
+          col.forEach(function(m){ tabla[m.c]=1; if(yCuadro===null || m.y>yCuadro) yCuadro=m.y; });
+          marcas.forEach(function(m){
+            /* en la hoja "TOMA DE MEDIDAS" no hay cuadro: todas las letras son del dibujo */
+            if(!esToma && (col.indexOf(m)>=0 || (yCuadro!==null && m.y<=yCuadro))) return;
+            if(yRotulos===null || m.y<yRotulos) yRotulos=m.y;
+          });
+          info[n]={ cods:cods, tabla:tabla, dibujo:/TOMA\s+DE\s+MEDIDAS/i.test(txtPag),
+                    yCuadro:yCuadro, yTitulo:yTitulo, yTextoArriba:yTextoArriba, yRotulos:yRotulos, alto:vp.height };
           listo++; if(listo===total){ DIB.paginas=info; cb(info); }
         });
       }).catch(function(){
-        info[n]={cods:{},dibujo:false};
+        info[n]={cods:{},tabla:{},dibujo:false};
         listo++; if(listo===total){ DIB.paginas=info; cb(info); }
       });
     })(n);
@@ -1965,6 +1991,7 @@ function asegurarPdf(cb){
 function abrirDibujo(reintento){
   var caja=document.getElementById('dibCaja'), id=ESPEC && ESPEC.fileId;
   DIB.cod = (PUNTO!==null && F && F.puntos[PUNTO]) ? String(F.puntos[PUNTO][0]).toUpperCase() : '';
+  DIB.puesta=false;                         /* al abrir se repone el lugar donde se dejó */
   document.getElementById('dibujo').style.display='flex';
   txt('dibTit', DIB.cod ? 'Dibujo · punto '+DIB.cod : 'Dibujo de la ficha');
   if(!(DIB.pdf && DIB.fileId===id)){
@@ -1984,12 +2011,33 @@ function aviso(m){
 }
 function cerrarDibujo(){ guardarVista(); document.getElementById('dibujo').style.display='none'; }
 function irAlPunto(){
-  leerPaginas(function(info){
-    var pag=paginaDe(DIB.cod, info);
-    if(pag!==DIB.pagina) guardarVista();
-    DIB.pagina=pag;
-    pintarDibujo();
-  });
+  leerPaginas(function(){ pintarDibujo(); });
+}
+/* Las hojas que se muestran, en orden: solo los dibujos que traen códigos de la tabla que se mide
+   (decisión de Christian, 18/11/2026).
+   - ficha técnica: las hojas "TOMA DE MEDIDAS";
+   - hoja de corte: la hoja de la tabla y las que le siguen con códigos NUEVOS (el cuadro que
+     continúa: 25361 trae cuerpo en la hoja 1 y manga en la 2). Se detiene en la hoja cuyo cuadro
+     repite códigos: es el cuadro de otro color (22562 trae una hoja por color). Las hojas sin
+     códigos (dibujos de guía, notas) no salen;
+   - si no se reconoce ninguna, la hoja de la tabla, como antes.        */
+function hojasDibujo(info){
+  var ns=Object.keys(info).map(function(n){ return parseInt(n,10); }).sort(function(a,b){ return a-b; });
+  var toma=ns.filter(function(n){ return info[n].dibujo; });
+  if(toma.length) return toma;
+  if(ESPEC && ESPEC.tipo==='CORTE'){
+    var p0=parseInt(ESPEC.pagina,10)||1, vistos={}, lista=[], fin=false;
+    ns.forEach(function(n){
+      if(fin || n<p0) return;
+      var t=Object.keys(info[n].tabla||{});
+      /* sin cuadro: vale si trae al menos tres códigos (rótulos de un dibujo); una letra suelta en una nota no cuenta */
+      if(!t.length){ if(Object.keys(info[n].cods||{}).length>=3 && lista.length) lista.push(n); return; }
+      if(lista.length && t.some(function(k){ return vistos[k]; })){ fin=true; return; }   // cuadro de otro color
+      lista.push(n); t.forEach(function(k){ vistos[k]=1; });
+    });
+    if(lista.length) return lista;
+  }
+  return [paginaDe(DIB.cod, info)];
 }
 
 /* ---- acercar sin volver a dibujar ----
@@ -1997,8 +2045,8 @@ function irAlPunto(){
    solo cambia el tamaño con que se muestra, así es inmediato y no se
    pierde el lugar. Cada página recuerda su acercamiento y su posición,
    también al cerrar el dibujo y volver a abrirlo.                       */
-function claveVista(){ return DIB.fileId+'|'+DIB.pagina+'|'+(DIB.soloDibujo?1:0); }
-function lienzoDib(){ return document.getElementById('dibCaja').querySelector('canvas'); }
+function lienzosDib(){ return Array.prototype.slice.call(document.getElementById('dibCaja').querySelectorAll('canvas')); }
+function lienzoDib(){ return lienzosDib()[0]||null; }
 function guardarVista(){
   var caja=document.getElementById('dibCaja');
   if(!DIB.pint || !DIB.base || !lienzoDib()) return;
@@ -2007,10 +2055,49 @@ function guardarVista(){
   DIB.mem[DIB.pint]={ z:z, x:caja.scrollLeft/z, y:caja.scrollTop/z };
 }
 function tamanoDib(z){
-  var cv=lienzoDib(); if(!cv || !DIB.base) return;
+  var cvs=lienzosDib(); if(!cvs.length || !DIB.base) return;
   DIB.z=z;
-  cv.style.width=(DIB.base.w*z)+'px'; cv.style.height=(DIB.base.h*z)+'px';
+  cvs.forEach(function(cv,i){
+    var h=DIB.base.hojas[i]; if(!h) return;
+    cv.style.width=(h.w*z)+'px'; cv.style.height=(h.h*z)+'px';
+    cv.style.marginTop=(i ? DIB.base.sep*z : 0)+'px';      // la separación crece con el acercamiento: no se pierde el lugar
+  });
   if(window.__dib) window.__dib.z=Math.round(z*100)/100;
+}
+/* dónde empieza cada dibujo dentro de la caja, y cuál se está viendo */
+function topeHoja(i){
+  var caja=document.getElementById('dibCaja'), cv=lienzosDib()[i];
+  return cv ? cv.getBoundingClientRect().top-caja.getBoundingClientRect().top+caja.scrollTop : 0;
+}
+function hojaVista(){
+  var caja=document.getElementById('dibCaja'), n=lienzosDib().length, k=0;
+  for(var i=0;i<n;i++) if(topeHoja(i) <= caja.scrollTop+caja.clientHeight*0.4) k=i;
+  return k;
+}
+/* Al elegir otro punto, baja solo hasta el dibujo donde está ese código. Si el código está en
+   varias hojas (una hoja de corte por color, cada una con su cuadro), vale la hoja de la tabla
+   que se está midiendo o la primera que le sigue (el cuadro que continúa en la hoja siguiente). */
+function hojaDelPunto(cod){
+  var info=DIB.paginas||{}, p0=parseInt(ESPEC&&ESPEC.pagina,10)||1, k=-1, k1=-1;
+  DIB.base.hojas.forEach(function(h,i){
+    if(cod && !(info[h.n] && info[h.n].cods && info[h.n].cods[cod])) return;
+    if(!cod && h.n!==p0) return;
+    if(k1<0) k1=i;
+    if(k<0 && h.n>=p0) k=i;
+  });
+  return k>=0 ? k : k1;
+}
+function alPunto(){
+  if(!DIB.base){ return; }
+  var caja=document.getElementById('dibCaja'), k;
+  if(!DIB.cod || DIB.cod===DIB.codVisto){
+    /* primera vez que se abre esta ficha sin punto elegido: empieza en la hoja de su tabla */
+    if(!DIB.cod && !DIB.mem[DIB.pint] && !DIB.inicio){ k=hojaDelPunto(''); if(k>0) caja.scrollTop=topeHoja(k); }
+    DIB.inicio=true; DIB.codVisto=DIB.cod; return;
+  }
+  DIB.inicio=true; DIB.codVisto=DIB.cod;
+  k=hojaDelPunto(DIB.cod);
+  if(k>=0 && k!==hojaVista()){ caja.scrollTop=topeHoja(k); }
 }
 function aplicarVista(){
   var caja=document.getElementById('dibCaja'), m=DIB.mem[DIB.pint];
@@ -2034,11 +2121,10 @@ function zoomDib(d){
   ponerZoom((DIB.z||1)*(d>0 ? 1.4 : 1/1.4));
 }
 function pasarDib(d){
-  if(!DIB.pdf) return;
-  var p=DIB.pagina+d;
-  if(p<1 || p>DIB.pdf.numPages) return;
-  guardarVista();
-  DIB.pagina=p; pintarDibujo();
+  if(!DIB.pdf || !DIB.base) return;
+  var k=hojaVista()+d;
+  if(k<0 || k>=DIB.base.hojas.length) return;
+  document.getElementById('dibCaja').scrollTop=topeHoja(k);
 }
 /* Dos dedos acercan y alejan; doble toque (o doble clic) acerca al lugar
    tocado y, si ya estaba acercado, vuelve al tamaño inicial.            */
@@ -2084,74 +2170,87 @@ function pasarDib(d){
      el dibujo va debajo de la última fila del cuadro;
    - si es la hoja "TOMA DE MEDIDAS", debajo de su título;
    - si el trozo sale muy chico, se muestra la hoja completa.        */
-function zonaDibujo(pg){
-  var info=(DIB.paginas||{})[DIB.pagina]||{};
-  var alto=info.alto||pg.getViewport({scale:1}).height;
+function zonaDibujo(n, altoHoja){
+  var info=(DIB.paginas||{})[n]||{};
+  var alto=info.alto||altoHoja;
   var y=null;
-  if(info.yCuadro!=null) y=info.yCuadro+14;
-  else if(info.yTitulo!=null) y=info.yTitulo+6;
-  // y por debajo de las notas y observaciones de la mitad superior
-  if(info.yTextoArriba!=null) y=Math.max(y||0, info.yTextoArriba+10);
+  if(info.dibujo && info.yTitulo!=null) y=info.yTitulo+6;      // hoja "TOMA DE MEDIDAS": debajo de su título
+  else if(info.yCuadro!=null) y=info.yCuadro+14;                // debajo de la última fila del cuadro
+  else if(!info.dibujo) return null;                            // hoja sin cuadro ni título (dibujos de guía): va entera
+  if(info.yRotulos!=null){
+    /* el dibujo trae sus letras como texto: empieza un poco antes de la primera */
+    if(info.yCuadro!=null && !(info.dibujo && info.yTitulo!=null)) y=Math.max(y, info.yRotulos-90);
+  }else if(info.yTextoArriba!=null){
+    // dibujo en imagen: por debajo de las notas y observaciones de la mitad superior
+    y=Math.max(y||0, info.yTextoArriba+10);
+  }
   if(!y) return null;
   if(alto-y < alto*0.22) return null;      // no quedaría dibujo que mostrar
   return { y:y, alto:alto-y };
 }
 
-function pieDib(zona){
-  var b=document.getElementById('btnHoja');
-  if(b){ b.textContent = DIB.soloDibujo ? 'Ver hoja completa' : 'Ver solo el dibujo'; }
+function pieDib(){
+  var n=DIB.base ? DIB.base.hojas.length : 1;
+  var a=document.getElementById('btnDibAnt'), s=document.getElementById('btnDibSig');
+  if(a) a.style.display = n>1 ? '' : 'none';
+  if(s) s.style.display = n>1 ? '' : 'none';
   txt('dibPie', (DIB.cod ? 'Punto '+DIB.cod+'. ' : '')+
-    (zona? 'Dibujo de la prenda' : 'Hoja completa')+
-    ' · página '+DIB.pagina+' de '+DIB.pdf.numPages+' · acerca con dos dedos o con +');
+    (n>1 ? n+' dibujos · baja para verlos todos' : 'Dibujo de la prenda')+
+    ' · acerca con dos dedos o con +');
 }
 function pintarDibujo(){
   var caja=document.getElementById('dibCaja');
   if(!DIB.pdf) return;
-  var clave=claveVista();
-  /* la misma hoja ya está dibujada: se muestra como quedó, sin redibujar */
+  var lista=hojasDibujo(DIB.paginas||{});
+  var clave=DIB.fileId+'|'+lista.join(',');
+  /* los mismos dibujos ya están puestos: se muestran como quedaron, sin redibujar */
   if(DIB.pint===clave && lienzoDib() && DIB.base){
-    aplicarVista(); pieDib(DIB.base.zona);
+    if(!DIB.puesta){ aplicarVista(); DIB.puesta=true; }
+    alPunto(); pieDib();
     if(window.__dib) window.__dib.cod=DIB.cod;
     return;
   }
   var turno=++DIB.turno;
-  DIB.pdf.getPage(DIB.pagina).then(function(pg){
+  Promise.all(lista.map(function(n){ return DIB.pdf.getPage(n); })).then(function(pgs){
     if(turno!==DIB.turno) return;
-    var v1=pg.getViewport({scale:1});
-    var zona = DIB.soloDibujo ? zonaDibujo(pg) : null;
     var ancho=(caja.clientWidth||360)-4;
-    var ajuste=Math.max(0.4, ancho/v1.width);          // la hoja al ancho de la pantalla
-    var altoPt=zona ? zona.alto : v1.height;
-    /* se dibuja a 6 veces el ancho de pantalla, sin pasar de 9 millones de puntos (memoria del celular) */
-    var esc=Math.max(ajuste, Math.min(ajuste*6, Math.sqrt(9e6/(v1.width*altoPt))));
-    DIB.escala=esc;
-    var vp=pg.getViewport({scale:esc});
-    var cv=document.createElement('canvas');
-    var dy = zona ? Math.round(zona.y*esc) : 0;
-    cv.width=Math.round(vp.width);
-    cv.height=Math.round(altoPt*esc);
-    caja.innerHTML=''; caja.appendChild(cv);
-    DIB.base={ w:v1.width*ajuste, h:altoPt*ajuste, z0: zona ? 1.6 : 1, zona:!!zona };   // el recorte se ve más grande
-    DIB.pint=clave;
-    var g=cv.getContext('2d');
-    g.fillStyle='#fff'; g.fillRect(0,0,cv.width,cv.height);
-    g.translate(0, -dy);                     // se dibuja solo la zona del dibujo
-    window.__dib={ pagina:DIB.pagina, escala:Math.round(esc*100)/100, cod:DIB.cod,
-                   ancho:cv.width, alto:cv.height, paginas:DIB.pdf.numPages, listo:false,
-                   recorte: zona? {desde:Math.round(zona.y), alto:Math.round(zona.alto)} : null };
-    aplicarVista();
+    /* memoria del celular: 9 millones de puntos por dibujo como mucho, y 14 millones entre todos */
+    var tope=Math.min(9e6, 14e6/pgs.length);
+    var hojas=[], trabajos=[], escMin=null;
+    caja.innerHTML='';
+    pgs.forEach(function(pg,i){
+      var n=lista[i], v1=pg.getViewport({scale:1});
+      var zona=zonaDibujo(n, v1.height);
+      var ajuste=Math.max(0.4, ancho/v1.width);          // la hoja al ancho de la pantalla
+      var altoPt=zona ? zona.alto : v1.height;
+      var esc=Math.max(ajuste, Math.min(ajuste*6, Math.sqrt(tope/(v1.width*altoPt))));
+      var vp=pg.getViewport({scale:esc});
+      var cv=document.createElement('canvas');
+      cv.width=Math.round(vp.width);
+      cv.height=Math.round(altoPt*esc);
+      caja.appendChild(cv);
+      var g=cv.getContext('2d');
+      g.fillStyle='#fff'; g.fillRect(0,0,cv.width,cv.height);
+      g.translate(0, zona ? -Math.round(zona.y*esc) : 0);   // se dibuja solo la zona del dibujo
+      hojas.push({ n:n, w:v1.width*ajuste, h:altoPt*ajuste, zona:!!zona, ancho:cv.width, alto:cv.height });
+      if(escMin===null || esc<escMin) escMin=esc;
+      trabajos.push(function(){ return pg.render({ canvasContext:g, viewport:vp }).promise; });
+    });
+    DIB.escala=escMin;
+    DIB.base={ hojas:hojas, sep:12, z0: hojas[0].zona ? 1.6 : 1 };   // el recorte se ve más grande
+    DIB.pint=clave; DIB.inicio=false; DIB.codVisto='';
+    window.__dib={ paginas:DIB.pdf.numPages, hojas:hojas, escala:Math.round(escMin*100)/100, cod:DIB.cod, listo:false };
+    aplicarVista(); DIB.puesta=true;
+    alPunto();
     txt('dibPie','Dibujando…');
-    pg.render({ canvasContext:g, viewport:vp }).promise.then(function(){
+    return trabajos.reduce(function(p,f){
+      return p.then(function(){ if(turno===DIB.turno) return f(); });
+    }, Promise.resolve()).then(function(){
       if(turno!==DIB.turno) return;
       window.__dib.listo=true;
-      pieDib(zona);
+      pieDib();
     });
-  }).catch(function(){ DIB.pint=null; caja.innerHTML=aviso('No se pudo dibujar la página.'); });
-}
-function alternarHoja(){
-  guardarVista();
-  DIB.soloDibujo=!DIB.soloDibujo;
-  pintarDibujo();
+  }).catch(function(){ DIB.pint=null; caja.innerHTML=aviso('No se pudo dibujar la ficha.'); });
 }
 
 /* El botón solo aparece mientras se mide y si la ficha está en el Drive */
