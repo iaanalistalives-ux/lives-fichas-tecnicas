@@ -788,6 +788,7 @@ td.nada{color:#C8D3CF;}
       <div><span class="lbl">Auditora</span><select class="txt" id="fAud"><option value="">Todas</option></select></div>
       <div><span class="lbl">Desde</span><input class="txt" type="date" id="fDesde"></div>
       <div><span class="lbl">Hasta</span><input class="txt" type="date" id="fHasta"></div>
+      <div><span class="lbl">Prueba de vapor</span><select class="txt" id="fVapor" onchange="buscar()"><option value="">Todas</option><option value="S">Solo pruebas</option><option value="N">Sin pruebas</option></select></div>
     </div>
     <div class="acciones">
       <button class="btn ghost" onclick="volverBuscador()">‹ Buscar fichas</button>
@@ -1070,6 +1071,7 @@ function params(){
 function limpiar(){
   ['fEstilo','fGrupo','fDesde','fHasta'].forEach(function(i){ document.getElementById(i).value=''; });
   document.getElementById('fTaller').value=''; document.getElementById('fAud').value='';
+  document.getElementById('fVapor').value='';
   buscar();
 }
 
@@ -1089,6 +1091,9 @@ function buscar(){
       return;
     }
     error(''); MEDS=r.mediciones||[];
+    /* prueba de vapor (18/11/2026): el filtro deja solo las pruebas de vapor, o las quita */
+    var fv=document.getElementById('fVapor').value;
+    if(fv) MEDS=MEDS.filter(function(m){ return fv==='S' ? esVapor(m) : !esVapor(m); });
     pintarKpis(); pintarLista();
     document.getElementById('sync').textContent=
       'Actualizado '+new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});
@@ -1097,6 +1102,14 @@ function buscar(){
 
 function pintarKpis(){ /* sin KPI en pantalla (pedido de Christian, 10/11/2026); se conserva la función porque el bloque de Excel la detecta */ }
 
+/* prueba de vapor (18/11/2026): medición marcada con el interruptor «PRUEBA DE VAPOR» del formulario */
+var NOM_VAPOR={ ANTES:'Antes de vapor', DESPUES:'Después de vapor' };
+function esVapor(m){ return !!(m && (m.pruebaVapor===true || m.pruebaVapor==='true')); }
+function etapaTxt(m){
+  if(esVapor(m)) return 'Prueba de vapor'+(NOM_VAPOR[m.vapor]?' · '+NOM_VAPOR[m.vapor]:'');
+  return NOM_ETAPA[m.etapa]||m.etapa||'';
+}
+function escTxt(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function pintarLista(){
   var out=document.getElementById('salida');
   if(!MEDS.length){
@@ -1106,7 +1119,7 @@ function pintarLista(){
   /* Regla 500 (12/10/2026): sin filtros se dibujan solo las 500 mediciones más recientes;
      con cualquier filtro, todas. Los KPI usan todas. Orden: la más reciente arriba. */
   var orden=MEDS.slice().sort(function(a,b){ return String(b.fecha||'').localeCompare(String(a.fecha||'')); });
-  var sinFiltro=['fEstilo','fGrupo','fTaller','fAud','fDesde','fHasta'].every(function(i){ return !String(document.getElementById(i).value||'').trim(); });
+  var sinFiltro=['fEstilo','fGrupo','fTaller','fAud','fDesde','fHasta','fVapor'].every(function(i){ return !String(document.getElementById(i).value||'').trim(); });
   var ver=sinFiltro ? orden.slice(0,500) : orden;
   var dias={};
   ver.forEach(function(m){ (dias[String(m.fecha).slice(0,10)]=dias[String(m.fecha).slice(0,10)]||[]).push(m); });
@@ -1118,7 +1131,7 @@ function pintarLista(){
       h+='<div class="fila'+(re?' rech':'')+'" onclick="verDetalle(\''+m.id+'\')">'+
          '<div class="est">'+m.estilo+(m.version?'<br><span style="font-size:11px;color:var(--stone);">'+m.version+'</span>':'')+'</div>'+
          '<div class="inf"><b>'+(m.grupo||'—')+'</b> · '+(m.color||'—')+
-         (m.etapa?' · '+(NOM_ETAPA[m.etapa]||m.etapa):'')+
+         (esVapor(m)?' · <b style="color:var(--sage);">'+etapaTxt(m)+'</b>':(m.etapa?' · '+etapaTxt(m):''))+
          '<br>'+(m.auditora||'—')+' · '+(m.taller||'—')+' · '+String(m.fecha).slice(11)+
          '<br>'+m.nMedidas+' medidas · '+(m.nFuera>0
              ? '<b style="color:var(--rose);">'+m.nFuera+' fuera de tolerancia</b>'
@@ -1167,7 +1180,7 @@ function pintarDetalle(m){
   DIB_ESPEC = { pagina:(m.espec&&m.espec.pagina)||1, puntos:(m.espec&&m.espec.puntos)||[] };
   document.getElementById('dTit').textContent = m.estilo+' · '+(m.grupo||'');
   document.getElementById('dSub').textContent =
-    (NOM_ETAPA[m.etapa]||'')+(m.combo?' · '+m.combo:'')+' · '+m.auditora+' · '+m.taller;
+    etapaTxt(m)+(m.combo?' · '+m.combo:'')+' · '+m.auditora+' · '+m.taller;
 
   var puntos = (m.espec && m.espec.puntos) ? m.espec.puntos : [];
   var descDe={}, tolDe={}, espDe={};
@@ -1177,10 +1190,13 @@ function pintarDetalle(m){
     espDe[p.cod]=p.vals;
   });
 
+  var hObs = (esVapor(m) && String(m.obs||'').trim())
+    ? '<div class="panel pTabla"><div class="pt">Comentario de la prueba de vapor</div>'+
+      '<div style="white-space:pre-wrap;font-size:14px;line-height:1.45;">'+escTxt(m.obs)+'</div></div>' : '';
   var h='<div class="panel"><div class="pt">Datos de la auditoría</div><div class="cab">'+
     dato('Estilo',m.estilo)+dato('Grupo',m.grupo)+dato('Cliente',m.cliente)+
     dato('Color',m.color)+dato('Combo de ficha',m.combo||'—')+
-    dato('Etapa',NOM_ETAPA[m.etapa]||m.etapa)+
+    dato('Etapa',etapaTxt(m))+
     dato('Versión de ficha',m.version||'—')+
     dato('Auditora',m.auditora)+dato('Taller',m.taller)+dato('Fecha',m.fecha)+
     dato('Resultado',m.resultado)+
@@ -1192,7 +1208,7 @@ function pintarDetalle(m){
   var tallas=Object.keys(porTalla);
 
   if(!tallas.length){
-    h+='<div class="vacio">Esta auditoría no tiene medidas registradas.</div>';
+    h+='<div class="vacio">Esta auditoría no tiene medidas registradas.</div>'+hObs;
     document.getElementById('dCuerpo').innerHTML=h;
     return;
   }
@@ -1243,11 +1259,12 @@ function pintarDetalle(m){
        '«—» es sin diferencia. El porcentaje es la diferencia sobre la medida de ficha. En rojo, lo que se pasó de tolerancia.'+
        '<span class="soloweb"> Pasa el cursor sobre un valor para ver la medida real.</span></div></div>';
   });
+  h+=hObs;
 
   document.getElementById('dCuerpo').innerHTML=h;
   document.getElementById('mSub').textContent =
     'Estilo '+m.estilo+'  ·  '+(m.grupo||'')+'  ·  '+(m.cliente||'')+'  ·  '+
-    (NOM_ETAPA[m.etapa]||'')+(m.combo?'  ·  '+m.combo:'')+'  ·  Resultado: '+(m.resultado||'—');
+    etapaTxt(m)+(m.combo?'  ·  '+m.combo:'')+'  ·  Resultado: '+(m.resultado||'—');
   document.getElementById('mFec').innerHTML =
     'Auditoría: '+m.fecha+'<br>Impreso: '+new Date().toLocaleString('es-PE');
 }

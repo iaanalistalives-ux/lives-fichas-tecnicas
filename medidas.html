@@ -656,6 +656,18 @@ input.txt:focus{outline:none;border-color:var(--sage);}
 .avisoCombo{font-size:11.5px;color:var(--tan);font-weight:700;margin-top:6px;}
 .pill{background:#fff;border:1.5px solid var(--warm);color:#333;font-family:inherit;font-size:14px;font-weight:700;border-radius:20px;padding:9px 16px;cursor:pointer;}
 .pill.on{background:var(--sage);border-color:var(--sage);color:#fff;}
+/* prueba de vapor (18/11/2026) */
+.pill[disabled]{opacity:.45;cursor:not-allowed;border-style:dashed;}
+.swVapor{display:flex;align-items:center;gap:12px;margin:16px 0 4px;padding:10px 12px;border:1.5px solid var(--warm);border-radius:12px;cursor:pointer;user-select:none;-webkit-user-select:none;position:relative;}
+.swVapor input{position:absolute;opacity:0;width:1px;height:1px;}
+.swVapor .swP{position:relative;flex:0 0 46px;width:46px;height:26px;border-radius:13px;background:#B9C2BF;transition:background .15s;}
+.swVapor .swP:after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 2px rgba(0,0,0,.3);}
+.swVapor input:checked + .swP{background:var(--sage);}
+.swVapor input:checked + .swP:after{left:23px;}
+.swVapor input:focus-visible + .swP{outline:2px solid var(--emer);outline-offset:2px;}
+.swVapor .swT{font-size:14px;font-weight:800;letter-spacing:.04em;}
+.swVapor.on{border-color:var(--sage);}
+.obsVapor{width:100%;box-sizing:border-box;min-height:84px;resize:vertical;font-family:inherit;font-size:15px;padding:10px 12px;height:auto;}
 .num{display:flex;align-items:center;gap:12px;}
 .num button{width:44px;height:44px;border-radius:8px;border:1.5px solid var(--warm);background:#fff;color:var(--sage);font-size:22px;font-weight:700;cursor:pointer;}
 .num b{font-size:26px;min-width:34px;text-align:center;}
@@ -888,8 +900,9 @@ body.capAbierta #btnDib{display:none!important;}
       <div class="pills" id="pGrupo"></div>
       <div class="avisoCombo" id="avisoGrupo"></div>
     </div>
+    <label class="swVapor" id="swVapor"><input type="checkbox" id="chkVapor" onchange="cambiarVapor(this.checked)"><span class="swP"></span><span class="swT">PRUEBA DE VAPOR</span></label>
     <div id="selEtapa" style="display:none;">
-      <span class="lbl">¿Qué estás midiendo?</span>
+      <span class="lbl" id="lblEtapa">¿Qué estás midiendo?</span>
       <div class="pills" id="pEtapa"></div>
     </div>
     <div id="selCombo" style="display:none;">
@@ -1192,6 +1205,7 @@ function borradorGuardar(){
   if(!F || !Object.keys(DATOS).length) return;
   try{
     LS.set(borradorClave(), JSON.stringify({ ts:Date.now(), grupo:GRUPO, etapa:ETAPA, combo:COMBO, color:COLOR,
+      pv:PVAPOR, vapor:VAPOR, obs:OBS,
       taller:SES.taller, datos:DATOS, prendas:PRENDAS, tact:TACT, pact:PACT, idEnvio:ID_ENVIO }));
   }catch(e){}
 }
@@ -1207,7 +1221,7 @@ function pintarBorrador(){
   var c=document.getElementById('pBorr'); if(!c) return;
   if(!BORR){ c.style.display='none'; return; }
   var n=Object.keys(BORR.datos||{}).length;
-  txt('borrInfo',(BORR.grupo?BORR.grupo+' · ':'')+(NOM_ETAPA[BORR.etapa]||BORR.etapa||'')+(BORR.color?' · '+BORR.color:'')+
+  txt('borrInfo',(BORR.grupo?BORR.grupo+' · ':'')+(BORR.pv ? 'Prueba de vapor · '+(NOM_VAPOR[BORR.vapor]||'') : (NOM_ETAPA[BORR.etapa]||BORR.etapa||''))+(BORR.color?' · '+BORR.color:'')+
       ' · '+n+' medida'+(n===1?'':'s')+' anotada'+(n===1?'':'s')+'. Si vas a medir otro color, descártala primero.');
   c.style.display='block';
 }
@@ -1216,6 +1230,7 @@ function borradorContinuar(){
   /* el borrador vuelve con su grupo; los de antes del 17/11/2026 no lo traen: eran de la ficha más reciente */
   if(BORR.grupo) GRUPO=BORR.grupo;
   else if(!GRUPO){ var _vs=VARIANTES.slice().sort(recienteVar); GRUPO=_vs.length ? (gruposDeVar(_vs[0])[0]||'') : ''; }
+  PVAPOR=!!BORR.pv; VAPOR=PVAPOR?(BORR.vapor||''):''; OBS=PVAPOR?(BORR.obs||''):'';
   ETAPA=BORR.etapa||ETAPA; COMBO=BORR.combo||''; COLOR=BORR.color||''; LINEA_OK=true;
   RETOMAR=true; pintarEtapas();
 }
@@ -1230,7 +1245,7 @@ function reiniciarElecciones(){
 /* Descartar mientras se mide: borra lo anotado y vuelve a elegir (color, etapa, línea) */
 function descartarMedicion(){
   if(!confirm('¿Descartar esta medición? Se pierden las medidas anotadas y podrás elegir otro color.')) return;
-  borradorBorrar(); DATOS={}; PRENDAS={}; ID_ENVIO=''; PUNTO=null; DIF=null;
+  borradorBorrar(); DATOS={}; PRENDAS={}; ID_ENVIO=''; PUNTO=null; DIF=null; OBS="";
   var capa=document.getElementById('capa'); if(capa) capa.innerHTML='';
   document.body.classList.remove('capAbierta');
   document.getElementById('medir').style.display='none';
@@ -1338,6 +1353,44 @@ var TACT='', PACT=1, DATOS={};
 var VARIANTES=[], ETAPA='', COMBO='';
 var NOM_ETAPA={ TERMINADA:'Prenda terminada', ANTES_VAPOR:'Antes de vapor', CORTE:'Corte' };
 
+/* ---------- prueba de vapor (18/11/2026, pedido de Christian) ----------
+   Interruptor «PRUEBA DE VAPOR». Encendido, en vez de las etapas se elige ANTES DE VAPOR o
+   DESPUÉS DE VAPOR. «Antes» solo se activa si la ficha trae tabla de antes de vapor; «Después»
+   usa la tabla de prenda terminada (o, si no hay, la que tenga la ficha que no sea de antes de
+   vapor). Lo medido se guarda marcado como prueba de vapor (no se junta con las demás mediciones)
+   y lleva un comentario al final.                                                              */
+var PVAPOR=false, VAPOR='', OBS='';
+var NOM_VAPOR={ ANTES:'Antes de vapor', DESPUES:'Después de vapor' };
+function etapaDespues(etapas){
+  if(etapas.indexOf('TERMINADA')>=0) return 'TERMINADA';
+  var o=etapas.filter(function(e){ return e!=='ANTES_VAPOR'; });
+  return o.length ? o[o.length-1] : '';
+}
+function nomEtapaAct(e){ return PVAPOR ? 'Prueba de vapor · '+(NOM_VAPOR[VAPOR]||'') : (NOM_ETAPA[e]||e||''); }
+function cambiarVapor(on){
+  PVAPOR=!!on; VAPOR=''; COMBO=''; LINEA_OK=false;
+  if(!PVAPOR){ ETAPA=''; OBS=''; }
+  pintarEtapas();
+}
+function elegirVapor(v){ if(v===VAPOR) return; VAPOR=v; COMBO=''; LINEA_OK=false; pintarEtapas(); }
+function pintarVapor(etapas){
+  /* devuelve true si ya se puede seguir (hay etapa); false si falta elegir antes o después */
+  var hayAntes=etapas.indexOf('ANTES_VAPOR')>=0, eDesp=etapaDespues(etapas);
+  if(VAPOR==='ANTES' && !hayAntes) VAPOR='';
+  if(VAPOR==='DESPUES' && !eDesp) VAPOR='';
+  if(!VAPOR){ if(hayAntes && !eDesp) VAPOR='ANTES'; else if(!hayAntes && eDesp) VAPOR='DESPUES'; }
+  document.getElementById('selEtapa').style.display='block';
+  txt('lblEtapa','Prueba de vapor: ¿qué estás midiendo?');
+  document.getElementById('pEtapa').innerHTML =
+    [['ANTES',hayAntes],['DESPUES',!!eDesp]].map(function(o){
+      return '<button class="pill'+(o[0]===VAPOR?' on':'')+'"'+(o[1]?'':' disabled title="Esta ficha no trae esa tabla"')+
+             ' onclick="elegirVapor(\''+o[0]+'\')">'+NOM_VAPOR[o[0]].toUpperCase()+'</button>';
+    }).join('');
+  if(!VAPOR) return false;
+  ETAPA = VAPOR==='ANTES' ? 'ANTES_VAPOR' : eDesp;
+  return true;
+}
+
 /* ---------- grupo de la prenda (17/11/2026) ----------
    Un mismo estilo corre en varios grupos a la vez y cada grupo tiene su ficha (EFI-131, EFI-136,
    EFI-142…). Antes solo se ofrecía la ficha más reciente del estilo y la de los otros grupos
@@ -1426,6 +1479,24 @@ function pintarEtapas(){
     var i=ORDEN_ETAPA.indexOf(a), j=ORDEN_ETAPA.indexOf(b);
     return (i<0?9:i)-(j<0?9:j);
   });
+  var chk=document.getElementById('chkVapor');
+  if(chk){ chk.checked=PVAPOR; document.getElementById('swVapor').classList.toggle('on',PVAPOR); }
+  if(PVAPOR){
+    if(!pintarVapor(etapas)){
+      /* la ficha trae las dos: la auditora tiene que elegir antes o después */
+      document.getElementById('selCombo').style.display='none';
+      document.getElementById('pColores').style.display='none';
+      F=null; ESPEC=null; ESPEC_SEQ++;
+      txt('fichaTit','Elige antes o después de vapor');
+      txt('fichaInfo','');
+      pintarBorrador();
+      return;
+    }
+    pintarCombos();
+    return;
+  }
+  txt('lblEtapa','¿Qué estás midiendo?');
+  document.getElementById('selEtapa').style.display='none';
   if(!ETAPA || etapas.indexOf(ETAPA)<0)
     ETAPA = etapas.indexOf('TERMINADA')>=0 ? 'TERMINADA' : etapas[0];
   if(etapas.length>1){
@@ -1581,7 +1652,7 @@ function aplicarEspec(espec){
     txt('fichaTit', F.nombre);
     txt('fichaTit', F.nombre+(ESPEC.version?'-'+ESPEC.version:''));
     txt('fichaInfo',
-      (NOM_ETAPA[ESPEC.etapa]||F.tipo)+(ESPEC.combo?' · '+ESPEC.combo:'')+
+      (PVAPOR ? nomEtapaAct() : (NOM_ETAPA[ESPEC.etapa]||F.tipo))+(ESPEC.combo?' · '+ESPEC.combo:'')+
       (ESPEC.version?' · versión '+ESPEC.version:'')+
       /* el grupo elegido no tiene tabla para esta etapa: se avisa de qué grupo es la ficha usada */
       (GRUPO && gruposDeVar(ESPEC).length && gruposDeVar(ESPEC).indexOf(GRUPO)<0 ? ' · ficha de '+ESPEC.grupo : '')+
@@ -1644,6 +1715,7 @@ function textoFrac(txt){
 function empezar(){
   if(!F){
     if(listaGrupos().length>1 && !GRUPO){ alert('Elige el grupo de la prenda que vas a medir.'); return; }
+    if(PVAPOR && !VAPOR){ alert('Elige si mides ANTES DE VAPOR o DESPUÉS DE VAPOR.'); return; }
     alert(document.getElementById('selCombo').style.display==='block' && !COMBO
       ? 'Elige la línea de tallas de la prenda (Missy o Plus).'
       : 'Todavía no se cargó la tabla de medidas.');
@@ -1658,7 +1730,7 @@ function empezar(){
     return;
   }
   if(BORR && !confirm('Hay una medición sin terminar. ¿Descartarla y empezar esta nueva?')) return;
-  DATOS={}; PRENDAS={}; ID_ENVIO='';
+  DATOS={}; PRENDAS={}; ID_ENVIO=''; OBS="";
   F.tallas.forEach(function(t){ PRENDAS[t]=1; });
   TACT=F.tallas[0]; PACT=1;
   borradorBorrar(); pintarBorrador();
@@ -2458,6 +2530,13 @@ function pintarResumen(){
        'Todas las medidas dentro de tolerancia</div></div>';
   }
 
+  if(PVAPOR){
+    h+='<div class="sectitle">Comentario de la prueba de vapor</div>'+
+       '<div class="panel"><div class="ph">'+nomEtapaAct()+'. Anota lo que observaste (opcional).</div>'+
+       '<textarea class="txt obsVapor" id="obsVapor" maxlength="1000" placeholder="Escribe aquí tu comentario" '+
+       'oninput="OBS=this.value;borradorGuardar();">'+
+       String(OBS||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</textarea></div>';
+  }
   h+='<div class="sectitle">Guardar auditoría</div>'+
      '<div class="panel"><div class="ph">Puedes seguir midiendo. Guarda cuando termines.</div>'+
      '<div class="accs"><button class="btn" onclick="decidir(\'APROBADO\')">Aprobar y guardar</button>'+
@@ -2477,7 +2556,8 @@ function decidir(r){
              esp:d.esp, real:d.val, tol:d.tol, ok:d.ok };
   });
   if(!det.length){ alert('No hay medidas registradas.'); return; }
-  if(!confirm('¿Guardar esta auditoría como '+r+'?\n\n'+det.length+' medidas · '+
+  var ob=document.getElementById('obsVapor'); if(PVAPOR && ob) OBS=ob.value;
+  if(!confirm('¿Guardar esta '+(PVAPOR?'PRUEBA DE VAPOR ('+(NOM_VAPOR[VAPOR]||'')+')':'auditoría')+' como '+r+'?\n\n'+det.length+' medidas · '+
       det.filter(function(x){return !x.ok;}).length+' fuera de tolerancia')) return;
 
   var prendas={};
@@ -2507,7 +2587,8 @@ function decidir(r){
                version:ESPEC.version||'', unidad:(UNID==='cm'?'cm':'pulg'),
                cliente:PAR.cliente||'', color:COLOR, taller:SES.taller, auditora:SES.auditora,
                fileId:ESPEC.fileId||'', archivo:ESPEC.archivo||'',
-               tallas:Object.keys(prendas), prendas:prendas, resultado:r, obs:'' },
+               tallas:Object.keys(prendas), prendas:prendas, resultado:r,
+               pruebaVapor:PVAPOR, vapor:(PVAPOR?VAPOR:''), obs:(PVAPOR?String(OBS||'').trim():'') },
          det: det },
     function(res){
       if(!res || !res.ok){
@@ -2520,7 +2601,7 @@ function decidir(r){
       }
       ID_ENVIO=''; borradorBorrar();
       document.getElementById('medir').innerHTML=
-        '<div class="wrap"><div class="ok" style="font-size:16px;">Auditoría guardada como <b>'+r+'</b>'+
+        '<div class="wrap"><div class="ok" style="font-size:16px;">'+(PVAPOR?'Prueba de vapor ('+(NOM_VAPOR[VAPOR]||'')+') guardada':'Auditoría guardada')+' como <b>'+r+'</b>'+
         '<span class="codigo">Código: '+(res.id||'—')+'</span></div>'+
         '<div class="panel"><div class="pt">'+F.nombre+'</div><div class="ph">'+
         det.length+' medidas · '+det.filter(function(x){return !x.ok;}).length+

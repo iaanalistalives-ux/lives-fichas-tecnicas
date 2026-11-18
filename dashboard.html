@@ -620,6 +620,15 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 .wrap{width:100%;max-width:none;margin:0 auto;padding:14px clamp(16px,2.2vw,52px) 44px}
 .bar{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;background:var(--card);border-radius:var(--r);box-shadow:var(--sh);padding:10px 14px;margin-bottom:14px;position:sticky;top:0;z-index:15}
 .bar label{font-size:11px;font-weight:700;color:var(--stone);text-transform:uppercase;letter-spacing:.4px;display:flex;flex-direction:column;gap:2px}
+/* interruptor «Prueba de vapor» (18/11/2026) */
+.bar label.swPV{cursor:pointer;position:relative;user-select:none;-webkit-user-select:none}
+.swPV input{position:absolute;opacity:0;width:1px;height:1px}
+.swPV .swP{position:relative;display:block;width:44px;height:24px;border-radius:12px;background:#B9C2BF;transition:background .15s;margin:5px 0 4px}
+.swPV .swP:after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 2px rgba(0,0,0,.3)}
+.swPV input:checked + .swP{background:#0F7A5A}
+.swPV input:checked + .swP:after{left:23px}
+.swPV input:focus-visible + .swP{outline:2px solid #0F7A5A;outline-offset:2px}
+@media print{.swPV .swP{display:none}.swPV:not(.on){display:none!important}}
 select,input.txt{font-family:inherit;font-size:13.5px;font-weight:700;color:var(--sage);border:1px solid var(--warm);border-radius:8px;padding:7px 10px;background:#fff;min-height:38px}
 select{cursor:pointer;max-width:210px}
 input.txt{width:140px}
@@ -763,6 +772,7 @@ body.sinScroll{overflow:hidden}
     <label>Auditor(a)<select id="fAud"><option value="">Todos</option></select></label>
     <label>Etapa<select id="fEta"><option value="">Todas</option></select></label>
     <label>Estilo<input class="txt" id="fEst" type="search" placeholder="Buscar estilo…" autocomplete="off"></label>
+    <label class="swPV" id="swPV" title="Encendido: solo las pruebas de vapor. Apagado: las demás mediciones. No se juntan.">Prueba de vapor<input type="checkbox" id="fPV"><span class="swP"></span></label>
     <span class="spacer"></span>
     <div class="lsAcc"><button class="btn" id="btnVolver" type="button">‹ Buscar fichas</button><button class="btn" id="btnImprimir" type="button">Imprimir</button></div>
   </div>
@@ -850,7 +860,12 @@ const KEY='sb_publishable_1g-n6UT70EUlNAo8Lyc04w_jKR4LpXZ';
 const $=id=>document.getElementById(id);
 const MESES=['ene','feb','mar','abr','may','jun','jul','ago','set','oct','nov','dic'];
 const MESES_L=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Setiembre','Octubre','Noviembre','Diciembre'];
-const NOM_ETAPA={TERMINADA:'Prenda terminada',ANTES_VAPOR:'Antes de vapor',CORTE:'Corte'};
+const NOM_ETAPA={TERMINADA:'Prenda terminada',ANTES_VAPOR:'Antes de vapor',CORTE:'Corte',PV_ANTES:'Antes de vapor',PV_DESPUES:'Después de vapor'};
+const ETAPAS=['CORTE','ANTES_VAPOR','TERMINADA','PV_ANTES','PV_DESPUES'];
+/* Prueba de vapor (18/11/2026, pedido de Christian): las mediciones marcadas como prueba de vapor no se juntan
+   con las demás. El interruptor de la barra elige cuál de los dos grupos se ve; todo el tablero, las ventanas
+   de detalle y el Excel usan solo ese grupo. En las pruebas la etapa es «Antes de vapor» o «Después de vapor». */
+let MALL=[], VAP_N=[], VAP_P=[], PV=false;
 const ORD_TALLA=['XXS','XS','S','P','M','L','XL','XXL','2XL','3XL','1X','2X','3X'];
 const SAGE='#0F7A5A',EMER='#10B981',ROSE='#DC2626',SLATE='#4E6B78',TAUPE='#B45309',TAN='#F59E0B',GRIS='#C5D0CC';
 const MIN_MED=30, MIN_AUD=8;   /* mínimo de muestra: 30 medidas para % de medidas; 8 mediciones para % de mediciones */
@@ -890,8 +905,10 @@ function leer(){
 }
 function preparar(r){
   const sumar=a=>({n:a[0],f:a[1],sd:a[2],se:a[3],nNeg:a[4],nPos:a[5],fNeg:a[6],fPos:a[7]});
-  M=(r.mediciones||[]).map(m=>{
+  MALL=(r.mediciones||[]).map(m=>{
     const s=semDe(m.fecha);
+    m.pv=m.pv===true||m.pv==='true';
+    if(m.pv){ m.etapaTabla=m.etapa; m.etapa=m.vapor==='ANTES'?'PV_ANTES':'PV_DESPUES'; }
     m.dia=String(m.fecha).slice(0,10); m.mes=m.dia.slice(0,7); m.sem=s.k; m.semLbl=s.lbl; m.semCor=s.cor;
     m.rech=m.resultado==='RECHAZADO';
     m.talKey=m.taller_cod||m.taller; m.audKey=m.auditora_cod||m.auditora;
@@ -900,7 +917,12 @@ function preparar(r){
     m.T=(m.tl||[]).map(a=>Object.assign({t:a[0]}, sumar(a.slice(1))));
     return m;
   }).sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));
-  VAPOR=r.vapor||[];
+  VAP_N=r.vapor||[]; VAP_P=r.vaporPrueba||[];
+  aplicarPV();
+}
+function aplicarPV(){
+  M=MALL.filter(m=>m.pv===PV); VAPOR=PV?VAP_P:VAP_N;
+  $('swPV').classList.toggle('on',PV);
 }
 
 /* ---------- cálculo ---------- */
@@ -942,13 +964,14 @@ function F(){ return {per:$('fPer').value, cli:$('fCli').value, tal:$('fTal').va
 function pasa(m,f,sinPer){ return (sinPer||enPer(m,f.per)) && (!f.cli||m.cliente===f.cli) && (!f.tal||m.talKey===f.tal) && (!f.aud||m.audKey===f.aud) && (!f.eta||m.etapa===f.eta) && (!f.est||String(m.estilo).toUpperCase().indexOf(f.est)>=0); }
 function hayFiltro(){ const f=F(); return !!(f.per||f.cli||f.tal||f.aud||f.eta||f.est); }
 function llenarFiltros(){
+  ['fPer','fCli','fTal','fAud','fEta'].forEach(i=>{ const e=$(i); while(e.children.length>1) e.removeChild(e.lastChild); e.value=''; });
   const op=(sel,arr)=>arr.forEach(([v,t])=>{ const o=document.createElement('option'); o.value=v; o.textContent=t; sel.appendChild(o); });
   const meses=[...new Set(M.map(m=>m.mes))].sort().reverse(), sems=[...new Set(M.map(m=>m.sem))].sort().reverse();
   const gm=document.createElement('optgroup'); gm.label='Meses'; op(gm,meses.map(k=>[k,perLbl(k)])); $('fPer').appendChild(gm);
   const gs=document.createElement('optgroup'); gs.label='Semanas'; op(gs,sems.map(k=>[k,perLbl(k)])); $('fPer').appendChild(gs);
   const uni=(kf,lf)=>{ const o=new Map(); M.forEach(m=>{ if(kf(m)) o.set(kf(m),lf(m)); }); return [...o.entries()].sort((a,b)=>String(a[1]).localeCompare(String(b[1]))); };
   op($('fCli'),uni(m=>m.cliente,m=>m.cliente)); op($('fTal'),uni(m=>m.talKey,m=>m.taller)); op($('fAud'),uni(m=>m.audKey,m=>m.auditora));
-  op($('fEta'),['CORTE','ANTES_VAPOR','TERMINADA'].filter(e=>M.some(m=>m.etapa===e)).map(e=>[e,NOM_ETAPA[e]]));
+  op($('fEta'),ETAPAS.filter(e=>M.some(m=>m.etapa===e)).map(e=>[e,NOM_ETAPA[e]]));
 }
 
 /* ---------- Chart.js ---------- */
@@ -1009,7 +1032,7 @@ function mostrar(id,si){ const e=$(id); if(e) e.style.display=si?'':'none'; }
 function render(){
   const f=F(); VIS=M.filter(m=>pasa(m,f));
   const vac=$('vacio');
-  if(!VIS.length){ vac.style.display='block'; vac.textContent=M.length?'No hay mediciones con esos filtros. Cambia el período o quita algún filtro en la barra de arriba.':'Todavía no hay mediciones registradas.'; $('tablero').style.display='none'; return; }
+  if(!VIS.length){ vac.style.display='block'; vac.textContent=M.length?'No hay mediciones con esos filtros. Cambia el período o quita algún filtro en la barra de arriba.':(PV?'Todavía no hay pruebas de vapor registradas. Apaga «Prueba de vapor» para ver las demás mediciones.':'Todavía no hay mediciones registradas.'); $('tablero').style.display='none'; return; }
   vac.style.display='none'; $('tablero').style.display='';
   const S=stat(VIS);
   pintarKpis(S,f); pintarTend(f); pintarRes(); pintarResumen(S); pintarEstilos(S); pintarPuntos(S); pintarTalleres(S); pintarVapor(f); pintarLista();
@@ -1075,7 +1098,7 @@ function pintarRes(){
 }
 function pintarResumen(S){
   const centro=pct(S.f,S.n);
-  const eta=['CORTE','ANTES_VAPOR','TERMINADA'].map(e=>grupos(VIS.filter(m=>m.etapa===e),m=>m.etapa,m=>NOM_ETAPA[m.etapa]||m.etapa)[0]).filter(Boolean);
+  const eta=ETAPAS.map(e=>grupos(VIS.filter(m=>m.etapa===e),m=>m.etapa,m=>NOM_ETAPA[m.etapa]||m.etapa)[0]).filter(Boolean);
   mostrar('pEta',eta.length>1);
   if(eta.length>1){ barrasH('cEta',eta.map(g=>filaFuera(g,null,()=>abrirFicha({tipo:'etapa',clave:g.k,titulo:'Etapa · '+g.label}))),{min:170});
     $('phEta').textContent='% de medidas fuera de tolerancia sobre las medidas tomadas en cada etapa. Promedio del filtro: '+num(centro,1)+'%. Toca una barra para ver el detalle.'; }
@@ -1184,11 +1207,11 @@ function pintarVapor(f){
     const t=ps.reduce((a,v)=>{ a.sA+=v.sA; a.sT+=v.sT; a.eA+=v.eA; a.eT+=v.eT; a.nA+=v.nA; a.nT+=v.nT; return a; },{sA:0,sT:0,eA:0,eT:0,nA:0,nT:0});
     const real=(t.sT/t.sA-1)*100, fic=t.eA?(t.eT/t.eA-1)*100:null, cli=(M.find(m=>m.estilo===e)||{}).cliente||'';
     h+='<div class="panel col12"><span class="tira volumen"></span><div class="pt">Estilo '+esc(e)+(cli?' · '+esc(cli):'')+' — con el vapor cambia <span class="'+clsDesv(real)+'">'+sig(real)+'</span>'+(fic!=null?' (la ficha espera '+sig(fic)+')':'')+'</div>'+
-       '<div class="ph">Medida promedio de la prenda terminada contra la de antes de vapor, en los mismos puntos y tallas ('+ps.length+' puntos; '+num(t.nA)+' medidas antes de vapor y '+num(t.nT)+' de prenda terminada). Negativo = encoge con el vapor. No son las mismas prendas medidas dos veces: es una aproximación, y no depende del período elegido arriba.</div>'+
+       '<div class="ph">Medida promedio '+(PV?'después de vapor':'de la prenda terminada')+' contra la de antes de vapor, en los mismos puntos y tallas ('+ps.length+' puntos; '+num(t.nA)+' medidas antes de vapor y '+num(t.nT)+(PV?' después de vapor':' de prenda terminada')+'). Negativo = encoge con el vapor. No son las mismas prendas medidas dos veces: es una aproximación, y no depende del período elegido arriba.</div>'+
        '<div class="cwrap"><canvas id="cVap'+i+'"></canvas></div></div>';
     graf.push(['cVap'+i,ps.map(v=>{ const d=(v.sT/v.sA-1)*100, fe=v.eA?(v.eT/v.eA-1)*100:null;
       return {label:(v.desc?String(v.desc).toUpperCase():'Punto')+' ('+v.cod+')',val:d,txt:sig(d),color:d<0?SLATE:TAUPE,
-              tip:['Real: '+sig(d)+(fe!=null?' · ficha: '+sig(fe):''), v.nA+' medidas antes de vapor · '+v.nT+' de prenda terminada · '+v.tallas+' talla(s)']}; }).sort((a,b)=>a.val-b.val)]);
+              tip:['Real: '+sig(d)+(fe!=null?' · ficha: '+sig(fe):''), v.nA+' medidas antes de vapor · '+v.nT+(PV?' después de vapor · ':' de prenda terminada · ')+v.tallas+' talla(s)']}; }).sort((a,b)=>a.val-b.val)]);
   });
   $('gVapor').innerHTML=h;
   graf.forEach(g=>barrasH(g[0],g[1],{div:1,dec:1,largo:48}));
@@ -1296,7 +1319,7 @@ function irTab(i){
 window.LS_XLS={
   ancla:function(){ return $('btnImprimir'); }, clase:'btn',
   datos:function(){
-    const f=F(), S=stat(VIS), lbl=[perLbl(f.per),f.cli,f.tal&&(VIS[0]||{}).taller,f.aud&&(VIS[0]||{}).auditora,f.eta&&NOM_ETAPA[f.eta],f.est&&('estilo '+f.est)].filter(Boolean).join(' · ');
+    const f=F(), S=stat(VIS), lbl=[PV&&'Pruebas de vapor',perLbl(f.per),f.cli,f.tal&&(VIS[0]||{}).taller,f.aud&&(VIS[0]||{}).auditora,f.eta&&NOM_ETAPA[f.eta],f.est&&('estilo '+f.est)].filter(Boolean).join(' · ');
     const pc=(a,b)=>b?a/b:null, dvx=s=>s.se?s.sd/s.se:null;
     const cm=[{campo:'n',titulo:'Medidas',tipo:'entero'},{campo:'f',titulo:'Fuera de tolerancia',tipo:'entero'},{campo:'pf',titulo:'% fuera',tipo:'porcentaje'},{campo:'dv',titulo:'Desviación contra la ficha',tipo:'porcentaje'},{campo:'ng',titulo:'Hacia menos',tipo:'entero'},{campo:'ps',titulo:'Hacia más',tipo:'entero'}];
     const ca=[{campo:'a',titulo:'Mediciones',tipo:'entero'},{campo:'r',titulo:'Rechazadas',tipo:'entero'}];
@@ -1327,6 +1350,7 @@ window.LS_XLS={
 
 /* ---------- arranque ---------- */
 ['fPer','fCli','fTal','fAud','fEta'].forEach(i=>$(i).addEventListener('change',()=>{ if(i==='fPer') GRAN=''; render(); }));
+$('fPV').addEventListener('change',()=>{ PV=$('fPV').checked; GRAN=''; if(FI) cerrarFicha(); aplicarPV(); llenarFiltros(); render(); });
 let tEst=null; $('fEst').addEventListener('input',()=>{ clearTimeout(tEst); tEst=setTimeout(render,250); });
 $('segTend').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; GRAN=b.dataset.g; pintarTend(F()); });
 $('tabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(b) irTab(+b.dataset.t); });
