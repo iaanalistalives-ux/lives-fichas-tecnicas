@@ -3,7 +3,7 @@
 Las reglas generales de trabajo están en el repo privado `lives-instrucciones` (CLAUDE.md). Este archivo solo describe esta herramienta.
 
 ## Qué hace
-Buscador de fichas técnicas en PDF y control de medidas contra la ficha, desde el portal LIVES. Cuatro pantallas:
+Buscador de fichas técnicas en PDF y control de medidas contra la ficha, desde el portal LIVES. Cinco pantallas:
 - `index.html` — **consulta** "Buscador de Fichas Técnicas".
   - Busca por estilo y por grupo (dos casillas de texto) y filtra por tipo (Técnica, Acabados, Corte, RM).
   - Estilo y grupo en cascada, en los dos sentidos (17/11/2026, pedido de Christian): las dos casillas filtran mientras se escribe y se usan una, la otra o las dos. La casilla «Grupo» propone solo los grupos de las fichas que coinciden con el estilo escrito y el tipo elegido (sin estilo, todos; al entrar a la casilla ya salen), y la de estilo propone solo lo que hay dentro del grupo escrito. El grupo coincide por parte del texto y sin importar el guion ("PAK14" trae PAK-143 a PAK-149). Si las dos casillas no coinciden en ninguna ficha, sale «No hay fichas con …» (ya no se borra sola la casilla de grupo). El Excel sale con el mismo filtro. Antes el grupo era una lista desplegable. La casilla de estilo propone solo estilos y estilos del cliente (ya no clientes ni grupos, que al elegirlos no encontraban nada).
@@ -28,6 +28,16 @@ Buscador de fichas técnicas en PDF y control de medidas contra la ficha, desde 
   - La hoja abre con "Ver figura" (dibujo de la prenda de la ficha, con zoom y cambio de página, como "Ver dibujo" del formulario) y con "Ver ficha" (PDF completo). La hoja impresa no lleva firmas (28/10/2026).
   - Bajo cada diferencia de la hoja sale su porcentaje (diferencia ÷ medida de ficha, con 1 decimal; 28/10/2026). Se calcula en la pantalla con `esp` y `dif`, que ya vienen en decimales en `fichas_mediciones_detalle`; no depende de la unidad (pulgadas o cm). La columna Tol. ± también lleva su porcentaje (tolerancia ÷ medida de ficha), y `medidas.html` lo muestra en cada punto (esperado ± tolerancia, diferencia anotada y resultado al elegirla) y en la lista de puntos fuera de tolerancia. El Excel no cambia: trae una fila por auditoría, sin medidas sueltas.
   - Al imprimir o sacar el PDF de la hoja, la tabla de cada talla puede partirse entre hojas (clase `pTabla`): sigue justo después de los datos, el encabezado se repite en cada hoja y ninguna fila se corta (29/10/2026).
+- `dashboard.html` — **dashboard** "Dashboard de Medidas" (18/11/2026, pedido de Christian: antes costaba ver tendencias). Se abre con el botón «Dashboard» de `historial.html` y vuelve con «‹ Mediciones». Lee todo de una sola función, `fichas_dashboard()`.
+  - Filtros: período (todo, mes o semana), cliente, taller, auditor(a), etapa y «Buscar estilo…». Excel LIVES (`LS_XLS`) e Imprimir.
+  - KPI: % de auditorías rechazadas (con variación contra el período anterior), auditorías, % de medidas fuera de tolerancia, desviación contra la ficha y % de las fuera de tolerancia que salen más chicas.
+  - Desviación contra la ficha = suma de diferencias ÷ suma de medidas de ficha (ponderado; los centímetros se pasan a pulgadas para sumar). Negativo = la prenda sale más chica que la ficha. No es encogimiento de laboratorio.
+  - Pestañas: Resumen (tendencia por día, semana o mes; resultado, con las aprobadas que tenían medidas fuera; por etapa; por cliente; «Dónde atacar primero»), Estilos, Puntos de medida y tallas, Talleres y auditores, Cambio con el vapor y Auditorías (regla 500).
+  - Los puntos se juntan por su descripción en la ficha; las hojas de corte no traen descripción y ahí el punto es estilo + código. Los puntos con menos de 30 medidas quedan plegados.
+  - Cambio con el vapor: medida promedio de la prenda terminada contra la de antes de vapor, mismo estilo, código y talla (no son las mismas prendas: es una aproximación). Solo sale si un estilo tiene las dos etapas, con 3 medidas o más por punto en cada una.
+  - Sin meta declarada: el color compara contra el promedio ponderado ± 1 desviación. Mínimo de muestra: 30 medidas para un % de medidas y 8 auditorías para un % de auditorías.
+  - Todo gráfico se toca: abre una ventana con el detalle (estilo, cliente, taller, auditor(a), etapa, punto, talla o la lista de auditorías), con su propio período. «Ver hoja» abre la hoja de la auditoría (`historial.html?id=…&hoja=1`) dentro de la misma ventana.
+  - Grupo: una medición guardada con grupo "DP-002" se muestra con el grupo del nombre de su archivo. Cliente: el del prefijo del grupo en `cat_clientes`. La base no se cambia.
 - `tablas.html` — **administración** de la verificadora. Sirve para:
   - subir fichas en PDF;
   - leer las tablas de medidas automáticamente (desde el 29/10/2026, si dos tablas de la misma etapa repiten las mismas medidas pero declaran colores distintos en "COLORES:", son tablas distintas y cada una lleva sus colores como combo; antes la segunda se descartaba);
@@ -45,6 +55,7 @@ Todo pasa por funciones; las pantallas no leen tablas directo.
   - `fichas_inicio`, `fichas_variantes`, `fichas_espec`, `fichas_medir` y `fichas_archivos` leen `fichas_indice` y `fichas_especificaciones`.
   - `fichas_listas` trae talleres, auditoras y la lista de quién verifica.
   - `fichas_mediciones` y `fichas_medicion` leen `fichas_mediciones` y `fichas_mediciones_detalle`.
+  - `fichas_dashboard()` (18/11/2026, registro `Fi01`) solo lee: devuelve cada auditoría con sus medidas ya sumadas por punto y por talla (con la descripción del punto, de `fichas_especificaciones`) y el cruce antes de vapor contra terminada. Lectura libre, como el resto. A Sistemas: es una consulta de agregación, sin nada exclusivo de Postgres salvo el jsonb de las tablas.
   - `fichas_quien` lee `cat_personal`.
 - Vigencia por grupo (17/11/2026): `fichas_recalcular_vigente_` deja una tabla vigente por estilo + tipo + etapa + combo + GRUPO (antes una sola por estilo, y la ficha de un grupo tapaba a la de otro). `fichas_variantes` devuelve las vigentes de todos los grupos. `fichas_espec(p_estilo, p_tipo, p_etapa, p_combo, p_archivo)` trae la tabla de ese archivo; sin archivo, la más reciente. Respaldo de antes del cambio: tablas `respaldo_fichas_grupo_20261117` (grupo y vigente anteriores) y `respaldo_fichas_funciones_20261117`. Las mediciones guardadas antes con grupo "DP-002" no se tocaron.
 - Guardar mediciones (`medidas.html`): `fichas_guardar_medicion`, que escribe en `fichas_mediciones` y `fichas_mediciones_detalle`. El `p_id_envio` evita duplicados si se reintenta.

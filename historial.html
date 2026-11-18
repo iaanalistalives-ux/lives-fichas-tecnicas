@@ -792,6 +792,7 @@ td.nada{color:#C8D3CF;}
       <button class="btn ghost" onclick="volverBuscador()">‹ Buscar fichas</button>
       <button class="btn" onclick="buscar()">Buscar</button>
       <button class="btn ghost" onclick="limpiar()">Limpiar</button>
+      <button class="btn ghost" onclick="verDashboard()">Dashboard</button>
       <span id="sync" style="font-size:11.5px;color:var(--stone);"></span>
     </div>
   </div>
@@ -979,6 +980,8 @@ function error(m){
   e.style.display=m?'block':'none'; e.textContent=m||'';
 }
 function volverBuscador(){ location.href='index.html'; }
+/* Dashboard de medidas (18/11/2026): tendencias, puntos, tallas, talleres y auditores */
+function verDashboard(){ var u=paramDe('usuario'); location.href='dashboard.html'+(u?'?usuario='+encodeURIComponent(u):''); }
 
 /* ---------- medidas: pulgadas o centímetros ---------- */
 /* La auditoría guarda en qué unidad está la ficha. En pulgadas se muestra
@@ -1054,6 +1057,8 @@ function iniciar(){
     }
   });
   buscar();
+  /* el dashboard abre aquí la hoja de una auditoría: historial.html?id=…&hoja=1 */
+  if(p.id) verDetalle(p.id);
 }
 function params(){
   var o={}, q=location.search.replace(/^\?/,'').split('&');
@@ -1150,7 +1155,11 @@ function verDetalle(id){
     pintarDetalle(r.medicion);
   });
 }
-function cerrarDet(){ document.getElementById('det').style.display='none'; }
+function cerrarDet(){
+  document.getElementById('det').style.display='none';
+  /* abierta desde el dashboard (dentro de su ventana): al cerrar la hoja se avisa al dashboard para que cierre la ventana */
+  if(paramDe('hoja') && window.parent!==window){ try{ window.parent.postMessage({tipo:'lives-medidas-cerrar-hoja'}, location.origin); }catch(e){} }
+}
 
 function pintarDetalle(m){
   UNID = (m && m.unidad==='cm') ? 'cm' : 'pulg';   /* lo dice la ficha medida */
