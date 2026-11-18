@@ -792,7 +792,6 @@ td.nada{color:#C8D3CF;}
       <button class="btn ghost" onclick="volverBuscador()">‹ Buscar fichas</button>
       <button class="btn" onclick="buscar()">Buscar</button>
       <button class="btn ghost" onclick="limpiar()">Limpiar</button>
-      <button class="btn ghost" onclick="verDashboard()">Dashboard</button>
       <span id="sync" style="font-size:11.5px;color:var(--stone);"></span>
     </div>
   </div>
@@ -980,8 +979,6 @@ function error(m){
   e.style.display=m?'block':'none'; e.textContent=m||'';
 }
 function volverBuscador(){ location.href='index.html'; }
-/* Dashboard de medidas (18/11/2026): tendencias, puntos, tallas, talleres y auditores */
-function verDashboard(){ var u=paramDe('usuario'); location.href='dashboard.html'+(u?'?usuario='+encodeURIComponent(u):''); }
 
 /* ---------- medidas: pulgadas o centímetros ---------- */
 /* La auditoría guarda en qué unidad está la ficha. En pulgadas se muestra

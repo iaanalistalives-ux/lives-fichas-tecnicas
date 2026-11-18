@@ -764,7 +764,7 @@ body.sinScroll{overflow:hidden}
     <label>Etapa<select id="fEta"><option value="">Todas</option></select></label>
     <label>Estilo<input class="txt" id="fEst" type="search" placeholder="Buscar estilo…" autocomplete="off"></label>
     <span class="spacer"></span>
-    <div class="lsAcc"><button class="btn" id="btnVolver" type="button">‹ Mediciones</button><button class="btn" id="btnImprimir" type="button">Imprimir</button></div>
+    <div class="lsAcc"><button class="btn" id="btnVolver" type="button">‹ Buscar fichas</button><button class="btn" id="btnImprimir" type="button">Imprimir</button></div>
   </div>
   <div class="errBox" id="errBox"></div>
   <div class="vacio" id="vacio"></div>
@@ -1331,7 +1331,7 @@ let tEst=null; $('fEst').addEventListener('input',()=>{ clearTimeout(tEst); tEst
 $('segTend').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; GRAN=b.dataset.g; pintarTend(F()); });
 $('tabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(b) irTab(+b.dataset.t); });
 $('btnImprimir').addEventListener('click',()=>window.print());
-$('btnVolver').addEventListener('click',()=>{ const u=new URLSearchParams(location.search).get('usuario'); location.href='historial.html'+(u?'?usuario='+encodeURIComponent(u):''); });
+$('btnVolver').addEventListener('click',()=>{ const u=new URLSearchParams(location.search).get('usuario'); location.href='index.html'+(u?'?usuario='+encodeURIComponent(u):''); });
 $('fiPer').addEventListener('change',()=>{ FI.per=$('fiPer').value; renderFicha(); });
 $('fiX').addEventListener('click',cerrarFicha); $('hojaX').addEventListener('click',cerrarHoja);
 $('ficha').addEventListener('click',e=>{ if(e.target===$('ficha')) cerrarFicha(); });
