@@ -828,6 +828,15 @@ body.capAbierta #btnDib{display:none!important;}
   font:inherit;font-size:16px;font-weight:700;}
 #dibujo .dCaja{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;background:#fff;touch-action:pan-x pan-y;overscroll-behavior:contain;}
 #dibujo canvas{display:block;}
+/* En celular (700 px o menos) el dibujo no lleva barra ni botones: se acerca con dos dedos y se baja con el
+   dedo; se cierra con la ✕ flotante o con el botón atrás del celular. En PC sigue la barra con ‹ › − + ✕
+   (decisión de Christian, 18/11/2026). */
+#dibujo #dibX{display:none;position:absolute;right:14px;bottom:52px;z-index:2;width:52px;height:52px;border:0;border-radius:50%;
+  background:var(--petrol);color:#fff;font-size:22px;font-weight:800;line-height:1;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,.4);}
+@media (max-width:700px){
+  #dibujo .dTop{display:none;}
+  #dibujo #dibX{display:block;}
+}
 #dibujo .dPie{padding:8px 12px;background:var(--petrol);color:#fff;font-size:12px;text-align:center;}
 .sectitle{font-size:15.5px;font-weight:700;color:var(--sage-dark);margin:18px 0 10px;padding-bottom:5px;border-bottom:2px solid var(--warm);}
 .note{background:#fff;border:1px solid var(--warm);border-left:4px solid var(--tan);border-radius:6px;padding:10px 13px;font-size:11.5px;color:var(--stone);margin:14px 0;line-height:1.5;}
@@ -915,6 +924,7 @@ body.capAbierta #btnDib{display:none!important;}
     <button onclick="cerrarDibujo()" aria-label="Cerrar">✕</button>
   </div>
   <div class="dCaja" id="dibCaja"></div>
+  <button type="button" id="dibX" onclick="cerrarDibujo()" aria-label="Cerrar el dibujo">✕</button>
   <div class="dPie" id="dibPie">Las medidas del dibujo van con su código.</div>
 </div>
 
@@ -1087,6 +1097,8 @@ var MED_PUSH=false;
 function medirVisible(){ var m=document.getElementById('medir'); return !!m && m.style.display==='block'; }
 function marcarHistorialMedir(){
   if(MED_PUSH) return;
+  /* al volver con atrás la lista se queda donde estaba: el navegador no la regresa arriba (18/11/2026) */
+  try{ history.scrollRestoration='manual'; }catch(e){}
   try{ history.pushState({medir:1},''); MED_PUSH=true; }catch(e){}
 }
 function atrasMedir(){
@@ -1102,6 +1114,9 @@ window.addEventListener('popstate', function(){
   if(window.__salirMedir){ window.__salirMedir=false; volverBuscador(); return; }
   if(!medirVisible()) return;
   MED_PUSH=false;
+  /* con el dibujo abierto, atrás solo cierra el dibujo: se vuelve a donde se estaba midiendo (18/11/2026) */
+  var dib=document.getElementById('dibujo');
+  if(dib && dib.style.display==='flex'){ cerrarDibujo(); marcarHistorialMedir(); return; }
   if(typeof PUNTO!=='undefined' && PUNTO!==null){ cerrarPunto(); marcarHistorialMedir(); return; }
   volverBuscador();
 });
@@ -2196,7 +2211,7 @@ function pieDib(){
   if(s) s.style.display = n>1 ? '' : 'none';
   txt('dibPie', (DIB.cod ? 'Punto '+DIB.cod+'. ' : '')+
     (n>1 ? n+' dibujos · baja para verlos todos' : 'Dibujo de la prenda')+
-    ' · acerca con dos dedos o con +');
+    (window.matchMedia && window.matchMedia('(max-width:700px)').matches ? ' · acerca con dos dedos' : ' · acerca con + o con doble clic'));
 }
 function pintarDibujo(){
   var caja=document.getElementById('dibCaja');
