@@ -1485,8 +1485,8 @@ function pintarEtapas(){
     if(!pintarVapor(etapas)){
       /* la ficha trae las dos: la auditora tiene que elegir antes o después */
       document.getElementById('selCombo').style.display='none';
-      document.getElementById('pColores').style.display='none';
       F=null; ESPEC=null; ESPEC_SEQ++;
+      pintarColores();                       /* los colores siguen activos */
       txt('fichaTit','Elige antes o después de vapor');
       txt('fichaInfo','');
       pintarBorrador();
@@ -1599,9 +1599,13 @@ function pintarColores(){
   if(!caja) return;
   // colores de todos los combos de la etapa elegida, no solo del activo
   var lista=[];
-  varsDeEtapa(ETAPA).forEach(function(v){
+  /* en prueba de vapor los colores siguen activos siempre: se ofrecen los de todas las tablas de la
+     ficha (corte, antes de vapor, terminada), también antes de elegir antes o después de vapor */
+  var ets=[ETAPA];
+  if(PVAPOR){ ets=[]; VARIANTES.forEach(function(v){ if(ets.indexOf(v.etapa)<0) ets.push(v.etapa); }); }
+  ets.forEach(function(e){ varsDeEtapa(e).forEach(function(v){
     coloresDeCombo(v.combo).forEach(function(c){ if(lista.indexOf(c)<0) lista.push(c); });
-  });
+  }); });
   coloresDeCombo(COMBO).forEach(function(c){ if(lista.indexOf(c)<0) lista.push(c); });
   if(!lista.length){ caja.style.display='none'; return; }
   caja.style.display='flex';
