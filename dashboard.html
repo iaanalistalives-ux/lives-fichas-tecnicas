@@ -802,6 +802,10 @@ body.sinScroll{overflow:hidden}
           <div class="seg" id="segTend"><button type="button" data-g="dia">Día</button><button type="button" data-g="sem">Semana</button><button type="button" data-g="mes">Mes</button></div></div>
           <div class="cwrap"><canvas id="cTend"></canvas></div><div class="vacioP" id="vTend" style="display:none"></div></div>
         <div class="panel col4" id="pRes"><span class="tira resultado"></span><div class="pt">Resultado de las mediciones</div><div class="ph">Aprobadas sin medidas fuera, aprobadas aunque tenían medidas fuera de tolerancia, y rechazadas. Toca una parte para ver la lista.</div><div class="cwrap"><canvas id="cRes"></canvas></div><div class="donutpie" id="resPie"></div></div>
+        <div class="panel col12" id="pDir"><span class="tira volumen"></span>
+          <div class="pcab"><div><div class="pt">Tendencia a más o a menos</div><div class="ph" id="phDir"></div></div>
+          <div class="seg" id="segDir"><button type="button" data-d="estilo">Estilo</button><button type="button" data-d="grupo">Grupo</button><button type="button" data-d="color">Color</button></div></div>
+          <div class="cwrap"><canvas id="cDir"></canvas></div><div class="vacioP" id="vDir" style="display:none"></div></div>
         <div class="panel col6" id="pEta"><span class="tira riesgo"></span><div class="pt">Medidas fuera de tolerancia por etapa</div><div class="ph" id="phEta"></div><div class="cwrap"><canvas id="cEta"></canvas></div></div>
         <div class="panel col6" id="pCli"><span class="tira riesgo"></span><div class="pt">Medidas fuera de tolerancia por cliente</div><div class="ph" id="phCli"></div><div class="cwrap"><canvas id="cCli"></canvas></div></div>
         <div class="panel col12" id="pAtacar"><span class="tira riesgo"></span><div class="pt">Dónde atacar primero</div><div class="ph" id="phAtacar"></div><div class="atacar" id="atacar"></div></div>
@@ -869,7 +873,7 @@ let MALL=[], VAP_N=[], VAP_P=[], PV=false;
 const ORD_TALLA=['XXS','XS','S','P','M','L','XL','XXL','2XL','3XL','1X','2X','3X'];
 const SAGE='#0F7A5A',EMER='#10B981',ROSE='#DC2626',SLATE='#4E6B78',TAUPE='#B45309',TAN='#F59E0B',GRIS='#C5D0CC';
 const MIN_MED=30, MIN_AUD=8;   /* mínimo de muestra: 30 medidas para % de medidas; 8 mediciones para % de mediciones */
-let M=[], VAPOR=[], VIS=[], CH={}, GRAN='', FI=null;
+let M=[], VAPOR=[], VIS=[], CH={}, GRAN='', FI=null, DIR='estilo';
 
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function num(v,d){ return (v==null||!isFinite(v))?'—':Number(v).toLocaleString('es-PE',{minimumFractionDigits:d||0,maximumFractionDigits:d||0}); }
@@ -912,6 +916,8 @@ function preparar(r){
     m.dia=String(m.fecha).slice(0,10); m.mes=m.dia.slice(0,7); m.sem=s.k; m.semLbl=s.lbl; m.semCor=s.cor;
     m.rech=m.resultado==='RECHAZADO';
     m.talKey=m.taller_cod||m.taller; m.audKey=m.auditora_cod||m.auditora;
+    /* el color se mira dentro de su estilo: el mismo nombre de color en otro estilo es otra tela */
+    m.colLbl=String(m.color||'').replace(/\s+/g,' ').trim().toUpperCase(); m.colKey=m.colLbl?m.estilo+'|'+m.colLbl:'';
     m.P=(m.pts||[]).map(a=>{ const d=String(a[1]||'').replace(/\s+/g,' ').replace(/[.\s]+$/,'').trim();
       return Object.assign({cod:a[0], key:d?quitaTildes(d):('§'+m.estilo+'·'+a[0]), label:d?d.toUpperCase():('Estilo '+m.estilo+' · punto '+a[0]+' ('+(NOM_ETAPA[m.etapa]||m.etapa).toLowerCase()+')')}, sumar(a.slice(2))); });
     m.T=(m.tl||[]).map(a=>Object.assign({t:a[0]}, sumar(a.slice(1))));
@@ -1015,7 +1021,7 @@ function barrasH(id,rows,o){
       onClick:(e,els)=>{ if(els.length&&rows[els[0].index].go) rows[els[0].index].go(); },
       onHover:(e,els)=>{ e.native.target.style.cursor=els.length?'pointer':'default'; },
       plugins:{legend:{display:false},tooltip:{callbacks:{title:it=>rows[it[0].dataIndex].label,label:it=>rows[it.dataIndex].tip}}},
-      scales:{x:Object.assign({ticks:{callback:v=>num(v,o.dec==null?0:o.dec)+'%'},grid:{color:c=>c.tick&&c.tick.value===0&&o.div?'#9BB1AA':'#F1F6F4'}}, o.div?{min:-ext*1.45,max:ext*1.45}:{beginAtZero:true,suggestedMax:ext*1.05}),
+      scales:{x:Object.assign({ticks:{callback:v=>num(v,o.dec==null?0:o.dec)+'%'},grid:{color:c=>c.tick&&c.tick.value===0&&o.div?'#9BB1AA':'#F1F6F4'}}, o.div?{min:-ext*(o.amp||1.45),max:ext*(o.amp||1.45)}:{beginAtZero:true,suggestedMax:ext*1.05}),
               y:{grid:{display:false},ticks:{autoSkip:false,callback:function(v){ return corto(this.getLabelForValue(v),maxL); }}}}},
     plugins:[valBarras]});
 }
@@ -1035,7 +1041,7 @@ function render(){
   if(!VIS.length){ vac.style.display='block'; vac.textContent=M.length?'No hay mediciones con esos filtros. Cambia el período o quita algún filtro en la barra de arriba.':(PV?'Todavía no hay pruebas de vapor registradas. Apaga «Prueba de vapor» para ver las demás mediciones.':'Todavía no hay mediciones registradas.'); $('tablero').style.display='none'; return; }
   vac.style.display='none'; $('tablero').style.display='';
   const S=stat(VIS);
-  pintarKpis(S,f); pintarTend(f); pintarRes(); pintarResumen(S); pintarEstilos(S); pintarPuntos(S); pintarTalleres(S); pintarVapor(f); pintarLista();
+  pintarKpis(S,f); pintarTend(f); pintarRes(); pintarDir(); pintarResumen(S); pintarEstilos(S); pintarPuntos(S); pintarTalleres(S); pintarVapor(f); pintarLista();
   reajustarGrids(); plegarTablas();
   Object.keys(CH).forEach(k=>{ try{CH[k].resize();}catch(e){} });
 }
@@ -1095,6 +1101,32 @@ function pintarRes(){
       onHover:(e,els)=>{ e.native.target.style.cursor=els.length?'pointer':'default'; },
       plugins:{legend:{position:'bottom',labels:{boxWidth:12,usePointStyle:true,padding:10}},tooltip:{callbacks:{label:it=>' '+it.raw+' de '+VIS.length+' mediciones ('+p1(it.raw,VIS.length)+')'}}}}});
   $('resPie').textContent=lim.length+' aprobadas sin medidas fuera · '+apf.length+' aprobadas con medidas fuera · '+rec.length+' rechazadas';
+}
+/* Tendencia a más o a menos (19/11/2026, pedido de Christian): hacia dónde se va cada estilo, grupo o color contra su ficha.
+   Desviación = suma de diferencias ÷ suma de medidas de ficha. A menos = sale más chico que la ficha; a más = más grande. */
+const DIMS={
+  estilo:{uno:'estilo',nom:'estilos',kf:m=>m.estilo,lf:m=>m.estilo+' · '+m.cliente,go:g=>({tipo:'estilo',clave:g.k,titulo:'Estilo '+g.k+' · '+g.items[0].cliente})},
+  grupo:{uno:'grupo',nom:'grupos',kf:m=>m.grupo,lf:m=>m.grupo+' · '+m.cliente,go:g=>({tipo:'grupo',clave:g.k,titulo:'Grupo '+g.k+' · '+g.items[0].cliente})},
+  color:{uno:'color',nom:'colores',kf:m=>m.colKey,lf:m=>m.colLbl+' · '+m.estilo,go:g=>({tipo:'color',clave:g.k,titulo:'Color '+g.items[0].colLbl+' · estilo '+g.items[0].estilo})}};
+function pintarDir(){
+  const con=d=>grupos(VIS,DIMS[d].kf,DIMS[d].lf).filter(g=>g.s.n>=MIN_MED&&desv(g.s)!=null);
+  /* si ninguna de las tres vistas llega al mínimo de medidas, el panel no sale */
+  if(!Object.keys(DIMS).some(d=>con(d).length)){ mostrar('pDir',false); return; }
+  mostrar('pDir',true);
+  [...$('segDir').children].forEach(b=>b.classList.toggle('active',b.dataset.d===DIR));
+  const D=DIMS[DIR], todos=con(DIR), r2=g=>Number(desv(g.s).toFixed(2));
+  if(!todos.length){ $('cDir').parentNode.style.display='none'; mostrar('vDir',true); $('phDir').textContent='';
+    $('vDir').textContent='Ningún '+D.uno+' llega a '+MIN_MED+' medidas con estos filtros.'; return; }
+  $('cDir').parentNode.style.display=''; mostrar('vDir',false);
+  const ver=todos.slice().sort((a,b)=>Math.abs(desv(b.s))-Math.abs(desv(a.s))).slice(0,15).sort((a,b)=>desv(a.s)-desv(b.s));
+  const nMen=todos.filter(g=>r2(g)<0).length, nMas=todos.filter(g=>r2(g)>0).length, nIg=todos.length-nMen-nMas;
+  $('phDir').textContent='Desviación de cada '+D.uno+' contra su ficha (suma de diferencias ÷ suma de medidas de ficha). Hacia la izquierda tiende a menos: sale más chico que la ficha; hacia la derecha tiende a más: sale más grande. '+
+    'De '+todos.length+' '+D.nom+' con '+MIN_MED+' medidas o más, '+nMen+' tienden a menos'+(nIg?', ':' y ')+nMas+' a más'+(nIg?' y '+nIg+(nIg===1?' sale':' salen')+' igual a la ficha':'')+'.'+
+    (todos.length>15?' Se muestran los 15 que más se alejan.':'')+(DIR==='color'?' Cada color se mira dentro de su estilo.':'')+' Toca una barra para ver cómo se mueve por día.';
+  barrasH('cDir',ver.map(g=>{ const r=filaDesv(g,()=>abrirFicha(D.go(g))), v=r2(g);
+    if(!MOVIL()) r.txt=(v<0?'A menos ':v>0?'A más ':'Igual ')+sig(r.val);
+    r.tip=['Tiende '+(v<0?'a menos':v>0?'a más':'a salir igual')+': sale '+sentido(r.val)+' ('+sig(r.val)+')', r.tip[1], num(g.s.f)+' fuera de tolerancia de '+num(g.s.n)+' medidas ('+p1(g.s.f,g.s.n)+') · '+g.s.aud+' medición(es)'];
+    return r; }),{div:1,dec:1,amp:MOVIL()?1.45:1.75,largo:40});
 }
 function pintarResumen(S){
   const centro=pct(S.f,S.n);
@@ -1230,7 +1262,7 @@ function pintarLista(){
 
 /* ---------- ficha: detalle de un estilo, cliente, taller, auditor(a), etapa, punto, talla o una lista ---------- */
 function baseFicha(){ const c=FI.clave;
-  return FI.tipo==='lista'?M.filter(m=>FI.ids.indexOf(m.id)>=0):FI.tipo==='estilo'?M.filter(m=>m.estilo===c):FI.tipo==='cliente'?M.filter(m=>m.cliente===c):
+  return FI.tipo==='lista'?M.filter(m=>FI.ids.indexOf(m.id)>=0):FI.tipo==='estilo'?M.filter(m=>m.estilo===c):FI.tipo==='grupo'?M.filter(m=>m.grupo===c):FI.tipo==='color'?M.filter(m=>m.colKey===c):FI.tipo==='cliente'?M.filter(m=>m.cliente===c):
     FI.tipo==='taller'?M.filter(m=>m.talKey===c):FI.tipo==='auditora'?M.filter(m=>m.audKey===c):FI.tipo==='etapa'?M.filter(m=>m.etapa===c):
     FI.tipo==='punto'?M.filter(m=>m.P.some(p=>p.key===c)):M.filter(m=>m.T.some(t=>t.t===c)); }
 function abrirFicha(o){
@@ -1332,6 +1364,8 @@ window.LS_XLS={
               {k:'Aprobadas con medidas fuera de tolerancia',v:S.apF,d:'mediciones'},{k:'% de medidas fuera de tolerancia',v:pct(S.f,S.n),d:num(S.f)+' de '+num(S.n)+' medidas'},
               {k:'Desviación contra la ficha (%)',v:desv(S),d:'suma de diferencias ÷ suma de medidas de ficha'},{k:'% de las fuera de tolerancia que salen más chicas',v:pct(S.fNeg,S.fNeg+S.fPos),d:num(S.fNeg)+' de '+num(S.fNeg+S.fPos)}]},
       {titulo:'Por estilo',columnas:[k('Estilo'),{campo:'c',titulo:'Cliente',tipo:'texto'}].concat(ca,cm),filas:ordenFuera(grupos(VIS,m=>m.estilo,m=>m.estilo)).map(g=>Object.assign(fila(g),{c:g.items[0].cliente}))},
+      {titulo:'Por grupo',columnas:[k('Grupo'),{campo:'c',titulo:'Cliente',tipo:'texto'}].concat(ca,cm),filas:ordenFuera(grupos(VIS,m=>m.grupo,m=>m.grupo)).map(g=>Object.assign(fila(g),{c:g.items[0].cliente}))},
+      {titulo:'Por color',nota:'Cada color se mira dentro de su estilo.',columnas:[k('Color'),{campo:'e',titulo:'Estilo',tipo:'alfanumerico'},{campo:'c',titulo:'Cliente',tipo:'texto'}].concat(ca,cm),filas:ordenFuera(grupos(VIS,m=>m.colKey,m=>m.colLbl)).map(g=>Object.assign(fila(g),{e:g.items[0].estilo,c:g.items[0].cliente}))},
       {titulo:'Por punto de medida',columnas:[k('Punto de medida')].concat(ca.slice(0,1),cm),filas:ordenFuera(gruposSub(VIS,'P')).map(fila)},
       {titulo:'Por talla',columnas:[k('Talla')].concat(cm),filas:gruposSub(VIS,'T').sort(ordTalla).map(fila)},
       {titulo:'Por etapa',columnas:[k('Etapa')].concat(ca,cm),filas:grupos(VIS,m=>m.etapa,m=>NOM_ETAPA[m.etapa]||m.etapa).map(fila)},
@@ -1353,6 +1387,7 @@ window.LS_XLS={
 $('fPV').addEventListener('change',()=>{ PV=$('fPV').checked; GRAN=''; if(FI) cerrarFicha(); aplicarPV(); llenarFiltros(); render(); });
 let tEst=null; $('fEst').addEventListener('input',()=>{ clearTimeout(tEst); tEst=setTimeout(render,250); });
 $('segTend').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; GRAN=b.dataset.g; pintarTend(F()); });
+$('segDir').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; DIR=b.dataset.d; pintarDir(); reajustarGrids(); });
 $('tabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(b) irTab(+b.dataset.t); });
 $('btnImprimir').addEventListener('click',()=>window.print());
 $('btnVolver').addEventListener('click',()=>{ const u=new URLSearchParams(location.search).get('usuario'); location.href='index.html'+(u?'?usuario='+encodeURIComponent(u):''); });
