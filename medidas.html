@@ -651,6 +651,14 @@ select.txt.falta{border-color:var(--rose);background:#FFF7F7;}
 .avisoQuien{background:#FFFBEB;border:1px solid var(--tan);border-left:4px solid var(--tan);border-radius:8px;padding:10px 13px;font-size:13px;color:#92400E;margin:10px 0 0;line-height:1.45;}
 .codigo{font-family:Consolas,monospace;font-size:13px;color:var(--stone);font-weight:400;display:block;margin-top:6px;}
 input.txt:focus{outline:none;border-color:var(--sage);}
+/* Color de la lista (19/11/2026): se escribe y se elige el color de la base de OPs */
+.colCaja{position:relative;}
+input.txt.colOk{border-color:var(--sage);font-weight:700;color:var(--sage);}
+.colLista{border:1.5px solid var(--warm);border-top:none;border-radius:0 0 6px 6px;background:#fff;max-height:264px;overflow-y:auto;margin-top:-2px;}
+.colLista button{display:block;width:100%;text-align:left;background:#fff;border:none;border-bottom:1px solid var(--warm-light);font-family:inherit;font-size:15px;font-weight:700;color:#333;padding:11px 12px;cursor:pointer;min-height:44px;}
+.colLista button:hover,.colLista button:active{background:var(--warm-light);}
+.colLista button small{font-weight:400;color:var(--stone);font-size:12px;margin-left:6px;}
+.colLista .colNada{padding:11px 12px;font-size:13px;color:var(--stone);}
 
 .pills{display:flex;gap:8px;flex-wrap:wrap;}
 .avisoCombo{font-size:11.5px;color:var(--tan);font-weight:700;margin-top:6px;}
@@ -913,8 +921,11 @@ body.capAbierta #btnDib{display:none!important;}
 
     <span class="lbl">Color de la prenda</span>
     <div class="pills" id="pColores" style="margin-bottom:8px;"></div>
-    <input class="txt mayus" id="colorOtro" placeholder="Otro color (escríbelo)"
-           oninput="this.value=this.value.toUpperCase()" autocapitalize="characters" spellcheck="false">
+    <div class="colCaja">
+      <input class="txt mayus" id="colorOtro" placeholder="Otro color (escríbelo)" autocomplete="off"
+             oninput="colorEscribe(this)" onfocus="colorEscribe(this)" autocapitalize="characters" spellcheck="false">
+      <div class="colLista" id="colLista" style="display:none;"></div>
+    </div>
 
     <button class="btn full" style="margin-top:18px;" onclick="empezar()">Empezar a medir</button>
     <div style="font-size:11.5px;color:var(--stone);margin-top:10px;text-align:center;">
@@ -1066,7 +1077,8 @@ var SB_MAPA={
   mediciones: function(p){ return ['fichas_mediciones',{p_estilo:p.estilo||'',p_grupo:p.grupo||'',p_taller:p.taller||'',
                                    p_auditora:p.auditora||'',p_desde:p.desde||'',p_hasta:p.hasta||''}]; },
   medicion:   function(p){ return ['fichas_medicion',{p_id:p.id||''}]; },
-  quien:      function(p){ return ['fichas_quien',{p_usuario:p.usuario||''}]; }
+  quien:      function(p){ return ['fichas_quien',{p_usuario:p.usuario||''}]; },
+  colores:    function(p){ return ['fichas_colores',{p_estilo:p.estilo||''}]; }
 };
 function jsonp(params, cb){
   var p=qsObj(params), m=SB_MAPA[p.accion||'datos'];
@@ -1173,6 +1185,7 @@ function arrancar(){
     return;
   }
   txt('hsub', PAR.estilo+' · '+(PAR.grupo||''));
+  cargarColores();
   // un solo viaje: variantes + tabla + historial
   jsonp('accion=medir&clave='+encodeURIComponent(SES.clave)+
         '&estilo='+encodeURIComponent(PAR.estilo)+'&tipo='+encodeURIComponent(PAR.tipo), function(r){
@@ -1239,7 +1252,8 @@ function borradorDescartar(){
   borradorBorrar(); reiniciarElecciones(); pintarBorrador();
 }
 function reiniciarElecciones(){
-  COLOR=''; var o=document.getElementById('colorOtro'); if(o) o.value='';
+  COLOR=''; var o=document.getElementById('colorOtro'); if(o){ o.value=''; o.classList.remove('colOk'); }
+  COLOR_LISTA=''; colorCerrar();
   pintarColores();
 }
 /* Descartar mientras se mide: borra lo anotado y vuelve a elegir (color, etapa, línea) */
@@ -1618,8 +1632,74 @@ function elegirColor(b,c){
   Array.prototype.forEach.call(document.querySelectorAll('#pColores .pill'),function(x){x.classList.remove('on');});
   b.classList.add('on');
   COLOR=c;
-  document.getElementById('colorOtro').value='';
+  var o=document.getElementById('colorOtro'); o.value=''; o.classList.remove('colOk');
+  COLOR_LISTA=''; colorCerrar();
 }
+
+/* ===== Color de la lista (19/11/2026, pedido de Christian) =====
+   Los botones siguen siendo los colores que trae la ficha. Si el color no está ahí, ya no se escribe
+   libre: en la casilla se escribe y van saliendo los más parecidos para elegir (primero los del estilo,
+   después los de los demás estilos). Si la lista no cargó (sin señal), la casilla queda como antes,
+   para no detener a la auditora. */
+var COLS_EST=[], COLS_TODOS=[], COLS_OK=false, COLOR_LISTA='';
+function cargarColores(){
+  jsonp('accion=colores&estilo='+encodeURIComponent(PAR.estilo||''), function(r){
+    if(!r || !r.ok || !(r.todos||[]).length) return;
+    COLS_EST=r.estilo||[]; COLS_TODOS=r.todos||[]; COLS_OK=true;
+    var o=document.getElementById('colorOtro');
+    if(o) o.placeholder='Otro color: escríbelo y elígelo de la lista';
+  });
+}
+function colNorm(t){ return normNombre(t).replace(/[^A-Z0-9]+/g,' ').trim(); }
+function colDist(a,b){           /* letras de diferencia entre dos palabras (tope 3) */
+  if(Math.abs(a.length-b.length)>2) return 3;
+  var p=[], i, j, q; for(j=0;j<=b.length;j++) p[j]=j;
+  for(i=1;i<=a.length;i++){ q=[i];
+    for(j=1;j<=b.length;j++) q[j]=Math.min(p[j]+1, q[j-1]+1, p[j-1]+(a.charAt(i-1)===b.charAt(j-1)?0:1));
+    p=q; }
+  return p[b.length];
+}
+function colPuntaje(q,c){        /* menor = más parecido; 99 = no se parece */
+  if(c===q) return 0;
+  if(c.indexOf(q)===0) return 1;
+  if((' '+c).indexOf(' '+q)>=0) return 2;
+  if(c.indexOf(q)>=0) return 3;
+  if(q.length<3) return 99;
+  var qs=q.replace(/ /g,''), cs=c.replace(/ /g,'');
+  var d=colDist(qs,cs); if(d<=2) return 4+d;
+  d=colDist(qs,cs.slice(0,qs.length)); if(d<=(qs.length>=6?2:1)) return 7+d;      /* va escribiendo, con una letra mal */
+  var pq=q.split(' '), pc=c.split(' '), ok=0;
+  pq.forEach(function(w){ if(w.length>=3 && pc.some(function(x){ return x.indexOf(w)===0 || colDist(w,x)<=1; })) ok++; });
+  return ok===pq.length ? 10 : (ok ? 12 : 99);
+}
+function colorParecidos(txt){
+  var q=colNorm(txt), deEst={}, out=[];
+  COLS_EST.forEach(function(c){ deEst[c]=1; });
+  if(!q) return COLS_EST.map(function(c){ return {c:c, est:1}; });
+  COLS_TODOS.forEach(function(c){ var p=colPuntaje(q,colNorm(c)); if(p<99) out.push({c:c, est:deEst[c]?1:0, p:p}); });
+  out.sort(function(a,b){ return (b.est-a.est) || (a.p-b.p) || (a.c<b.c?-1:1); });
+  return out.slice(0,12);
+}
+var COL_OPC=[];
+function colorEscribe(o){
+  o.value=o.value.toUpperCase();
+  if(!COLS_OK) return;                                   /* sin lista: se escribe libre, como antes */
+  if(o.value.trim()!==COLOR_LISTA){ COLOR_LISTA=''; o.classList.remove('colOk'); }
+  var caja=document.getElementById('colLista'), q=o.value.trim();
+  if(COLOR_LISTA){ colorCerrar(); return; }               /* sin texto salen los colores del estilo en la base */
+  COL_OPC=colorParecidos(q);
+  caja.innerHTML = COL_OPC.length
+    ? COL_OPC.map(function(x,i){ return '<button type="button" onclick="colorElegir(COL_OPC['+i+'].c)">'+
+        String(x.c).replace(/&/g,'&amp;').replace(/</g,'&lt;')+(x.est?'<small>de este estilo</small>':'')+'</button>'; }).join('')
+    : '<div class="colNada">'+(q?'Ningún color se parece a lo escrito. Revisa cómo está escrito.':'Escribe el color.')+'</div>';
+  caja.style.display='block';
+}
+function colorElegir(c){
+  var o=document.getElementById('colorOtro');
+  Array.prototype.forEach.call(document.querySelectorAll('#pColores .pill'),function(x){ x.classList.toggle('on', x.textContent===c); });
+  COLOR=c; COLOR_LISTA=c; o.value=c; o.classList.add('colOk'); colorCerrar();
+}
+function colorCerrar(){ var c=document.getElementById('colLista'); if(c){ c.style.display='none'; c.innerHTML=''; } }
 
 var ESPEC_SEQ=0;   /* si se cambia de grupo o etapa antes de que llegue la tabla, la respuesta vieja se descarta */
 function cargarEspec(){
@@ -1725,9 +1805,15 @@ function empezar(){
       : 'Todavía no se cargó la tabla de medidas.');
     return;
   }
-  var otro=document.getElementById('colorOtro').value.trim();
-  if(otro) COLOR=otro;                       // lo escrito manda sobre el botón
-  if(!COLOR){ alert('Elige o escribe el color de la prenda.'); return; }
+  var cOtro=document.getElementById('colorOtro'), otro=cOtro.value.trim();
+  if(otro && COLS_OK && otro!==COLOR_LISTA){
+    /* escrito pero no elegido: vale solo si es exactamente un color de la base; si no, se elige de la lista */
+    var igual=COLS_TODOS.filter(function(c){ return colNorm(c)===colNorm(otro); })[0];
+    if(igual) colorElegir(igual);
+    else{ colorEscribe(cOtro); alert('Elige el color de la lista: toca uno de los que salen debajo de la casilla.'); return; }
+  }
+  else if(otro) COLOR=otro;                  // sin lista (sin señal): lo escrito manda sobre el botón
+  if(!COLOR){ alert(COLS_OK ? 'Elige el color de la prenda.' : 'Elige o escribe el color de la prenda.'); return; }
   if(!SES.taller){
     document.getElementById('selTaller').classList.add('falta');
     alert('Elige el taller donde estás midiendo.');
