@@ -814,8 +814,7 @@ body.sinScroll{overflow:hidden}
 
     <div class="tabpane">
       <div class="grid">
-        <div class="panel col6" id="pEstDesv"><span class="tira volumen"></span><div class="pt">Hacia dónde se va cada estilo</div><div class="ph" id="phEstDesv"></div><div class="cwrap tall"><canvas id="cEstDesv"></canvas></div></div>
-        <div class="panel col6" id="pEstFuera"><span class="tira riesgo"></span><div class="pt">Estilos con más medidas fuera de tolerancia</div><div class="ph" id="phEstFuera"></div><div class="cwrap tall"><canvas id="cEstFuera"></canvas></div></div>
+        <div class="panel col12" id="pEstFuera"><span class="tira riesgo"></span><div class="pt">Estilos con más medidas fuera de tolerancia</div><div class="ph" id="phEstFuera"></div><div class="cwrap tall"><canvas id="cEstFuera"></canvas></div></div>
         <div class="panel col12" id="pEstTab"><span class="tira volumen"></span><div class="pt">Todos los estilos</div><div class="ph">Desviación = suma de diferencias ÷ suma de medidas de ficha. La barra reparte las medidas que no salieron exactas: hacia menos (gris azulado) y hacia más (café). Toca un estilo para ver sus puntos, tallas y mediciones.</div><div class="tw" id="tEst"></div></div>
       </div>
     </div>
@@ -1171,10 +1170,6 @@ function pintarEstilos(S){
   const est=grupos(VIS,m=>m.estilo,m=>m.estilo); est.forEach(g=>{ g.cli=g.items[0].cliente; g.grp=[...new Set(g.items.map(m=>m.grupo))].join(', '); });
   const go=g=>abrirFicha({tipo:'estilo',clave:g.k,titulo:'Estilo '+g.k+' · '+g.cli});
   const conM=est.filter(g=>g.s.n>=MIN_MED);
-  const dv=conM.slice().sort((a,b)=>Math.abs(desv(b.s))-Math.abs(desv(a.s))).slice(0,15).sort((a,b)=>desv(a.s)-desv(b.s));
-  mostrar('pEstDesv',dv.length>0);
-  if(dv.length){ barrasH('cEstDesv',dv.map(g=>Object.assign(filaDesv(g,()=>go(g)),{label:g.k+' · '+g.cli})),{div:1,dec:1});
-    $('phEstDesv').textContent='Desviación de cada estilo contra su ficha (suma de diferencias ÷ suma de medidas de ficha). Hacia la izquierda sale más chico; hacia la derecha, más grande. '+(conM.length>15?'Los 15 que más se alejan, de '+conM.length+' estilos':'Estilos')+' con '+MIN_MED+' medidas o más. Toca una barra.'; }
   const rf=refDe(est,pct(S.f,S.n)), fu=ordenFuera(conM).filter(g=>g.s.f>0).slice(0,15);
   mostrar('pEstFuera',fu.length>0);
   if(fu.length){ barrasH('cEstFuera',fu.map(g=>Object.assign(filaFuera(g,rf,()=>go(g)),{label:g.k+' · '+g.cli})));
