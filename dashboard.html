@@ -636,6 +636,8 @@ input.txt::placeholder{font-weight:400;color:var(--stone)}
 .btn{font-family:inherit;font-size:13px;font-weight:700;border-radius:8px;padding:8px 14px;min-height:38px;cursor:pointer;border:1px solid var(--warm);background:#fff;color:var(--sage)}
 .btn:hover{border-color:var(--sage)}
 .spacer{margin-left:auto}
+/* «‹ Buscar fichas» primero, arriba a la izquierda (19/11/2026, Christian): a la derecha se confundía con el Volver del portal */
+.bar>.volverFila{display:flex}
 .lsAcc{display:flex;gap:8px;align-items:center}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-bottom:14px}
 .kpi{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);padding:0;position:relative;overflow:hidden;display:flex;flex-direction:column}
@@ -736,6 +738,7 @@ body.sinScroll{overflow:hidden}
   .bar>label{flex:1 1 calc(50% - 8px);min-width:0}
   .bar>label select,.bar>label input{width:100%;min-width:0;max-width:none}
   .bar>.lsAcc{flex:1 1 100%}.bar>.lsAcc .btn{flex:1}
+  .bar>.volverFila{flex:1 1 100%}
   .btn,select,input.txt{min-height:44px;font-size:14px}
   .spacer{display:none}
   .kpis,.ficha-body .kpis{grid-template-columns:1fr;gap:10px}
@@ -766,6 +769,7 @@ body.sinScroll{overflow:hidden}
 <body>
 <div class="wrap">
   <div class="bar" id="barra">
+    <div class="volverFila"><button class="btn" id="btnVolver" type="button">‹ Buscar fichas</button></div>
     <label>Período<select id="fPer"><option value="">Todo</option></select></label>
     <label>Cliente<select id="fCli"><option value="">Todos</option></select></label>
     <label>Taller<select id="fTal"><option value="">Todos</option></select></label>
@@ -774,7 +778,7 @@ body.sinScroll{overflow:hidden}
     <label>Estilo<input class="txt" id="fEst" type="search" placeholder="Buscar estilo…" autocomplete="off"></label>
     <label class="swPV" id="swPV" title="Encendido: solo las pruebas de vapor. Apagado: las demás mediciones. No se juntan.">Prueba de vapor<input type="checkbox" id="fPV"><span class="swP"></span></label>
     <span class="spacer"></span>
-    <div class="lsAcc"><button class="btn" id="btnVolver" type="button">‹ Buscar fichas</button><button class="btn" id="btnImprimir" type="button">Imprimir</button></div>
+    <div class="lsAcc"><button class="btn" id="btnImprimir" type="button">Imprimir</button></div>
   </div>
   <div class="errBox" id="errBox"></div>
   <div class="vacio" id="vacio"></div>

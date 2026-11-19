@@ -10,7 +10,7 @@ Buscador de fichas técnicas en PDF y control de medidas contra la ficha, desde 
   - Muestra la ficha vigente con sus versiones y la abre en un visor propio (pdf.js). Hay una tarjeta por tipo + grupo + estilo + línea: cada grupo de un estilo tiene su ficha.
   - Grupo real (17/11/2026): "DP-002" es el código del formato de las fichas de Eileen Fisher, no un grupo. Si una ficha llega con ese código, la pantalla usa el grupo del nombre del archivo ("… - EFI-136.pdf"). Antes las fichas de EFI-131, EFI-136 y EFI-142 del mismo estilo se juntaban en una tarjeta y solo se veía la más reciente.
   - El botón "Medir" lleva a `medidas.html`.
-  - Sin cuadros de cantidades (KPI) arriba ni en "Ver todo lo cargado" (quitados el 10/11/2026: no se usaban). El botón "Mediciones" abre `historial.html`, que tiene "‹ Buscar fichas" para volver.
+  - Sin cuadros de cantidades (KPI) arriba ni en "Ver todo lo cargado" (quitados el 10/11/2026: no se usaban). El botón «Medidas Realizadas» (antes "Mediciones"; nombre pedido por Christian, 19/11/2026) abre `historial.html`. Botón «‹ Buscar fichas» (19/11/2026, pedido de Christian): en `historial.html`, `medidas.html` y `dashboard.html` va arriba del todo a la izquierda, porque a la derecha se confundía con el «Volver» del portal; en `medidas.html` antes decía «Volver».
   - Solo la verificadora ve el panel "Ver todo lo cargado" y el acceso a `tablas.html`.
   - Sin botón «Descargar Excel» (quitado el 18/11/2026, pedido de Christian): el bloque lives-excel-reporte sigue en la pantalla, pero el estilo `fichasSinExcel` esconde su botón. Para devolverlo basta quitar ese estilo.
 - `medidas.html` — **formulario** "Control de medidas".
