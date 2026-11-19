@@ -624,8 +624,11 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 .hsub{color:#F1F6F4;font-size:11.5px;}
 .quien{margin-left:auto;color:#F1F6F4;font-size:12px;text-align:right;max-width:45%;overflow-wrap:anywhere;}
 .volver{margin-left:auto;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.4);color:#fff;font-family:inherit;font-size:12.5px;font-weight:700;border-radius:6px;padding:9px 15px;cursor:pointer;white-space:nowrap;}
-/* «‹ Buscar fichas» arriba a la izquierda (19/11/2026, Christian): a la derecha se confundía con el Volver del portal */
-.lsSinBarra{justify-content:flex-start!important;}
+/* «‹ Buscar fichas» primero, al costado de los filtros y de tamaño normal (19/11/2026, Christian): arriba a la derecha se confundía con el Volver del portal y en la tira de arriba quedaba muy chico */
+.filaVolver{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;background:inherit;}
+.filaVolver>.btn{flex:0 0 auto;min-height:42px;white-space:nowrap;}
+.filaVolver>.filtros{flex:1 1 300px;min-width:0;}
+@media (min-width:701px){.filaVolver>.filtros{grid-template-columns:repeat(auto-fit,minmax(130px,1fr));}}
 .wrap{padding:16px 18px 50px;}
 
 #acceso{position:fixed;inset:0;background:var(--warm-light);z-index:120;display:none;align-items:center;justify-content:center;padding:20px;overflow-y:auto;}
@@ -775,15 +778,15 @@ td.nada{color:#C8D3CF;}
     <div class="hsub">Hojas de medidas llenadas por las auditoras</div>
   </div>
   <div class="quien" id="quienHd"></div>
-  <button class="volver" onclick="volverBuscador()">‹ Buscar fichas</button>
 </div>
 
 <div class="wrap" id="app">
   <div class="err" id="err"></div>
 
   <div class="panel">
-    <div class="pt">Buscar mediciones</div>
     <div class="ph lsOculto">Deja los campos vacíos para ver todo.</div>
+    <div class="filaVolver">
+    <button class="btn ghost" onclick="volverBuscador()">‹ Buscar fichas</button>
     <div class="filtros">
       <div><span class="lbl">Estilo</span><input class="txt" id="fEstilo" inputmode="numeric" placeholder="Ej. 25193"></div>
       <div><span class="lbl">Grupo</span><input class="txt" id="fGrupo" placeholder="Ej. PAK-135"></div>
@@ -792,6 +795,7 @@ td.nada{color:#C8D3CF;}
       <div><span class="lbl">Desde</span><input class="txt" type="date" id="fDesde"></div>
       <div><span class="lbl">Hasta</span><input class="txt" type="date" id="fHasta"></div>
       <div><span class="lbl">Prueba de vapor</span><select class="txt" id="fVapor" onchange="buscar()"><option value="">Todas</option><option value="S">Solo pruebas</option><option value="N">Sin pruebas</option></select></div>
+    </div>
     </div>
     <div class="acciones">
       <button class="btn" onclick="buscar()">Buscar</button>

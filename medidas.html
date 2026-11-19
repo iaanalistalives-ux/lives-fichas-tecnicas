@@ -631,8 +631,11 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 .hrow .hinf{min-width:0;overflow-wrap:anywhere;color:var(--stone);}
 .hrow .hinf b{color:#333;}
 .volver{margin-left:auto;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.35);color:#fff;font-family:inherit;font-size:12.5px;font-weight:700;border-radius:6px;padding:8px 14px;cursor:pointer;}
-/* «‹ Buscar fichas» arriba a la izquierda (19/11/2026, Christian): a la derecha se confundía con el Volver del portal */
+/* «‹ Buscar fichas» arriba a la izquierda y de tamaño normal, para que se note (19/11/2026, Christian): a la derecha se confundía con el Volver del portal */
 .lsSinBarra{justify-content:flex-start!important;}
+body .lsSinBarra{padding:10px 14px 0!important;}
+.lsSinBarra button.volver{padding:9px 16px!important;font-size:13.5px!important;min-height:40px!important;border-radius:6px!important;}
+@media (max-width:700px){.lsSinBarra button.volver{min-height:44px!important;font-size:14px!important;}}
 .err{background:#FBE9E9;border:1px solid var(--rose);border-radius:8px;padding:12px 16px;color:#DC2626;font-size:13px;margin:14px;}
 .ok{background:#ECFDF5;border:1px solid var(--emer);border-radius:8px;padding:14px 16px;color:#065F46;font-size:14px;font-weight:700;margin-bottom:12px;}
 
