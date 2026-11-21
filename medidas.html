@@ -1378,9 +1378,9 @@ var NOM_ETAPA={ TERMINADA:'Prenda terminada', ANTES_VAPOR:'Antes de vapor', CORT
    usa la tabla de prenda terminada (o, si no hay, la que tenga la ficha que no sea de antes de
    vapor). Lo medido se guarda marcado como prueba de vapor (no se junta con las demás mediciones)
    y lleva un comentario al final.
-   21/11/2026 (pedido de Christian): si la ficha no trae tabla de antes de vapor (por ejemplo, una
-   sola tabla de prenda terminada), «Antes» también se activa y usa esa misma tabla; ninguna de las
-   dos llega elegida: la auditora elige.                                                         */
+   21/11/2026 (pedido de Christian): si a la ficha le falta una de las dos tablas, la opción que
+   falta también se activa y usa la misma tabla que la otra (solo prenda terminada: «Antes» mide
+   con ella; solo antes de vapor: «Después» mide con ella). Ninguna llega elegida: la auditora elige. */
 var PVAPOR=false, VAPOR='', OBS='';
 var NOM_VAPOR={ ANTES:'Antes de vapor', DESPUES:'Después de vapor' };
 function etapaDespues(etapas){
@@ -1398,11 +1398,11 @@ function elegirVapor(v){ if(v===VAPOR) return; VAPOR=v; COMBO=''; LINEA_OK=false
 function pintarVapor(etapas){
   /* devuelve true si ya se puede seguir (hay etapa); false si falta elegir antes o después */
   var hayAntes=etapas.indexOf('ANTES_VAPOR')>=0, eDesp=etapaDespues(etapas);
-  /* sin tabla de antes de vapor, «Antes» mide con la misma tabla de «Después» (21/11/2026) */
+  /* si falta una de las dos tablas, esa opción mide con la misma tabla de la otra (21/11/2026) */
   var eAntes = hayAntes ? 'ANTES_VAPOR' : eDesp;
+  if(!eDesp) eDesp = eAntes;
   if(VAPOR==='ANTES' && !eAntes) VAPOR='';
   if(VAPOR==='DESPUES' && !eDesp) VAPOR='';
-  if(!VAPOR){ if(eAntes && !eDesp) VAPOR='ANTES'; }
   document.getElementById('selEtapa').style.display='block';
   txt('lblEtapa','Prueba de vapor: ¿qué estás midiendo?');
   document.getElementById('pEtapa').innerHTML =
