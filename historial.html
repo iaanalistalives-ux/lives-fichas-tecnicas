@@ -1085,7 +1085,7 @@ function iniciar(){
   });
   buscar();
   /* el dashboard abre aquí la hoja de una auditoría: historial.html?id=…&hoja=1 */
-  if(p.id) verDetalle(p.id);
+  if(p.id){ if(p.vs) verComparativo(p.id); else verDetalle(p.id); }   /* &vs=1: el dashboard abre el comparativo */
 }
 function params(){
   var o={}, q=location.search.replace(/^\?/,'').split('&');
