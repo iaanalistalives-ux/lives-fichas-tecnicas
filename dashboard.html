@@ -1163,7 +1163,7 @@ function splitHtml(s){ const t=s.nNeg+s.nPos; if(!t) return '<span class="splitT
   return '<div class="split" title="'+num(s.nNeg)+' hacia menos · '+num(s.nPos)+' hacia más"><i class="a" style="width:'+(s.nNeg/t*100).toFixed(1)+'%"></i><i class="b" style="width:'+(s.nPos/t*100).toFixed(1)+'%"></i></div><div class="splitTxt">'+num(pct(s.nNeg,t),0)+'% menos · '+num(pct(s.nPos,t),0)+'% más</div>'; }
 function tabla(cols,rows,onRow){   /* cols: [{t, r(derecha), h(fila)->html}] */
   const id='t'+Math.random().toString(36).slice(2,8);
-  setTimeout(()=>{ const tb=$(id); if(tb&&onRow) tb.querySelectorAll('tr[data-i]').forEach(tr=>tr.onclick=e=>{ const h=e.target.closest('[data-hoja]'); if(h){ verHoja(h.dataset.hoja); return; } if(e.target.closest('button')) return; onRow(rows[+tr.dataset.i]); }); },0);
+  setTimeout(()=>{ const tb=$(id); if(tb&&onRow) tb.querySelectorAll('tr[data-i]').forEach(tr=>tr.onclick=e=>{ const h=e.target.closest('[data-hoja]'); if(h){ verHoja(h.dataset.hoja); return; } const v=e.target.closest('[data-vs]'); if(v){ verHoja(v.dataset.vs,true); return; } if(e.target.closest('button')) return; onRow(rows[+tr.dataset.i]); }); },0);
   return '<table><thead><tr>'+cols.map(c=>'<th'+(c.r?' class="r"':'')+'>'+c.t+'</th>').join('')+'</tr></thead><tbody id="'+id+'">'+
     rows.map((r,i)=>'<tr data-i="'+i+'" class="'+(onRow?'clic':'')+(r.s&&r.s.n<MIN_MED?' baja':'')+'">'+cols.map(c=>'<td'+(c.r?' class="r"':c.nm?' class="nm"':'')+'>'+c.h(r)+'</td>').join('')+'</tr>').join('')+'</tbody></table>';
 }
@@ -1227,7 +1227,94 @@ function pintarTalleres(S){
     {t:'Aprobadas con medidas fuera',r:1,h:g=>num(g.s.apF)},{t:'Prendas por medición',r:1,h:g=>num(g.s.prendas/g.s.aud,1)},{t:'Medidas por medición',r:1,h:g=>num(g.s.n/g.s.aud,0)},
     {t:'Medidas',r:1,h:g=>num(g.s.n)},{t:'% fuera encontrado',r:1,h:g=>p1(g.s.f,g.s.n)}]),aud,goA);
 }
+/* ===== Pruebas de vapor con pareja (23/11/2026, pedido de Christian) =====
+   Con «Prueba de vapor» encendido, la pestaña compara cada prueba DESPUÉS con SU prueba ANTES (la que la
+   auditora enlazó al medir, `vaporRef`; en las guardadas antes de esa opción, la última ANTES del mismo
+   estilo, grupo, línea y color). Son las mismas prendas: ya no es una aproximación. Arriba va el resultado
+   de todas las parejas juntas por estilo y debajo cada pareja por separado. Las pruebas sin pareja (solo
+   antes o solo después) no entran. Se lee con fichas_mediciones y fichas_medicion: la base no cambia. */
+let PARES=null, PARES_EST='';   /* null: sin leer; [] leído */
+function rpcFi(fn,body){ return fetch(SB+'/rest/v1/rpc/'+fn,{method:'POST',headers:{apikey:KEY,'Content-Type':'application/json'},body:JSON.stringify(body||{})}).then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }); }
+const esPvD=m=>!!(m&&(m.pruebaVapor===true||m.pruebaVapor==='true'));
+function lineaVs(c){ const m=String(c||'').toUpperCase().match(/^(MISSY|PLUS|PETITE)\b/); return m?m[1]:String(c||'').toUpperCase(); }
+function claveVs(m){ return [m.estilo,String(m.grupo||'').toUpperCase(),lineaVs(m.combo),quitaTildes(String(m.color||'')).toUpperCase().replace(/\s+/g,' ').trim()].join('|'); }
+function antesDeDesp(d,lista){
+  if(d.vaporRef){ const r=lista.find(x=>x.id===d.vaporRef); if(r) return r; }
+  if(Object.prototype.hasOwnProperty.call(d,'vaporRef')) return null;   /* guardada sin enlazar: queda sola */
+  const tom={}; lista.forEach(x=>{ if(esPvD(x)&&x.vapor==='DESPUES'&&x.vaporRef&&x.id!==d.id) tom[x.vaporRef]=1; });
+  const k=claveVs(d);
+  return lista.filter(x=>esPvD(x)&&x.vapor==='ANTES'&&!tom[x.id]&&claveVs(x)===k&&String(x.fecha||'')<=String(d.fecha||''))
+              .sort((a,b)=>String(b.fecha||'').localeCompare(String(a.fecha||'')))[0]||null;
+}
+function calcPar(A,D){
+  const fac=(A.unidad===D.unidad)?1:(D.unidad==='cm'?2.54:1/2.54), u=v=>(v==null||v===''||isNaN(v))?null:+v*fac;
+  const info={}; ((D.espec&&D.espec.puntos)||[]).forEach(p=>{ info[p.cod]={desc:p.desc||'',tol:+p.tol||0}; });
+  ((A.espec&&A.espec.puntos)||[]).forEach(p=>{ if(!info[p.cod]) info[p.cod]={desc:p.desc||'',tol:+p.tol||0}; });
+  const ix=(det,cv)=>{ const o={}; (det||[]).forEach(x=>{ const r=cv?u(x.real):+x.real; if(r==null||isNaN(r)) return; const k=x.talla+'|'+x.cod; (o[k]=o[k]||{s:0,n:0}); o[k].s+=r; o[k].n++; }); return o; };
+  const IA=ix(A.detalle,true), ID=ix(D.detalle,false);
+  const r={sA:0,sC:0,nPar:0,sup:0,fA:0,nA:0,fD:0,nD:0,cod:{}};
+  (A.detalle||[]).forEach(x=>{ r.nA++; if(!x.ok) r.fA++; }); (D.detalle||[]).forEach(x=>{ r.nD++; if(!x.ok) r.fD++; });
+  Object.keys(IA).forEach(k=>{ const a=IA[k], d=ID[k]; if(!d) return; const pa=a.s/a.n, pd=d.s/d.n; if(!(pa>0)) return;
+    const cod=k.split('|').slice(1).join('|'), inf=info[cod]||{desc:'',tol:0};
+    r.sA+=pa; r.sC+=pd-pa; r.nPar++; if(inf.tol>0&&Math.abs(pd-pa)>inf.tol) r.sup++;
+    const o=r.cod[cod]=r.cod[cod]||{a:0,c:0,n:0,desc:inf.desc}; o.a+=pa; o.c+=pd-pa; o.n++; });
+  r.cam=r.sA>0?r.sC/r.sA*100:null; return r;
+}
+function cargarPares(){
+  PARES_EST='cargando';
+  rpcFi('fichas_mediciones',{p_estilo:'',p_grupo:'',p_taller:'',p_auditora:'',p_desde:'',p_hasta:''}).then(r=>{
+    const lista=(r&&r.mediciones)||[], pares=[];
+    lista.filter(m=>esPvD(m)&&m.vapor==='DESPUES').forEach(d=>{ const a=antesDeDesp(d,lista); if(a) pares.push({a:a,d:d}); });
+    const sinPar=lista.filter(m=>esPvD(m)&&!pares.some(p=>p.a.id===m.id||p.d.id===m.id)).length;
+    return Promise.all(pares.map(p=>Promise.all([rpcFi('fichas_medicion',{p_id:p.a.id}),rpcFi('fichas_medicion',{p_id:p.d.id})]).then(([ra,rd])=>{
+      if(!ra||!ra.medicion||!rd||!rd.medicion) return null;
+      return Object.assign(p,{A:ra.medicion,D:rd.medicion,r:calcPar(ra.medicion,rd.medicion),enlazada:!!p.d.vaporRef}); })))
+      .then(ps=>{ PARES=ps.filter(Boolean).sort((x,y)=>String(y.d.fecha).localeCompare(String(x.d.fecha))); PARES.sinPar=sinPar; PARES_EST='ok'; if(PV) render(); });
+  }).catch(()=>{ PARES_EST='error'; if(PV) render(); });
+}
+function paresVis(f){
+  const ids=new Set(VIS.map(m=>m.id));
+  return (PARES||[]).filter(p=>ids.has(p.d.id)||ids.has(p.a.id));
+}
+function pintarVaporPares(f){
+  if(PARES_EST===''){ cargarPares(); }
+  if(PARES_EST!=='ok'){
+    mostrar('tabVapor',true);
+    $('gVapor').innerHTML='<div class="panel col12"><span class="tira"></span><div class="vacioP">'+(PARES_EST==='error'?'No se pudieron leer las pruebas de vapor. Revisa tu conexión y vuelve a abrir la pantalla.':'Cargando las pruebas antes y después de vapor…')+'</div></div>';
+    return;
+  }
+  const ps=paresVis(f);
+  mostrar('tabVapor',(PARES||[]).length>0);
+  if(!ps.length){ $('gVapor').innerHTML='<div class="panel col12"><span class="tira"></span><div class="vacioP">'+((PARES||[]).length?'Ninguna prueba con su antes y después entra en los filtros elegidos.':'Todavía no hay pruebas de vapor con su antes y su después.')+'</div></div>';
+    if(!(PARES||[]).length && $('tabVapor').classList.contains('active')) irTab(0); return; }
+  /* resultado de todas las parejas, por estilo */
+  const est=new Map(); ps.forEach(p=>{ const e=p.d.estilo; if(!est.has(e)) est.set(e,[]); est.get(e).push(p); });
+  let h='', graf=[];
+  [...est.entries()].forEach(([e,lst],i)=>{
+    const t={sA:0,sC:0,nPar:0,sup:0}, cod={};
+    lst.forEach(p=>{ t.sA+=p.r.sA; t.sC+=p.r.sC; t.nPar+=p.r.nPar; t.sup+=p.r.sup;
+      Object.keys(p.r.cod).forEach(k=>{ const o=cod[k]=cod[k]||{a:0,c:0,n:0,desc:p.r.cod[k].desc}; o.a+=p.r.cod[k].a; o.c+=p.r.cod[k].c; o.n+=p.r.cod[k].n; }); });
+    const cam=t.sA?t.sC/t.sA*100:null, cli=lst[0].D.cliente||lst[0].d.cliente||'';
+    h+='<div class="panel col12"><span class="tira volumen"></span><div class="pt">Estilo '+esc(e)+(cli?' · '+esc(cli):'')+' — con el vapor cambia <span class="'+clsDesv(cam)+'">'+sig(cam)+'</span></div>'+
+       '<div class="ph">'+lst.length+' prueba(s) con su antes y su después, las mismas prendas medidas dos veces. Cambio = suma de (después − antes) ÷ suma de antes, con la medida promedio de cada punto y talla medidos en las dos. Negativo = encoge con el vapor. '+t.sup+' de '+t.nPar+' punto-talla cambiaron más que la tolerancia.</div>'+
+       '<div class="cwrap"><canvas id="cVap'+i+'"></canvas></div></div>';
+    graf.push(['cVap'+i,Object.keys(cod).map(k=>{ const o=cod[k], d=o.a?o.c/o.a*100:0;
+      return {label:(o.desc?String(o.desc).toUpperCase():'Punto')+' ('+k+')',val:d,txt:sig(d),color:d<0?SLATE:TAUPE,tip:['Cambio con el vapor: '+sig(d), o.n+' talla(s) comparadas']}; }).sort((a,b)=>a.val-b.val)]);
+  });
+  /* cada pareja por separado */
+  h+='<div class="panel col12"><span class="tira"></span><div class="pt">Cada prueba con su antes y su después</div>'+
+     '<div class="ph">Una fila por pareja. Toca una fila para abrir su comparativo, prenda por prenda.'+(PARES.sinPar?' '+PARES.sinPar+' prueba(s) de vapor sin pareja (solo antes o solo después) no entran en esta pestaña.':'')+'</div>'+
+     '<div class="tw">'+tabla([{t:'Estilo',nm:1,h:p=>esc(p.d.estilo)},{t:'Grupo',h:p=>esc(p.d.grupo)},{t:'Color',h:p=>esc(p.d.color)},{t:'Línea',h:p=>esc(p.d.combo||'—')},
+       {t:'Taller',h:p=>esc(p.d.taller)},{t:'Antes',h:p=>esc(p.a.fecha)},{t:'Después',h:p=>esc(p.d.fecha)},
+       {t:'Cambio con el vapor',r:1,h:p=>'<b class="'+clsDesv(p.r.cam)+'">'+sig(p.r.cam)+'</b>'},
+       {t:'Fuera antes',r:1,h:p=>num(p.r.fA)+' de '+num(p.r.nA)},{t:'Fuera después',r:1,h:p=>num(p.r.fD)+' de '+num(p.r.nD)},
+       {t:'Cambian más que la tol.',r:1,h:p=>num(p.r.sup)+' de '+num(p.r.nPar)},
+       {t:'',h:p=>'<button type="button" class="lnk" data-vs="'+esc(p.d.id)+'">Ver comparativo</button>'}],ps,p=>verHoja(p.d.id,true))+'</div></div>';
+  $('gVapor').innerHTML=h;
+  graf.forEach(g=>barrasH(g[0],g[1],{div:1,dec:1,largo:48}));
+}
 function pintarVapor(f){
+  if(PV){ pintarVaporPares(f); return; }
   /* medida promedio de la prenda terminada contra la de antes de vapor, mismo estilo, punto y talla. No depende del período. */
   const filas=VAPOR.filter(v=>(!f.est||String(v.estilo).toUpperCase().indexOf(f.est)>=0) && v.nA>=3 && v.nT>=3 && v.sA>0 && (!f.cli||M.some(m=>m.estilo===v.estilo&&m.cliente===f.cli)));
   const est=new Map(); filas.forEach(v=>{ if(!est.has(v.estilo)) est.set(v.estilo,[]); est.get(v.estilo).push(v); });
@@ -1315,9 +1402,9 @@ function renderFicha(){
   }
   reajustarGrids();
 }
-function verHoja(id){
+function verHoja(id,vs){
   const q=new URLSearchParams(location.search), u=q.get('usuario');
-  $('hojaFr').src='historial.html?id='+encodeURIComponent(id)+'&hoja=1'+(u?'&usuario='+encodeURIComponent(u):'');
+  $('hojaFr').src='historial.html?id='+encodeURIComponent(id)+'&hoja=1'+(vs?'&vs=1':'')+(u?'&usuario='+encodeURIComponent(u):'');
   $('hojaCab').style.display=''; $('hoja').style.display='flex'; document.body.classList.add('sinScroll');
 }
 /* cuando la hoja ya cargó, su propio botón Cerrar cierra la ventana: el de arriba solo queda mientras carga */
@@ -1370,6 +1457,11 @@ window.LS_XLS={
       {titulo:'Por etapa',columnas:[k('Etapa')].concat(ca,cm),filas:grupos(VIS,m=>m.etapa,m=>NOM_ETAPA[m.etapa]||m.etapa).map(fila)},
       {titulo:'Por cliente',columnas:[k('Cliente')].concat(ca,cm),filas:ordenFuera(grupos(VIS,m=>m.cliente)).map(fila)},
       {titulo:'Por taller',nota:'% rechazadas solo con '+MIN_AUD+' mediciones o más.',columnas:[k('Taller')].concat(ca,[{campo:'pr',titulo:'% rechazadas',tipo:'porcentaje'}],cm),filas:ordenFuera(grupos(VIS,m=>m.talKey,m=>m.taller)).map(fila)},
+      ...(PV&&PARES_EST==='ok'&&paresVis(f).length?[{titulo:'Antes vs después de vapor',nota:'Una fila por prueba con su antes y su después (mismas prendas). Cambio = suma de (después − antes) ÷ suma de antes, por punto y talla medidos en las dos; negativo = encoge.',
+        columnas:[{campo:'e',titulo:'Estilo',tipo:'alfanumerico'},{campo:'g',titulo:'Grupo',tipo:'alfanumerico'},{campo:'co',titulo:'Color',tipo:'texto'},{campo:'li',titulo:'Línea',tipo:'texto'},{campo:'ta',titulo:'Taller',tipo:'texto'},
+          {campo:'fa',titulo:'Antes',tipo:'alfanumerico'},{campo:'fd',titulo:'Después',tipo:'alfanumerico'},{campo:'cv',titulo:'Cambio con el vapor',tipo:'porcentaje'},
+          {campo:'xa',titulo:'Fuera antes',tipo:'entero'},{campo:'na',titulo:'Medidas antes',tipo:'entero'},{campo:'xd',titulo:'Fuera después',tipo:'entero'},{campo:'nd',titulo:'Medidas después',tipo:'entero'},{campo:'su',titulo:'Punto-talla que cambian más que la tolerancia',tipo:'entero'}],
+        filas:paresVis(f).map(p=>({e:p.d.estilo,g:p.d.grupo,co:p.d.color,li:p.d.combo,ta:p.d.taller,fa:p.a.fecha,fd:p.d.fecha,cv:p.r.cam==null?null:p.r.cam/100,xa:p.r.fA,na:p.r.nA,xd:p.r.fD,nd:p.r.nD,su:p.r.sup}))}]:[]),
       {titulo:'Por auditor(a)',nota:'% rechazadas solo con '+MIN_AUD+' mediciones o más.',columnas:[k('Auditor(a)')].concat(ca,[{campo:'pr',titulo:'% rechazadas',tipo:'porcentaje'},{campo:'apf',titulo:'Aprobadas con medidas fuera',tipo:'entero'}],cm),filas:grupos(VIS,m=>m.audKey,m=>m.auditora).sort((a,b)=>b.s.aud-a.s.aud).map(fila)}];
     const det=VIS.map(m=>{ const s=stat([m]); return {fe:m.fecha,es:m.estilo,gr:m.grupo,cl:m.cliente,co:m.color,et:NOM_ETAPA[m.etapa]||m.etapa,ta:m.taller,au:m.auditora,pr:m.prendas,n:m.nMedidas,f:m.nFuera,pf:pc(m.nFuera,m.nMedidas),dv:dvx(s),ng:s.nNeg,ps:s.nPos,re:m.resultado}; });
     return {titulo:'Dashboard de Medidas',sub:lbl,origen:'Fichas Técnicas · Dashboard de Medidas',
