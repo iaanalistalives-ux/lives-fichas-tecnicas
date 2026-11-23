@@ -680,6 +680,16 @@ input.txt.colOk{border-color:var(--sage);font-weight:700;color:var(--sage);}
 .swVapor input:focus-visible + .swP{outline:2px solid var(--emer);outline-offset:2px;}
 .swVapor .swT{font-size:14px;font-weight:800;letter-spacing:.04em;}
 .swVapor.on{border-color:var(--sage);}
+/* después de vapor enlazado a su antes (23/11/2026) */
+.antOp{display:flex;gap:10px;align-items:center;width:100%;text-align:left;background:#fff;border:1.5px solid var(--warm);border-radius:12px;padding:10px 12px;margin:0 0 8px;font-family:inherit;font-size:13px;color:#333;cursor:pointer;}
+.antOp b{font-size:14px;}
+.antOp .aInf{min-width:0;flex:1;overflow-wrap:anywhere;}
+.antOp .aInf span{color:var(--stone);}
+.antOp .aTag{font-size:10.5px;font-weight:800;padding:3px 8px;border-radius:20px;white-space:nowrap;background:var(--warm-light);color:var(--stone);}
+.antOp.on{border-color:var(--sage);box-shadow:0 0 0 2px var(--sage) inset;}
+.antOp.ninguna{justify-content:center;font-weight:700;color:var(--stone);}
+.antesLinea{font-size:13px;margin:-2px 0 8px;padding:6px 10px;border-radius:8px;background:var(--warm-light);color:#333;}
+.antesLinea b{color:var(--sage);}
 .obsVapor{width:100%;box-sizing:border-box;min-height:84px;resize:vertical;font-family:inherit;font-size:15px;padding:10px 12px;height:auto;}
 .num{display:flex;align-items:center;gap:12px;}
 .num button{width:44px;height:44px;border-radius:8px;border:1.5px solid var(--warm);background:#fff;color:var(--sage);font-size:22px;font-weight:700;cursor:pointer;}
@@ -917,6 +927,11 @@ body.capAbierta #btnDib{display:none!important;}
     <div id="selEtapa" style="display:none;">
       <span class="lbl" id="lblEtapa">¿Qué estás midiendo?</span>
       <div class="pills" id="pEtapa"></div>
+    </div>
+    <div id="selAntes" style="display:none;">
+      <span class="lbl">¿Continúas una prueba antes de vapor? (opcional)</span>
+      <div id="pAntes"></div>
+      <div class="avisoCombo" id="avisoAntes"></div>
     </div>
     <div id="selCombo" style="display:none;">
       <span class="lbl">Combo de la ficha</span>
@@ -1201,7 +1216,8 @@ function arrancar(){
     }
     VARIANTES=r.variantes;
     PRECARGA=r.espec||null;
-    pintarHistorial(r.mediciones||[]);
+    MEDS_EST=r.mediciones||[];
+    pintarHistorial(MEDS_EST);
     /* Medir ofrece todo lo que tiene la ficha del estilo (corte, antes de vapor, prenda terminada),
        no solo el tipo de la tarjeta desde donde se entró. Si falla, queda lo del tipo de la tarjeta. */
     jsonp('accion=variantes&clave='+encodeURIComponent(SES.clave)+
@@ -1223,7 +1239,7 @@ function borradorGuardar(){
   if(!F || !Object.keys(DATOS).length) return;
   try{
     LS.set(borradorClave(), JSON.stringify({ ts:Date.now(), grupo:GRUPO, etapa:ETAPA, combo:COMBO, color:COLOR,
-      pv:PVAPOR, vapor:VAPOR, obs:OBS,
+      pv:PVAPOR, vapor:VAPOR, obs:OBS, vref:VREF, vsin:VSIN,
       taller:SES.taller, datos:DATOS, prendas:PRENDAS, tact:TACT, pact:PACT, idEnvio:ID_ENVIO }));
   }catch(e){}
 }
@@ -1249,6 +1265,8 @@ function borradorContinuar(){
   if(BORR.grupo) GRUPO=BORR.grupo;
   else if(!GRUPO){ var _vs=VARIANTES.slice().sort(recienteVar); GRUPO=_vs.length ? (gruposDeVar(_vs[0])[0]||'') : ''; }
   PVAPOR=!!BORR.pv; VAPOR=PVAPOR?(BORR.vapor||''):''; OBS=PVAPOR?(BORR.obs||''):'';
+  VREF=(PVAPOR&&VAPOR==='DESPUES')?(BORR.vref||''):''; VSIN=!!(PVAPOR&&BORR.vsin); VANTES=null;
+  if(VREF) cargarAntes(VREF);
   ETAPA=BORR.etapa||ETAPA; COMBO=BORR.combo||''; COLOR=BORR.color||''; LINEA_OK=true;
   RETOMAR=true; pintarEtapas();
 }
@@ -1382,6 +1400,77 @@ var NOM_ETAPA={ TERMINADA:'Prenda terminada', ANTES_VAPOR:'Antes de vapor', CORT
    falta también se activa y usa la misma tabla que la otra (solo prenda terminada: «Antes» mide
    con ella; solo antes de vapor: «Después» mide con ella). Ninguna llega elegida: la auditora elige. */
 var PVAPOR=false, VAPOR='', OBS='';
+/* ---------- después de vapor enlazado a su antes (23/11/2026, pedido de Christian) ----------
+   Al medir DESPUÉS DE VAPOR se elige la prueba ANTES DE VAPOR que se está continuando (del mismo
+   estilo y grupo). Así no quedan datos distintos: trae su taller, línea y color, las mismas prendas
+   por talla, y en cada punto muestra lo que midió esa prenda antes de vapor. Se guarda con
+   `vaporRef` (el id de la prueba antes). Es OPCIONAL (aclaración de Christian, 23/11/2026): a veces
+   solo se mide antes o solo después; sin elegir se mide igual, y tocar la elegida la quita. */
+var MEDS_EST=[], VREF='', VSIN=false, VANTES=null;
+function fechaCorta(f){
+  var m=String(f||'').match(/^(\d{4})-(\d{2})-(\d{2})\s*(\d{2}:\d{2})?/), ms=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  return m ? (+m[3])+' '+ms[+m[2]-1]+(m[4]?' · '+m[4]:'') : String(f||'');
+}
+function esPrueba(m){ return !!(m && (m.pruebaVapor===true || m.pruebaVapor==='true')); }
+function antesDisponibles(){
+  var a=MEDS_EST.filter(function(m){ return esPrueba(m) && m.vapor==='ANTES'; });
+  if(GRUPO){ var g=a.filter(function(m){ return String(m.grupo||'').toUpperCase()===GRUPO; }); if(g.length) a=g; }
+  return a.sort(function(x,y){ return String(y.fecha||'').localeCompare(String(x.fecha||'')); });
+}
+function yaTieneDespues(id){
+  return MEDS_EST.some(function(m){ return esPrueba(m) && m.vapor==='DESPUES' && m.vaporRef===id; });
+}
+function pintarAntes(){
+  var box=document.getElementById('selAntes'); if(!box) return;
+  if(!(PVAPOR && VAPOR==='DESPUES')){ box.style.display='none'; return; }
+  var lst=antesDisponibles();
+  if(!lst.length){ box.style.display='none'; return; }
+  box.style.display='block';
+  if(VREF && !lst.some(function(m){ return m.id===VREF; })){ VREF=''; VANTES=null; }
+  document.getElementById('pAntes').innerHTML = lst.slice(0,12).map(function(m){
+    var np=0; Object.keys(m.prendas||{}).forEach(function(t){ np+=(+m.prendas[t]||0); });
+    var lin=lineaDeCombo(m.combo); lin=lin?NOM_LINEA[lin]:(m.combo||'');
+    return '<button type="button" class="antOp'+(m.id===VREF?' on':'')+'" onclick="elegirAntes(\''+m.id+'\')">'+
+      '<div class="aInf"><b>'+(m.color||'—')+(lin?' · '+lin:'')+'</b> · '+fechaCorta(m.fecha)+
+      '<br><span>'+(m.auditora||'—')+' · '+(m.taller||'—')+' · '+np+' prenda'+(np===1?'':'s')+
+      ' · tallas '+(m.tallas||[]).join(', ')+'</span></div>'+
+      (yaTieneDespues(m.id)?'<span class="aTag">ya tiene después</span>':'')+'</button>';
+  }).join('')+
+    '';
+  txt('avisoAntes', VREF ? 'Toca otra vez la elegida para quitarla.' : 'Opcional: si mediste antes de vapor estas mismas prendas, elígela y el comparativo saldrá con las dos. Si no, sigue sin elegir.');
+}
+function elegirAntes(id){
+  if(!id || id===VREF){ VREF=''; VSIN=false; VANTES=null; pintarAntes(); return; }   /* tocar la elegida la quita */
+  var m=MEDS_EST.filter(function(x){ return x.id===id; })[0]; if(!m) return;
+  VREF=id; VSIN=false; VANTES=null;
+  /* trae el taller, la línea y el color de la prueba antes */
+  var tv=String(m.taller||'').toUpperCase()==='LIVES' ? TALLER_PLANTA : (m.taller||'');
+  var sel=document.getElementById('selTaller');
+  if(sel && tv){ sel.value=tv; if(sel.value===tv) elegirTaller(tv); }
+  var vs=varsDeEtapa(ETAPA).map(function(v){ return v.combo||''; });
+  var lin=lineaDeCombo(m.combo);
+  var c=vs.indexOf(m.combo||'')>=0 ? (m.combo||'') : (lin ? (vs.filter(function(x){ return lineaDeCombo(x)===lin; })[0]||'') : '');
+  if(c || vs.indexOf('')>=0){ COMBO=c; LINEA_OK=true; }
+  if(m.color){
+    COLOR=m.color; COLOR_LISTA=m.color;
+    var o=document.getElementById('colorOtro');
+    var enBoton=Array.prototype.some.call(document.querySelectorAll('#pColores .pill'),function(x){ return x.textContent===m.color; });
+    if(o){ o.value=enBoton?'':m.color; o.classList.toggle('colOk',!enBoton); }
+  }
+  cargarAntes(id);
+  pintarEtapas();
+}
+function cargarAntes(id){
+  jsonp('accion=medicion&clave='+encodeURIComponent(SES.clave)+'&id='+encodeURIComponent(id), function(r){
+    if(id!==VREF) return;
+    VANTES=(r && r.ok && r.medicion) ? r.medicion : null;
+    if(VANTES && F && document.getElementById('medir').style.display==='block') pintarLista();
+  });
+}
+function antesDe(t,p,cod){
+  if(!VANTES || !VANTES.detalle) return null;
+  return VANTES.detalle.filter(function(d){ return d.talla===t && +d.prenda===+p && d.cod===cod; })[0]||null;
+}
 var NOM_VAPOR={ ANTES:'Antes de vapor', DESPUES:'Después de vapor' };
 function etapaDespues(etapas){
   if(etapas.indexOf('TERMINADA')>=0) return 'TERMINADA';
@@ -1390,11 +1479,11 @@ function etapaDespues(etapas){
 }
 function nomEtapaAct(e){ return PVAPOR ? 'Prueba de vapor · '+(NOM_VAPOR[VAPOR]||'') : (NOM_ETAPA[e]||e||''); }
 function cambiarVapor(on){
-  PVAPOR=!!on; VAPOR=''; COMBO=''; LINEA_OK=false;
+  PVAPOR=!!on; VAPOR=''; COMBO=''; LINEA_OK=false; VREF=''; VSIN=false; VANTES=null;
   if(!PVAPOR){ ETAPA=''; OBS=''; }
   pintarEtapas();
 }
-function elegirVapor(v){ if(v===VAPOR) return; VAPOR=v; COMBO=''; LINEA_OK=false; pintarEtapas(); }
+function elegirVapor(v){ if(v===VAPOR) return; VAPOR=v; COMBO=''; LINEA_OK=false; VREF=''; VSIN=false; VANTES=null; pintarEtapas(); }
 function pintarVapor(etapas){
   /* devuelve true si ya se puede seguir (hay etapa); false si falta elegir antes o después */
   var hayAntes=etapas.indexOf('ANTES_VAPOR')>=0, eDesp=etapaDespues(etapas);
@@ -1410,8 +1499,9 @@ function pintarVapor(etapas){
       return '<button class="pill'+(o[0]===VAPOR?' on':'')+'"'+(o[1]?'':' disabled title="Esta ficha no trae esa tabla"')+
              ' onclick="elegirVapor(\''+o[0]+'\')">'+NOM_VAPOR[o[0]].toUpperCase()+'</button>';
     }).join('');
-  if(!VAPOR) return false;
+  if(!VAPOR){ pintarAntes(); return false; }
   ETAPA = VAPOR==='ANTES' ? eAntes : eDesp;
+  pintarAntes();
   return true;
 }
 
@@ -1521,6 +1611,7 @@ function pintarEtapas(){
   }
   txt('lblEtapa','¿Qué estás midiendo?');
   document.getElementById('selEtapa').style.display='none';
+  document.getElementById('selAntes').style.display='none';
   if(!ETAPA || etapas.indexOf(ETAPA)<0)
     ETAPA = etapas.indexOf('TERMINADA')>=0 ? 'TERMINADA' : etapas[0];
   if(etapas.length>1){
@@ -1829,10 +1920,18 @@ function empezar(){
     alert('Elige el taller donde estás midiendo.');
     return;
   }
+  var mA=VREF ? MEDS_EST.filter(function(x){ return x.id===VREF; })[0] : null;
+  if(mA && mA.color && COLOR!==mA.color &&
+     !confirm('La prueba antes de vapor es del color '+mA.color+' y elegiste '+COLOR+'. ¿Seguir así?')) return;
   if(BORR && !confirm('Hay una medición sin terminar. ¿Descartarla y empezar esta nueva?')) return;
   DATOS={}; PRENDAS={}; ID_ENVIO=''; OBS="";
   F.tallas.forEach(function(t){ PRENDAS[t]=1; });
   TACT=F.tallas[0]; PACT=1;
+  if(mA){   /* las mismas prendas por talla que la prueba antes */
+    var primera='';
+    F.tallas.forEach(function(t){ var n=+((mA.prendas||{})[t])||0; if(n){ PRENDAS[t]=Math.min(20,n); if(!primera) primera=t; } });
+    if(primera) TACT=primera;
+  }
   borradorBorrar(); pintarBorrador();
   document.getElementById('config').style.display='none';
   document.querySelector('.header').style.display='none';
@@ -1960,6 +2059,9 @@ function panelPunto(i, esp, tol){
     '<button type="button" onclick="cerrarPunto()" aria-label="Cerrar">✕</button></div>'+
     '<div class="espLinea"><span class="espVal">'+fmtMed(esp)+'</span>'+
     '<span class="espTol"><b>Tolerancia</b> ± '+fmtMed(tol)+(tol>0?' (±'+fmtPct(tol,esp)+')':'')+'</span></div>'+
+    (function(){ var a=antesDe(TACT,PACT,p[0]); if(!a) return '';
+      return '<div class="antesLinea">Antes de vapor, esta prenda: <b>'+fmtMed(a.real)+'</b> ('+
+        ((a.difTxt&&a.difTxt!=='—')?a.difTxt:'exacta')+')</div>'; })()+
     '<div class="signo">'+
       '<button id="sgMenos" onclick="setSigno(-1)">− Menos</button>'+
       '<button id="sgMas" onclick="setSigno(1)">+ Más</button>'+
@@ -2688,7 +2790,8 @@ function decidir(r){
                cliente:PAR.cliente||'', color:COLOR, taller:SES.taller, auditora:SES.auditora,
                fileId:ESPEC.fileId||'', archivo:ESPEC.archivo||'',
                tallas:Object.keys(prendas), prendas:prendas, resultado:r,
-               pruebaVapor:PVAPOR, vapor:(PVAPOR?VAPOR:''), obs:(PVAPOR?String(OBS||'').trim():'') },
+               pruebaVapor:PVAPOR, vapor:(PVAPOR?VAPOR:''), obs:(PVAPOR?String(OBS||'').trim():''),
+               vaporRef:((PVAPOR&&VAPOR==='DESPUES')?VREF:'') },
          det: det },
     function(res){
       if(!res || !res.ok){

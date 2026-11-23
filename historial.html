@@ -742,7 +742,29 @@ input.txt:focus,select.txt:focus{outline:none;border-color:var(--sage);}
 #det .top{background:var(--petrol);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:5;border-bottom:2px solid var(--emer);flex-wrap:wrap;}
 #det .top .t{font-size:16px;font-weight:800;}
 #det .top .s{font-size:11.5px;color:#CFE5DE;}
-#det .top .btns{margin-left:auto;display:flex;gap:8px;}
+#det .top .btns{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;}
+/* comparativo antes vs después de vapor (23/11/2026) */
+.fila .btnVs{flex:0 0 auto;background:#fff;border:1.5px solid var(--sage);color:var(--sage);font-family:inherit;font-size:11.5px;font-weight:800;border-radius:20px;padding:5px 11px;cursor:pointer;white-space:nowrap;}
+.vsCab{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.vsCab .lado{border:1px solid var(--warm);border-radius:8px;padding:10px 12px;font-size:12.5px;}
+.vsCab .lado .q{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;color:var(--sage);margin-bottom:4px;}
+.vsCab .lado span{color:var(--stone);}
+.vsCab .lado .verH{margin-top:8px;background:none;border:none;color:var(--sage);font-family:inherit;font-size:12px;font-weight:800;padding:0;cursor:pointer;text-decoration:underline;}
+.vsModo{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px;}
+.vsModo button{background:#fff;border:1.5px solid var(--warm);color:#333;font-family:inherit;font-size:13px;font-weight:700;border-radius:20px;padding:7px 14px;cursor:pointer;}
+.vsModo button.on{border-color:var(--sage);color:var(--sage);box-shadow:0 0 0 1px var(--sage) inset;}
+.kpi .v.neu{color:#333;}
+.kpi .d{font-size:11px;color:var(--stone);margin-top:2px;}
+td.vs{font-weight:700;}
+td.vs small{display:block;font-size:10px;font-weight:600;}
+td.vs small.ok{color:var(--sage);}
+td.vs small.mal{color:var(--rose);}
+td.cam{font-weight:800;}
+td.cam.mal{color:var(--rose);background:#FEF2F2;}
+td.cam .pct{display:block;font-size:10px;font-weight:600;opacity:.85;}
+.topPtos{font-size:13px;line-height:1.6;}
+.topPtos b{color:#333;}
+@media(max-width:600px){ .vsCab{grid-template-columns:1fr;} }
 #det .top button{background:#fff;color:var(--petrol);border:none;font-family:inherit;font-size:12.5px;font-weight:800;border-radius:6px;padding:8px 15px;cursor:pointer;}
 #det .top button.alt{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.45);color:#fff;}
 #det .cuerpo{padding:16px 18px 50px;}
@@ -833,6 +855,7 @@ td.nada{color:#C8D3CF;}
 <div id="det"><div class="top">
     <div><div class="t" id="dTit">—</div><div class="s" id="dSub">—</div></div>
     <div class="btns">
+      <button class="alt" id="btnVs" onclick="verComparativo(VS_ID)" style="display:none;">Antes vs después</button>
       <button class="alt" id="btnFigura" onclick="abrirDibujo()" style="display:none;">Ver figura</button>
       <button class="alt" id="btnFicha" onclick="verFicha()" style="display:none;">Ver ficha</button>
       <button class="alt" onclick="imprimir()">Imprimir</button>
@@ -1096,7 +1119,7 @@ function buscar(){
       document.getElementById('salida').innerHTML='<div class="vacio">Sin conexión.</div>';
       return;
     }
-    error(''); MEDS=r.mediciones||[];
+    error(''); MEDS=r.mediciones||[]; MEDS_TODAS=MEDS.slice();
     /* prueba de vapor (18/11/2026): el filtro deja solo las pruebas de vapor, o las quita */
     var fv=document.getElementById('fVapor').value;
     if(fv) MEDS=MEDS.filter(function(m){ return fv==='S' ? esVapor(m) : !esVapor(m); });
@@ -1142,6 +1165,7 @@ function pintarLista(){
          '<br>'+m.nMedidas+' medidas · '+(m.nFuera>0
              ? '<b style="color:var(--rose);">'+m.nFuera+' fuera de tolerancia</b>'
              : 'todas dentro de tolerancia')+'</div>'+
+         (esVapor(m) && parVapor(m,MEDS_TODAS) ? '<button type="button" class="btnVs" onclick="event.stopPropagation();verComparativo(\''+m.id+'\')">Antes vs después</button>' : '')+
          '<div class="res '+(re?'re':'ap')+'">'+(m.resultado||'—')+'</div>'+
          '</div>';
     });
@@ -1149,6 +1173,190 @@ function pintarLista(){
   if(ver.length<MEDS.length)
     h+='<div class="lsTope500">Se muestran los 500 registros más recientes de '+MEDS.length.toLocaleString('es-PE')+'. Usa los filtros para ver los demás.</div>';
   out.innerHTML=h;
+}
+/* ===== Antes vs después de vapor (23/11/2026, pedido de Christian) =====
+   Una prueba de vapor DESPUÉS se une a su prueba ANTES: la que la auditora eligió al medir
+   (`vaporRef`) o, en las guardadas antes de esa opción, la última ANTES del mismo estilo, grupo,
+   línea y color medida antes que ella. Enlazar es opcional: una prueba sola no lleva el botón. El comparativo pone las dos lado a lado: medida promedio
+   antes, después, cuánto cambió con el vapor y cómo quedó cada una contra la ficha. */
+var MEDS_TODAS=[], VS_ID='', VS_MODO='prom', VS_DAT=null;
+function lineaVs(c){ var m=String(c||'').toUpperCase().match(/^(MISSY|PLUS|PETITE)\b/); return m?m[1]:String(c||'').toUpperCase(); }
+function claveVs(m){ return [m.estilo, String(m.grupo||'').toUpperCase(), lineaVs(m.combo), normNombre(m.color||'')].join('|'); }
+function antesDeDesp(d, lista){
+  if(d.vaporRef){ var r=lista.filter(function(x){ return x.id===d.vaporRef; })[0]; if(r) return r; }
+  /* desde que se puede enlazar (Fi04), toda prueba guardada trae la clave vaporRef: si viene vacía es
+     porque la auditora no enlazó (a veces solo se mide antes o solo después) y no se le busca pareja.
+     Solo las guardadas antes, que no traen la clave, se emparejan por estilo, grupo, línea y color. */
+  if(d.hasOwnProperty('vaporRef')) return null;
+  var tomados={};
+  lista.forEach(function(x){ if(esVapor(x) && x.vapor==='DESPUES' && x.vaporRef && x.id!==d.id) tomados[x.vaporRef]=1; });
+  var k=claveVs(d);
+  var c=lista.filter(function(x){ return esVapor(x) && x.vapor==='ANTES' && !tomados[x.id] &&
+        claveVs(x)===k && String(x.fecha||'')<=String(d.fecha||''); });
+  c.sort(function(a,b){ return String(b.fecha||'').localeCompare(String(a.fecha||'')); });
+  return c[0]||null;
+}
+function parVapor(m, lista){
+  if(!esVapor(m)) return null;
+  if(m.vapor==='DESPUES'){ var a=antesDeDesp(m, lista); return a?{antes:a, despues:m}:null; }
+  if(m.vapor==='ANTES'){
+    var ds=lista.filter(function(x){ return esVapor(x) && x.vapor==='DESPUES'; })
+                .sort(function(a,b){ return String(a.fecha||'').localeCompare(String(b.fecha||'')); });
+    for(var i=0;i<ds.length;i++){ var a2=antesDeDesp(ds[i], lista); if(a2 && a2.id===m.id) return {antes:m, despues:ds[i]}; }
+  }
+  return null;
+}
+function verComparativo(id){
+  if(!id) return;
+  var m0=MEDS_TODAS.filter(function(x){ return x.id===id; })[0];
+  document.getElementById('dTit').textContent='Antes vs después de vapor';
+  document.getElementById('dSub').textContent='Cargando…';
+  document.getElementById('btnFicha').style.display='none';
+  document.getElementById('btnFigura').style.display='none';
+  document.getElementById('btnVs').style.display='none';
+  document.getElementById('dCuerpo').innerHTML='<div class="cargando">Buscando la otra prueba…</div>';
+  document.getElementById('det').style.display='block';
+  window.scrollTo(0,0);
+  function conLista(lista){
+    var m=m0||lista.filter(function(x){ return x.id===id; })[0];
+    var par=m ? parVapor(m, lista) : null;
+    if(!par){
+      document.getElementById('dSub').textContent='';
+      document.getElementById('dCuerpo').innerHTML='<div class="vacio">Esta prueba todavía no tiene su '+
+        (m&&m.vapor==='ANTES'?'medición después de vapor':'medición antes de vapor')+
+        ' (mismo estilo, grupo, línea y color).</div>';
+      return;
+    }
+    var q='accion=medicion&clave='+encodeURIComponent(SES.clave)+'&id=';
+    jsonp(q+encodeURIComponent(par.antes.id), function(ra){
+      jsonp(q+encodeURIComponent(par.despues.id), function(rd){
+        if(!ra||!ra.ok||!ra.medicion||!rd||!rd.ok||!rd.medicion){
+          document.getElementById('dCuerpo').innerHTML='<div class="vacio">No se pudo cargar. Revisa tu señal.</div>'; return;
+        }
+        VS_DAT={a:ra.medicion, d:rd.medicion, ref:!!par.despues.vaporRef};
+        pintarComparativo();
+      });
+    });
+  }
+  /* se busca la pareja entre todas las mediciones del estilo, aunque los filtros de la lista la escondan */
+  var est=m0?m0.estilo:'';
+  jsonp('accion=mediciones&clave='+encodeURIComponent(SES.clave)+(est?'&estilo='+encodeURIComponent(est):''), function(r){
+    conLista((r&&r.ok&&r.mediciones)||MEDS_TODAS);
+  });
+}
+function modoVs(md){ VS_MODO=md; pintarComparativo(); }
+function pintarComparativo(){
+  var A=VS_DAT.a, D=VS_DAT.d;
+  UNID=(D.unidad==='cm')?'cm':'pulg';
+  var fac=(A.unidad===D.unidad)?1:(D.unidad==='cm'?2.54:1/2.54);   /* todo en la unidad de la prueba después */
+  function u(v){ return (v===null||v===undefined||v===''||isNaN(v)) ? null : +v*fac; }
+  var esp=(D.espec&&D.espec.puntos)||[], espA=(A.espec&&A.espec.puntos)||[];
+  var info={}; esp.forEach(function(p){ info[p.cod]={desc:p.desc||'', tol:p.tol, vals:p.vals||{}}; });
+  espA.forEach(function(p){ if(!info[p.cod]) info[p.cod]={desc:p.desc||'', tol:p.tol, vals:{}}; info[p.cod].valsA=p.vals||{}; });
+  var ordenCod=esp.map(function(p){ return p.cod; }); espA.forEach(function(p){ if(ordenCod.indexOf(p.cod)<0) ordenCod.push(p.cod); });
+
+  function indexar(det,conv){ var ix={};
+    (det||[]).forEach(function(x){ var k=x.talla+'|'+x.cod; (ix[k]=ix[k]||[]).push({p:+x.prenda, real:conv?u(x.real):+x.real, dif:conv?u(x.dif):+x.dif, ok:!!x.ok, esp:conv?u(x.esp):+x.esp}); });
+    return ix; }
+  var IA=indexar(A.detalle,true), ID=indexar(D.detalle,false);
+  var tallas=[]; (D.detalle||[]).concat(A.detalle||[]).forEach(function(x){ if(tallas.indexOf(x.talla)<0) tallas.push(x.talla); });
+  var tOrden=(D.espec&&D.espec.tallas)||[]; tallas.sort(function(a,b){ var i=tOrden.indexOf(a), j=tOrden.indexOf(b); return (i<0?99:i)-(j<0?99:j); });
+  function prom(l){ var s=0,n=0; l.forEach(function(x){ if(x.real!=null&&!isNaN(x.real)){ s+=x.real; n++; } }); return n?s/n:null; }
+
+  /* totales: cambio ponderado = suma(después − antes) ÷ suma(antes), en los puntos y tallas medidos en las dos */
+  var sA=0,sC=0,nPar=0, fA=0,nA=0,fD=0,nD=0, porCod={}, superan=0;
+  (A.detalle||[]).forEach(function(x){ nA++; if(!x.ok) fA++; });
+  (D.detalle||[]).forEach(function(x){ nD++; if(!x.ok) fD++; });
+  tallas.forEach(function(t){ ordenCod.forEach(function(c){
+    var la=IA[t+'|'+c], ld=ID[t+'|'+c]; if(!la||!ld) return;
+    var pa=prom(la), pd=prom(ld); if(pa==null||pd==null||!(pa>0)) return;
+    sA+=pa; sC+=pd-pa; nPar++;
+    var tol=info[c]?+info[c].tol:0; if(tol>0 && Math.abs(pd-pa)>tol) superan++;
+    var o=porCod[c]=porCod[c]||{a:0,c:0}; o.a+=pa; o.c+=pd-pa;
+  }); });
+  var cam=sA>0?sC/sA:null;
+  function pctTxt(x){ if(x==null||isNaN(x)) return '—'; var v=Math.round(x*1000)/10; return (v>0?'+':v<0?'−':'')+Math.abs(v).toFixed(1)+'%'; }
+
+  var h='<div class="panel"><div class="vsCab">'+
+    [['Antes de vapor',A],['Después de vapor',D]].map(function(z){ var m=z[1];
+      return '<div class="lado"><div class="q">'+z[0]+'</div>'+
+        '<b>'+escTxt(m.fecha)+'</b> · '+escTxt(m.auditora)+' · '+escTxt(m.taller)+
+        '<br><span>'+escTxt(m.color||'—')+(m.combo?' · '+escTxt(m.combo):'')+' · versión '+escTxt(m.version||'—')+'</span>'+
+        '<br><span>'+(m.nMedidas||0)+' medidas · </span><b style="color:'+(m.resultado==='RECHAZADO'?'var(--rose)':'var(--sage)')+';">'+escTxt(m.resultado||'—')+'</b>'+
+        '<br><button type="button" class="verH" onclick="verDetalle(\''+m.id+'\')">Ver hoja</button></div>';
+    }).join('')+'</div></div>';
+
+  h+='<div class="kpis">'+
+    '<div class="kpi'+(cam!=null&&cam<0?' mal':'')+'"><div class="v'+(cam==null||cam>=0?' neu':'')+'">'+pctTxt(cam)+'</div>'+
+      '<div class="l">Cambio con el vapor</div><div class="d">'+(cam==null?'Sin puntos medidos en las dos':(cam<0?'Encoge: sale más chica después':'Crece: sale más grande después'))+'</div></div>'+
+    '<div class="kpi'+(fA?' mal':'')+'"><div class="v">'+fA+' de '+nA+'</div><div class="l">Fuera de tolerancia antes</div><div class="d">'+pctTxt(nA?fA/nA:null).replace('+','')+' de las medidas</div></div>'+
+    '<div class="kpi'+(fD?' mal':'')+'"><div class="v">'+fD+' de '+nD+'</div><div class="l">Fuera de tolerancia después</div><div class="d">'+pctTxt(nD?fD/nD:null).replace('+','')+' de las medidas</div></div>'+
+    '<div class="kpi'+(superan?' mal':'')+'"><div class="v">'+superan+' de '+nPar+'</div><div class="l">Cambian más que la tolerancia</div><div class="d">punto y talla, con el vapor</div></div>'+
+    '</div>';
+
+  var top=Object.keys(porCod).map(function(c){ return {c:c, p:porCod[c].a>0?porCod[c].c/porCod[c].a:0}; })
+    .filter(function(x){ return Math.abs(x.p)>=0.0005; })
+    .sort(function(x,y){ return Math.abs(y.p)-Math.abs(x.p); }).slice(0,5);
+  if(top.length){
+    h+='<div class="panel"><div class="pt">Puntos que más cambian con el vapor</div><div class="topPtos">'+
+      top.map(function(x){ var d=info[x.c]&&info[x.c].desc;
+        return '<b>'+escTxt(d||x.c)+'</b>'+(d?' ('+escTxt(x.c)+')':'')+': '+(x.p<0?'encoge ':'crece ')+pctTxt(x.p);
+      }).join('<br>')+'</div></div>';
+  }
+
+  h+='<div class="vsModo"><button type="button" class="'+(VS_MODO==='prom'?'on':'')+'" onclick="modoVs(\'prom\')">Promedio por punto</button>'+
+     '<button type="button" class="'+(VS_MODO==='prenda'?'on':'')+'" onclick="modoVs(\'prenda\')">Prenda por prenda</button></div>';
+
+  function celVs(v,dif,ok){ if(v==null) return '<td class="nada">·</td>';
+    return '<td class="vs">'+fmtMed(v)+'<small class="'+(ok?'ok':'mal')+'">'+(Math.abs(dif||0)<1e-9?'= ficha':fmtMed(dif)+' vs ficha')+'</small></td>'; }
+  function celCam(pa,pd,tol){ if(pa==null||pd==null) return '<td class="nada">·</td>';
+    var c=pd-pa, mal=tol>0&&Math.abs(c)>tol;
+    return '<td class="cam'+(mal?' mal':'')+'">'+(Math.abs(c)<1e-9?'=':(c>0?'+':'')+fmtMed(c))+(pa>0&&Math.abs(c)>=1e-9?'<span class="pct">'+pctTxt(c/pa)+'</span>':'')+'</td>'; }
+
+  tallas.forEach(function(t){
+    var cods=ordenCod.filter(function(c){ return IA[t+'|'+c]||ID[t+'|'+c]; });
+    if(!cods.length) return;
+    var hayDesc=cods.some(function(c){ return info[c] && info[c].desc && info[c].desc.length>3; });
+    var prs=[]; cods.forEach(function(c){ (IA[t+'|'+c]||[]).concat(ID[t+'|'+c]||[]).forEach(function(x){ if(prs.indexOf(x.p)<0) prs.push(x.p); }); });
+    prs.sort(function(a,b){ return a-b; });
+    h+='<div class="tallaTit">Talla '+t+'</div><div class="panel pTabla" style="padding:12px 14px;"><div class="tw"><table><thead><tr>'+
+       '<th>Cód.</th>'+(hayDesc?'<th style="text-align:left;">Descripción</th>':'')+'<th>Ficha</th><th>Tol. ±</th>';
+    if(VS_MODO==='prom') h+='<th>Antes</th><th>Después</th><th>Cambio</th>';
+    else prs.forEach(function(p){ h+='<th>P'+p+' antes</th><th>P'+p+' después</th><th>P'+p+' cambio</th>'; });
+    h+='</tr></thead><tbody>';
+    cods.forEach(function(c){
+      var inf=info[c]||{vals:{}}, la=IA[t+'|'+c]||[], ld=ID[t+'|'+c]||[];
+      var e=inf.vals&&inf.vals[t]!=null?+inf.vals[t]:(ld[0]?ld[0].esp:(la[0]?la[0].esp:null));
+      var eA=inf.valsA&&inf.valsA[t]!=null?u(inf.valsA[t]):null;
+      var tol=+inf.tol||0;
+      h+='<tr><td class="cod">'+escTxt(c)+'</td>'+(hayDesc?'<td class="desc">'+escTxt(inf.desc||'')+'</td>':'')+
+         '<td class="esp">'+fmtMed(e)+(eA!=null&&e!=null&&Math.abs(eA-e)>1e-6?'<span class="pct" style="display:block;font-size:10px;font-weight:600;color:var(--stone);">antes '+fmtMed(eA)+'</span>':'')+'</td>'+
+         '<td class="tol">'+fmtMed(tol)+'</td>';
+      if(VS_MODO==='prom'){
+        var pa=prom(la), pd=prom(ld);
+        var da=la.length?la.reduce(function(s,x){ return s+(x.dif||0); },0)/la.length:null;
+        var dd=ld.length?ld.reduce(function(s,x){ return s+(x.dif||0); },0)/ld.length:null;
+        h+=celVs(pa,da,la.every(function(x){ return x.ok; }))+celVs(pd,dd,ld.every(function(x){ return x.ok; }))+celCam(pa,pd,tol);
+      }else prs.forEach(function(p){
+        var a=la.filter(function(x){ return x.p===p; })[0], d=ld.filter(function(x){ return x.p===p; })[0];
+        h+=(a?celVs(a.real,a.dif,a.ok):'<td class="nada">·</td>')+(d?celVs(d.real,d.dif,d.ok):'<td class="nada">·</td>')+
+           celCam(a?a.real:null, d?d.real:null, tol);
+      });
+      h+='</tr>';
+    });
+    h+='</tbody></table></div><div class="leyenda">Antes y después son la medida real'+(VS_MODO==='prom'?' promedio de las prendas':' de cada prenda')+
+       ', con su diferencia contra la ficha (en rojo, fuera de tolerancia). Cambio = después − antes; el porcentaje es sobre la medida antes. '+
+       'En rojo, el punto que cambió más que la tolerancia.'+(fac!==1?' Las medidas antes se pasaron a '+(UNID==='cm'?'centímetros':'pulgadas')+'.':'')+'</div></div>';
+  });
+  if(String(A.obs||'').trim()||String(D.obs||'').trim())
+    h+='<div class="panel pTabla"><div class="pt">Comentarios de la prueba de vapor</div><div style="white-space:pre-wrap;font-size:14px;line-height:1.45;">'+
+       (String(A.obs||'').trim()?'<b>Antes:</b> '+escTxt(A.obs)+'\n':'')+(String(D.obs||'').trim()?'<b>Después:</b> '+escTxt(D.obs):'')+'</div></div>';
+
+  document.getElementById('dTit').textContent='Antes vs después de vapor · '+D.estilo+' · '+(D.grupo||'');
+  document.getElementById('dSub').textContent=(D.color||'')+(D.combo?' · '+D.combo:'')+(VS_DAT.ref?'':' · pareja por estilo, grupo, línea y color');
+  document.getElementById('dCuerpo').innerHTML=h;
+  document.getElementById('mSub').textContent='Estilo '+D.estilo+'  ·  '+(D.grupo||'')+'  ·  '+(D.cliente||'')+'  ·  Prueba de vapor: antes vs después  ·  '+(D.color||'');
+  document.getElementById('mFec').innerHTML='Antes: '+A.fecha+' · Después: '+D.fecha+'<br>Impreso: '+new Date().toLocaleString('es-PE');
 }
 function fechaLarga(iso){
   if(!iso) return 'Sin fecha';
@@ -1187,6 +1395,8 @@ function pintarDetalle(m){
   document.getElementById('dTit').textContent = m.estilo+' · '+(m.grupo||'');
   document.getElementById('dSub').textContent =
     etapaTxt(m)+(m.combo?' · '+m.combo:'')+' · '+m.auditora+' · '+m.taller;
+  VS_ID = esVapor(m) ? m.id : '';
+  document.getElementById('btnVs').style.display = VS_ID ? 'inline-block' : 'none';
 
   var puntos = (m.espec && m.espec.puntos) ? m.espec.puntos : [];
   var descDe={}, tolDe={}, espDe={};
