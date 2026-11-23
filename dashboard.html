@@ -922,8 +922,8 @@ function preparar(r){
     /* el color se mira dentro de su estilo: el mismo nombre de color en otro estilo es otra tela */
     m.colLbl=String(m.color||'').replace(/\s+/g,' ').trim().toUpperCase(); m.colKey=m.colLbl?m.estilo+'|'+m.colLbl:'';
     m.P=(m.pts||[]).map(a=>{ const d=String(a[1]||'').replace(/\s+/g,' ').replace(/[.\s]+$/,'').trim();
-      return Object.assign({cod:a[0], key:d?quitaTildes(d):('§'+m.estilo+'·'+a[0]), label:d?d.toUpperCase():('Estilo '+m.estilo+' · punto '+a[0]+' ('+(NOM_ETAPA[m.etapa]||m.etapa).toLowerCase()+')')}, sumar(a.slice(2))); });
-    m.T=(m.tl||[]).map(a=>Object.assign({t:a[0]}, sumar(a.slice(1))));
+      return Object.assign({cod:a[0], key:d?quitaTildes(d):('§'+m.estilo+'·'+a[0]), label:d?d.toUpperCase():('Estilo '+m.estilo+' · punto '+a[0]+' ('+(NOM_ETAPA[m.etapa]||m.etapa).toLowerCase()+')')}, sumar(a.slice(2)), {ncm:m.unidad==='cm'?a[2]:0}); });
+    m.T=(m.tl||[]).map(a=>Object.assign({t:a[0]}, sumar(a.slice(1)), {ncm:m.unidad==='cm'?a[1]:0}));
     return m;
   }).sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));
   VAP_N=r.vapor||[]; VAP_P=r.vaporPrueba||[];
@@ -935,8 +935,19 @@ function aplicarPV(){
 }
 
 /* ---------- cálculo ---------- */
-function vacioS(){ return {aud:0,rech:0,apF:0,prendas:0,n:0,f:0,sd:0,se:0,nNeg:0,nPos:0,fNeg:0,fPos:0}; }
-function mas(s,p){ s.n+=p.n; s.f+=p.f; s.sd+=p.sd; s.se+=p.se; s.nNeg+=p.nNeg; s.nPos+=p.nPos; s.fNeg+=p.fNeg; s.fPos+=p.fPos; }
+function vacioS(){ return {aud:0,rech:0,apF:0,prendas:0,n:0,f:0,sd:0,se:0,nNeg:0,nPos:0,fNeg:0,fPos:0,ncm:0}; }
+function mas(s,p){ s.n+=p.n; s.f+=p.f; s.sd+=p.sd; s.se+=p.se; s.nNeg+=p.nNeg; s.nPos+=p.nPos; s.fNeg+=p.fNeg; s.fPos+=p.fPos; s.ncm+=p.ncm||0; }
+/* Diferencia promedio en medida (23/11/2026, pedido de Christian: jefes y auditoras leen el «a más / a menos» en
+   pulgadas o cm; el % queda al lado). = suma de diferencias ÷ número de medidas. La base la suma en pulgadas;
+   si todas las medidas del grupo son de fichas en cm, se muestra en cm. Pulgadas en 16avos, como la hoja. */
+function medTxt(pulg,enCm){
+  if(pulg==null||!isFinite(pulg)) return '—';
+  if(enCm){ const v=Math.round(pulg*2.54*10)/10; return v===0?'≈0 cm':(v>0?'+':'−')+num(Math.abs(v),1)+' cm'; }
+  const n=Math.round(Math.abs(pulg)*16); if(!n) return '≈0"';
+  const e=Math.floor(n/16), r=n%16; let a=r, b=16; while(a%2===0&&b>1&&a){ a/=2; b/=2; }
+  return (pulg>0?'+':'−')+(e?e+(r?' ':''):'')+(r?a+'/'+b:'')+'"';
+}
+function difU(s){ return s&&s.n?medTxt(s.sd/s.n,s.ncm>=s.n):'—'; }
 /* sel: {punto:clave} o {talla:t} limita las medidas a ese punto o talla; sin sel, todas las medidas de la medición */
 function partes(m,sel){ return sel&&sel.punto?m.P.filter(p=>p.key===sel.punto):sel&&sel.talla?m.T.filter(t=>t.t===sel.talla):m.T; }
 function stat(list,sel){
@@ -1031,9 +1042,9 @@ function barrasH(id,rows,o){
 function filaFuera(g,ref,go){ const p=pct(g.s.f,g.s.n), baja=g.s.n<MIN_MED;
   return {label:g.label,val:p,txt:num(p,1)+'%',baja:baja,color:baja?GRIS:colRef(p,ref),go:go,
           tip:[num(g.s.f)+' fuera de '+num(g.s.n)+' medidas'+(baja?' · muestra baja':''), g.s.aud+' medición(es), '+g.s.rech+' rechazada(s)']}; }
-function filaDesv(g,go){ const d=desv(g.s), baja=g.s.n<MIN_MED;
-  return {label:g.label,val:d,txt:sig(d),baja:baja,color:baja?GRIS:(d<0?SLATE:TAUPE),go:go,
-          tip:['Sale '+sentido(d)+' ('+sig(d)+')', num(g.s.nNeg)+' medidas hacia menos · '+num(g.s.nPos)+' hacia más · '+num(g.s.n-g.s.nNeg-g.s.nPos)+' exactas']}; }
+function filaDesv(g,go,u){ const d=desv(g.s), baja=g.s.n<MIN_MED, m=u?difU(g.s):'';
+  return {label:g.label,val:d,txt:u?(MOVIL()?m:m+' ('+sig(d,1)+')'):sig(d),baja:baja,color:baja?GRIS:(d<0?SLATE:TAUPE),go:go,
+          tip:(u?['Diferencia promedio: '+m+' por medida ('+sig(d,1)+')']:[]).concat(['Sale '+sentido(d)+' ('+sig(d)+')', num(g.s.nNeg)+' medidas hacia menos · '+num(g.s.nPos)+' hacia más · '+num(g.s.n-g.s.nNeg-g.s.nPos)+' exactas'])}; }
 function ordenFuera(rows){ return rows.slice().sort((a,b)=>((a.s.n<MIN_MED)-(b.s.n<MIN_MED)) || pct(b.s.f,b.s.n)-pct(a.s.f,a.s.n) || b.s.n-a.s.n); }
 function mostrar(id,si){ const e=$(id); if(e) e.style.display=si?'':'none'; }
 
@@ -1189,15 +1200,15 @@ function pintarPuntos(S){
     $('phPtFuera').textContent='% de medidas fuera de tolerancia sobre las veces que se midió cada punto ('+MIN_MED+' medidas o más; los '+fu.length+' más altos).'+txtRef(rf,'puntos'); }
   const dv=conM.slice().sort((a,b)=>Math.abs(desv(b.s))-Math.abs(desv(a.s))).slice(0,12).sort((a,b)=>desv(a.s)-desv(b.s));
   mostrar('pPtDesv',dv.length>0);
-  if(dv.length){ barrasH('cPtDesv',dv.map(g=>filaDesv(g,()=>go(g))),{div:1,dec:1,largo:34});
-    $('phPtDesv').textContent='Desviación de cada punto contra la ficha (suma de diferencias ÷ suma de medidas de ficha), los '+dv.length+' que más se alejan con '+MIN_MED+' medidas o más. Izquierda: más chico; derecha: más grande. En medidas pequeñas un octavo de pulgada pesa mucho.'; }
+  if(dv.length){ barrasH('cPtDesv',dv.map(g=>filaDesv(g,()=>go(g),1)),{div:1,dec:1,largo:34,amp:MOVIL()?1.6:2.1});
+    $('phPtDesv').textContent='Cuánto sale cada punto contra la ficha: diferencia promedio por medida, en pulgadas o cm, y entre paréntesis la desviación en % (suma de diferencias ÷ suma de medidas de ficha). Los '+dv.length+' que más se alejan con '+MIN_MED+' medidas o más. Izquierda: más chico; derecha: más grande.'; }
   const tl=gruposSub(VIS,'T').sort(ordTalla), goT=g=>abrirFicha({tipo:'talla',clave:g.k,titulo:'Talla '+g.k});
   mostrar('pTalla',tl.length>1); mostrar('pTallaDesv',tl.length>1);
   if(tl.length>1){ const rt=refDe(tl,pct(S.f,S.n));
     barrasH('cTalla',tl.map(g=>Object.assign(filaFuera(g,rt,()=>goT(g)),{label:'Talla '+g.k})),{min:200});
     $('phTalla').textContent='% de medidas fuera de tolerancia sobre las medidas tomadas en cada talla.'+txtRef(rt,'tallas');
     barrasH('cTallaDesv',tl.map(g=>Object.assign(filaDesv(g,()=>goT(g)),{label:'Talla '+g.k})),{div:1,dec:1,min:200}); }
-  const colsP=[{t:'Punto de medida',nm:1,h:g=>esc(g.label)},{t:'Estilos',r:1,h:g=>g.est.size}].concat(C_AUD.slice(0,1),C_MED), ord=ordenFuera(pts), pocos=ord.filter(g=>g.s.n<MIN_MED);
+  const colsP=[{t:'Punto de medida',nm:1,h:g=>esc(g.label)},{t:'Estilos',r:1,h:g=>g.est.size}].concat(C_AUD.slice(0,1),C_MED.slice(0,3),[{t:'Diferencia promedio',r:1,h:g=>'<span class="'+clsDesv(desv(g.s))+'">'+difU(g.s)+'</span>'}],C_MED.slice(3)), ord=ordenFuera(pts), pocos=ord.filter(g=>g.s.n<MIN_MED);
   /* los puntos con menos de 30 medidas (sobre todo de hojas de corte) quedan plegados para no alargar la pantalla */
   $('tPt').innerHTML=tabla(colsP,ord.filter(g=>g.s.n>=MIN_MED),go)+(pocos.length?'<div style="text-align:center;padding:10px 0"><button type="button" class="lnk" id="btnPocos">Ver también los '+pocos.length+' puntos con menos de '+MIN_MED+' medidas</button></div><div id="tPocos" style="display:none"></div>':'');
   if(pocos.length) $('btnPocos').onclick=()=>{ $('tPocos').innerHTML=tabla(colsP,pocos,go); $('tPocos').style.display=''; $('btnPocos').style.display='none'; };
@@ -1257,7 +1268,8 @@ function calcPar(A,D){
   Object.keys(IA).forEach(k=>{ const a=IA[k], d=ID[k]; if(!d) return; const pa=a.s/a.n, pd=d.s/d.n; if(!(pa>0)) return;
     const cod=k.split('|').slice(1).join('|'), inf=info[cod]||{desc:'',tol:0};
     r.sA+=pa; r.sC+=pd-pa; r.nPar++; if(inf.tol>0&&Math.abs(pd-pa)>inf.tol) r.sup++;
-    const o=r.cod[cod]=r.cod[cod]||{a:0,c:0,n:0,desc:inf.desc}; o.a+=pa; o.c+=pd-pa; o.n++; });
+    const o=r.cod[cod]=r.cod[cod]||{a:0,c:0,n:0,cp:0,ncm:0,desc:inf.desc}; o.a+=pa; o.c+=pd-pa; o.n++;
+    o.cp+=(pd-pa)/(D.unidad==='cm'?2.54:1); if(D.unidad==='cm') o.ncm++; });
   r.cam=r.sA>0?r.sC/r.sA*100:null; return r;
 }
 function cargarPares(){
@@ -1293,13 +1305,13 @@ function pintarVaporPares(f){
   [...est.entries()].forEach(([e,lst],i)=>{
     const t={sA:0,sC:0,nPar:0,sup:0}, cod={};
     lst.forEach(p=>{ t.sA+=p.r.sA; t.sC+=p.r.sC; t.nPar+=p.r.nPar; t.sup+=p.r.sup;
-      Object.keys(p.r.cod).forEach(k=>{ const o=cod[k]=cod[k]||{a:0,c:0,n:0,desc:p.r.cod[k].desc}; o.a+=p.r.cod[k].a; o.c+=p.r.cod[k].c; o.n+=p.r.cod[k].n; }); });
+      Object.keys(p.r.cod).forEach(k=>{ const q=p.r.cod[k], o=cod[k]=cod[k]||{a:0,c:0,n:0,cp:0,ncm:0,desc:q.desc}; o.a+=q.a; o.c+=q.c; o.n+=q.n; o.cp+=q.cp; o.ncm+=q.ncm; }); });
     const cam=t.sA?t.sC/t.sA*100:null, cli=lst[0].D.cliente||lst[0].d.cliente||'';
     h+='<div class="panel col12"><span class="tira volumen"></span><div class="pt">Estilo '+esc(e)+(cli?' · '+esc(cli):'')+' — con el vapor cambia <span class="'+clsDesv(cam)+'">'+sig(cam)+'</span></div>'+
-       '<div class="ph">'+lst.length+' prueba(s) con su antes y su después, las mismas prendas medidas dos veces. Cambio = suma de (después − antes) ÷ suma de antes, con la medida promedio de cada punto y talla medidos en las dos. Negativo = encoge con el vapor. '+t.sup+' de '+t.nPar+' punto-talla cambiaron más que la tolerancia.</div>'+
+       '<div class="ph">'+lst.length+' prueba(s) con su antes y su después, las mismas prendas medidas dos veces. Cambio = suma de (después − antes) ÷ suma de antes, con la medida promedio de cada punto y talla medidos en las dos. Negativo = encoge con el vapor. Cada barra dice el % y cuánto cambia la medida en promedio por talla. '+t.sup+' de '+t.nPar+' punto-talla cambiaron más que la tolerancia.</div>'+
        '<div class="cwrap"><canvas id="cVap'+i+'"></canvas></div></div>';
-    graf.push(['cVap'+i,Object.keys(cod).map(k=>{ const o=cod[k], d=o.a?o.c/o.a*100:0;
-      return {label:(o.desc?String(o.desc).toUpperCase():'Punto')+' ('+k+')',val:d,txt:sig(d),color:d<0?SLATE:TAUPE,tip:['Cambio con el vapor: '+sig(d), o.n+' talla(s) comparadas']}; }).sort((a,b)=>a.val-b.val)]);
+    graf.push(['cVap'+i,Object.keys(cod).map(k=>{ const o=cod[k], d=o.a?o.c/o.a*100:0, mu=medTxt(o.n?o.cp/o.n:null,o.ncm>=o.n);
+      return {label:(o.desc?String(o.desc).toUpperCase():'Punto')+' ('+k+')',val:d,txt:MOVIL()?sig(d,1):sig(d,1)+' · '+mu,color:d<0?SLATE:TAUPE,tip:['Cambio con el vapor: '+sig(d,1)+' · '+mu+' por talla', o.n+' talla(s) comparadas']}; }).sort((a,b)=>a.val-b.val)]);
   });
   /* cada pareja por separado */
   h+='<div class="panel col12"><span class="tira"></span><div class="pt">Cada prueba con su antes y su después</div>'+
@@ -1311,7 +1323,7 @@ function pintarVaporPares(f){
        {t:'Cambian más que la tol.',r:1,h:p=>num(p.r.sup)+' de '+num(p.r.nPar)},
        {t:'',h:p=>'<button type="button" class="lnk" data-vs="'+esc(p.d.id)+'">Ver comparativo</button>'}],ps,p=>verHoja(p.d.id,true))+'</div></div>';
   $('gVapor').innerHTML=h;
-  graf.forEach(g=>barrasH(g[0],g[1],{div:1,dec:1,largo:48}));
+  graf.forEach(g=>barrasH(g[0],g[1],{div:1,dec:1,largo:48,amp:MOVIL()?1.45:2.1}));
 }
 function pintarVapor(f){
   if(PV){ pintarVaporPares(f); return; }
@@ -1327,12 +1339,14 @@ function pintarVapor(f){
     h+='<div class="panel col12"><span class="tira volumen"></span><div class="pt">Estilo '+esc(e)+(cli?' · '+esc(cli):'')+' — con el vapor cambia <span class="'+clsDesv(real)+'">'+sig(real)+'</span>'+(fic!=null?' (la ficha espera '+sig(fic)+')':'')+'</div>'+
        '<div class="ph">Medida promedio '+(PV?'después de vapor':'de la prenda terminada')+' contra la de antes de vapor, en los mismos puntos y tallas ('+ps.length+' puntos; '+num(t.nA)+' medidas antes de vapor y '+num(t.nT)+(PV?' después de vapor':' de prenda terminada')+'). Negativo = encoge con el vapor. No son las mismas prendas medidas dos veces: es una aproximación, y no depende del período elegido arriba.</div>'+
        '<div class="cwrap"><canvas id="cVap'+i+'"></canvas></div></div>';
-    graf.push(['cVap'+i,ps.map(v=>{ const d=(v.sT/v.sA-1)*100, fe=v.eA?(v.eT/v.eA-1)*100:null;
-      return {label:(v.desc?String(v.desc).toUpperCase():'Punto')+' ('+v.cod+')',val:d,txt:sig(d),color:d<0?SLATE:TAUPE,
-              tip:['Real: '+sig(d)+(fe!=null?' · ficha: '+sig(fe):''), v.nA+' medidas antes de vapor · '+v.nT+(PV?' después de vapor · ':' de prenda terminada · ')+v.tallas+' talla(s)']}; }).sort((a,b)=>a.val-b.val)]);
+    const us=[...new Set(M.filter(m=>m.estilo===e).map(m=>m.unidad==='cm'?'cm':'pulg'))], u1=us.length===1?us[0]:'';
+    graf.push(['cVap'+i,ps.map(v=>{ const d=(v.sT/v.sA-1)*100, fe=v.eA?(v.eT/v.eA-1)*100:null,
+        mu=u1&&v.tallas?medTxt((v.sT-v.sA)/v.tallas/(u1==='cm'?2.54:1),u1==='cm'):'';
+      return {label:(v.desc?String(v.desc).toUpperCase():'Punto')+' ('+v.cod+')',val:d,txt:sig(d,1)+(mu&&!MOVIL()?' · '+mu:''),color:d<0?SLATE:TAUPE,
+              tip:['Real: '+sig(d,1)+(mu?' · '+mu+' por talla':'')+(fe!=null?' · ficha: '+sig(fe,1):''), v.nA+' medidas antes de vapor · '+v.nT+(PV?' después de vapor · ':' de prenda terminada · ')+v.tallas+' talla(s)']}; }).sort((a,b)=>a.val-b.val)]);
   });
   $('gVapor').innerHTML=h;
-  graf.forEach(g=>barrasH(g[0],g[1],{div:1,dec:1,largo:48}));
+  graf.forEach(g=>barrasH(g[0],g[1],{div:1,dec:1,largo:48,amp:MOVIL()?1.45:2.1}));
 }
 function filasAud(list){
   return tabla([{t:'Fecha',h:m=>esc(m.fecha)},{t:'Estilo',nm:1,h:m=>esc(m.estilo)},{t:'Grupo',h:m=>esc(m.grupo)},{t:'Cliente',h:m=>esc(m.cliente)},{t:'Color',h:m=>esc(m.color)},
@@ -1365,11 +1379,11 @@ function renderFicha(){
   const base=baseFicha(), list=base.filter(m=>enPer(m,FI.per));
   const sel=FI.tipo==='punto'?{punto:FI.clave}:FI.tipo==='talla'?{talla:FI.clave}:null, S=stat(list,sel), chip='<span class="chipPer">'+esc(perLbl(FI.per))+'</span>';
   $('fTit').textContent=FI.titulo; $('fSub').textContent=perLbl(FI.per)+' · '+S.aud+' medición(es)'+(sel?' donde se midió':'');
-  const dv=desv(S), fs=S.fNeg+S.fPos;
+  const dv=desv(S), fs=S.fNeg+S.fPos, enU=FI.tipo==='punto';
   let h='<div class="kpis">'+
     '<div class="kpi neutro"><span class="banda"></span><div class="cuerpo"><div class="l">Mediciones'+chip+'</div><div class="row"><span class="v">'+num(S.aud)+'</span></div><div class="s">'+S.rech+' rechazada(s)'+(S.aud>=MIN_AUD?' · '+p1(S.rech,S.aud):' · muestra baja para un % ('+S.aud+' de '+MIN_AUD+')')+(sel?'':' · '+S.apF+' aprobada(s) con medidas fuera')+'</div></div></div>'+
     '<div class="kpi"><span class="banda"></span><div class="cuerpo"><div class="l">Medidas fuera de tolerancia</div><div class="row"><span class="v">'+p1(S.f,S.n)+'</span></div><div class="s">'+num(S.f)+' de '+num(S.n)+' medidas'+(S.n<MIN_MED?' · muestra baja ('+S.n+' de '+MIN_MED+')':'')+'</div></div></div>'+
-    '<div class="kpi neutro"><span class="banda"></span><div class="cuerpo"><div class="l">Desviación contra la ficha</div><div class="row"><span class="v">'+sig(dv)+'</span></div><div class="s">Sale '+sentido(dv)+' · '+num(S.nNeg)+' medidas hacia menos y '+num(S.nPos)+' hacia más</div></div></div>'+
+    '<div class="kpi neutro"><span class="banda"></span><div class="cuerpo"><div class="l">'+(enU?'Diferencia promedio contra la ficha':'Desviación contra la ficha')+'</div><div class="row"><span class="v">'+(enU?difU(S):sig(dv))+'</span></div><div class="s">'+(enU?sig(dv,1)+' · ':'')+'Sale '+sentido(dv)+' · '+num(S.nNeg)+' medidas hacia menos y '+num(S.nPos)+' hacia más</div></div></div>'+
     '<div class="kpi neutro"><span class="banda"></span><div class="cuerpo"><div class="l">Fuera de tolerancia hacia menos</div><div class="row"><span class="v">'+(fs?p1(S.fNeg,fs):'—')+'</span></div><div class="s">'+(fs?num(S.fNeg)+' más chicas y '+num(S.fPos)+' más grandes':'Sin medidas fuera de tolerancia')+'</div></div></div></div>';
   if(!list.length){ $('fBody').innerHTML=h+'<div class="vacioP">No hay mediciones en este período.</div>'; return; }
   h+='<div class="grid">';
@@ -1377,7 +1391,7 @@ function renderFicha(){
   const ptsTalla=FI.tipo==='talla'?[]:pts;   /* por talla no hay desglose de puntos */
   const ests=FI.tipo==='estilo'?[]:(sel?grupos(list,m=>m.estilo,m=>m.estilo).map(g=>Object.assign(g,{s:stat(g.items,sel)})):grupos(list,m=>m.estilo,m=>m.estilo));
   const ptV=ptsTalla.slice().sort((a,b)=>pct(b.s.f,b.s.n)-pct(a.s.f,a.s.n)||Math.abs(desv(b.s))-Math.abs(desv(a.s))).slice(0,14).sort((a,b)=>desv(a.s)-desv(b.s));
-  if(ptV.length) h+='<div class="panel col6"><span class="tira volumen"></span><div class="pt">Desviación por punto de medida</div><div class="ph">Suma de diferencias ÷ suma de medidas de ficha de cada punto'+(ptsTalla.length>14?' (los 14 con más medidas fuera, de '+ptsTalla.length+')':'')+'. Izquierda: más chico que la ficha; derecha: más grande. El % de medidas fuera sale al pasar o tocar.</div><div class="cwrap"><canvas id="fcPt"></canvas></div></div>';
+  if(ptV.length) h+='<div class="panel col6"><span class="tira volumen"></span><div class="pt">Desviación por punto de medida</div><div class="ph">Diferencia promedio por medida de cada punto, en pulgadas o cm, y entre paréntesis en % (suma de diferencias ÷ suma de medidas de ficha)'+(ptsTalla.length>14?' (los 14 con más medidas fuera, de '+ptsTalla.length+')':'')+'. Izquierda: más chico que la ficha; derecha: más grande. El % de medidas fuera sale al pasar o tocar.</div><div class="cwrap"><canvas id="fcPt"></canvas></div></div>';
   if(tls.length>1) h+='<div class="panel col6"><span class="tira riesgo"></span><div class="pt">Medidas fuera de tolerancia por talla</div><div class="ph">% sobre las medidas tomadas en cada talla; la desviación contra la ficha sale al pasar o tocar.</div><div class="cwrap"><canvas id="fcTl"></canvas></div></div>';
   if(ests.length>1) h+='<div class="panel col6"><span class="tira volumen"></span><div class="pt">Por estilo</div><div class="ph">Desviación contra la ficha de cada estilo'+(ests.length>14?' (los 14 con más medidas, de '+ests.length+')':'')+'. Toca una barra para abrir el estilo.</div><div class="cwrap"><canvas id="fcEs"></canvas></div></div>';
   /* tendencia: recorre todos los días de la entidad (no se recorta con el período); el período elegido va resaltado */
@@ -1387,7 +1401,7 @@ function renderFicha(){
   else if(FI.tipo!=='lista') h+='<div class="panel col12"><span class="tira"></span><div class="vacioP">Solo hay un día con mediciones: hace falta más de uno para dibujar su tendencia.</div></div>';
   h+='<div class="panel col12"><span class="tira volumen"></span><div class="pt">Mediciones</div><div class="ph">La más reciente arriba. «Ver hoja» abre la hoja de medidas completa.</div><div class="tw">'+filasAud(list)+'</div></div></div>';
   $('fBody').innerHTML=h;
-  if(ptV.length) barrasH('fcPt',ptV.map(g=>{ const r=filaDesv(g,null); r.color=r.val<0?SLATE:TAUPE; r.baja=false; r.tip=[num(g.s.f)+' fuera de '+num(g.s.n)+' medidas ('+p1(g.s.f,g.s.n)+')'].concat(r.tip); r.label=g.label.replace(/^Estilo \S+ · /,''); return r; }),{div:1,dec:1,largo:34});
+  if(ptV.length) barrasH('fcPt',ptV.map(g=>{ const r=filaDesv(g,null,1); r.color=r.val<0?SLATE:TAUPE; r.baja=false; r.tip=[num(g.s.f)+' fuera de '+num(g.s.n)+' medidas ('+p1(g.s.f,g.s.n)+')'].concat(r.tip); r.label=g.label.replace(/^Estilo \S+ · /,''); return r; }),{div:1,dec:1,largo:34,amp:MOVIL()?1.6:2.1});
   if(tls.length>1) barrasH('fcTl',tls.map(g=>{ const r=filaFuera(g,null,null); r.label='Talla '+g.k; r.color=ROSE; r.baja=false; r.tip=r.tip.slice(0,1).concat(['Sale '+sentido(desv(g.s))+' ('+sig(desv(g.s))+')']); return r; }),{min:200});
   if(ests.length>1){ const ev=ests.slice().sort((a,b)=>b.s.n-a.s.n).slice(0,14).sort((a,b)=>desv(a.s)-desv(b.s));
     barrasH('fcEs',ev.map(g=>{ const r=filaDesv(g,()=>abrirFicha({tipo:'estilo',clave:g.k,titulo:'Estilo '+g.k+' · '+g.items[0].cliente})); r.label=g.k+' · '+g.items[0].cliente; r.color=r.val<0?SLATE:TAUPE; r.baja=false; r.tip=[num(g.s.f)+' fuera de '+num(g.s.n)+' medidas ('+p1(g.s.f,g.s.n)+')'].concat(r.tip); return r; }),{div:1,dec:1}); }
@@ -1440,6 +1454,7 @@ window.LS_XLS={
     const f=F(), S=stat(VIS), lbl=[PV&&'Pruebas de vapor',perLbl(f.per),f.cli,f.tal&&(VIS[0]||{}).taller,f.aud&&(VIS[0]||{}).auditora,f.eta&&NOM_ETAPA[f.eta],f.est&&('estilo '+f.est)].filter(Boolean).join(' · ');
     const pc=(a,b)=>b?a/b:null, dvx=s=>s.se?s.sd/s.se:null;
     const cm=[{campo:'n',titulo:'Medidas',tipo:'entero'},{campo:'f',titulo:'Fuera de tolerancia',tipo:'entero'},{campo:'pf',titulo:'% fuera',tipo:'porcentaje'},{campo:'dv',titulo:'Desviación contra la ficha',tipo:'porcentaje'},{campo:'ng',titulo:'Hacia menos',tipo:'entero'},{campo:'ps',titulo:'Hacia más',tipo:'entero'}];
+    const cmU=cm.slice(0,3).concat([{campo:'du',titulo:'Diferencia promedio',tipo:'texto'}],cm.slice(3));
     const ca=[{campo:'a',titulo:'Mediciones',tipo:'entero'},{campo:'r',titulo:'Rechazadas',tipo:'entero'}];
     const fila=g=>({k:g.label,a:g.s.aud,r:g.s.rech,pr:g.s.aud>=MIN_AUD?pc(g.s.rech,g.s.aud):null,apf:g.s.apF,n:g.s.n,f:g.s.f,pf:pc(g.s.f,g.s.n),dv:dvx(g.s),ng:g.s.nNeg,ps:g.s.nPos});
     const k=t=>({campo:'k',titulo:t,tipo:'texto'});
@@ -1452,7 +1467,7 @@ window.LS_XLS={
       {titulo:'Por estilo',columnas:[k('Estilo'),{campo:'c',titulo:'Cliente',tipo:'texto'}].concat(ca,cm),filas:ordenFuera(grupos(VIS,m=>m.estilo,m=>m.estilo)).map(g=>Object.assign(fila(g),{c:g.items[0].cliente}))},
       {titulo:'Por grupo',columnas:[k('Grupo'),{campo:'c',titulo:'Cliente',tipo:'texto'}].concat(ca,cm),filas:ordenFuera(grupos(VIS,m=>m.grupo,m=>m.grupo)).map(g=>Object.assign(fila(g),{c:g.items[0].cliente}))},
       {titulo:'Por color',nota:'Cada color se mira dentro de su estilo.',columnas:[k('Color'),{campo:'e',titulo:'Estilo',tipo:'alfanumerico'},{campo:'c',titulo:'Cliente',tipo:'texto'}].concat(ca,cm),filas:ordenFuera(grupos(VIS,m=>m.colKey,m=>m.colLbl)).map(g=>Object.assign(fila(g),{e:g.items[0].estilo,c:g.items[0].cliente}))},
-      {titulo:'Por punto de medida',columnas:[k('Punto de medida')].concat(ca.slice(0,1),cm),filas:ordenFuera(gruposSub(VIS,'P')).map(fila)},
+      {titulo:'Por punto de medida',nota:'Diferencia promedio = suma de diferencias ÷ medidas, en pulgadas (16avos) o en cm si todas sus fichas son en cm.',columnas:[k('Punto de medida')].concat(ca.slice(0,1),cmU),filas:ordenFuera(gruposSub(VIS,'P')).map(g=>Object.assign(fila(g),{du:difU(g.s)}))},
       {titulo:'Por talla',columnas:[k('Talla')].concat(cm),filas:gruposSub(VIS,'T').sort(ordTalla).map(fila)},
       {titulo:'Por etapa',columnas:[k('Etapa')].concat(ca,cm),filas:grupos(VIS,m=>m.etapa,m=>NOM_ETAPA[m.etapa]||m.etapa).map(fila)},
       {titulo:'Por cliente',columnas:[k('Cliente')].concat(ca,cm),filas:ordenFuera(grupos(VIS,m=>m.cliente)).map(fila)},
