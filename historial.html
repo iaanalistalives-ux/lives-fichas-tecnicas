@@ -1177,13 +1177,17 @@ function pintarLista(){
 /* ===== Antes vs después de vapor (23/11/2026, pedido de Christian) =====
    Una prueba de vapor DESPUÉS se une a su prueba ANTES: la que la auditora eligió al medir
    (`vaporRef`) o, en las guardadas antes de esa opción, la última ANTES del mismo estilo, grupo,
-   línea y color medida antes que ella. El comparativo pone las dos lado a lado: medida promedio
+   línea y color medida antes que ella. Enlazar es opcional: una prueba sola no lleva el botón. El comparativo pone las dos lado a lado: medida promedio
    antes, después, cuánto cambió con el vapor y cómo quedó cada una contra la ficha. */
 var MEDS_TODAS=[], VS_ID='', VS_MODO='prom', VS_DAT=null;
 function lineaVs(c){ var m=String(c||'').toUpperCase().match(/^(MISSY|PLUS|PETITE)\b/); return m?m[1]:String(c||'').toUpperCase(); }
 function claveVs(m){ return [m.estilo, String(m.grupo||'').toUpperCase(), lineaVs(m.combo), normNombre(m.color||'')].join('|'); }
 function antesDeDesp(d, lista){
   if(d.vaporRef){ var r=lista.filter(function(x){ return x.id===d.vaporRef; })[0]; if(r) return r; }
+  /* desde que se puede enlazar (Fi04), toda prueba guardada trae la clave vaporRef: si viene vacía es
+     porque la auditora no enlazó (a veces solo se mide antes o solo después) y no se le busca pareja.
+     Solo las guardadas antes, que no traen la clave, se emparejan por estilo, grupo, línea y color. */
+  if(d.hasOwnProperty('vaporRef')) return null;
   var tomados={};
   lista.forEach(function(x){ if(esVapor(x) && x.vapor==='DESPUES' && x.vaporRef && x.id!==d.id) tomados[x.vaporRef]=1; });
   var k=claveVs(d);

@@ -929,7 +929,7 @@ body.capAbierta #btnDib{display:none!important;}
       <div class="pills" id="pEtapa"></div>
     </div>
     <div id="selAntes" style="display:none;">
-      <span class="lbl">¿Qué prueba antes de vapor estás continuando?</span>
+      <span class="lbl">¿Continúas una prueba antes de vapor? (opcional)</span>
       <div id="pAntes"></div>
       <div class="avisoCombo" id="avisoAntes"></div>
     </div>
@@ -1404,7 +1404,8 @@ var PVAPOR=false, VAPOR='', OBS='';
    Al medir DESPUÉS DE VAPOR se elige la prueba ANTES DE VAPOR que se está continuando (del mismo
    estilo y grupo). Así no quedan datos distintos: trae su taller, línea y color, las mismas prendas
    por talla, y en cada punto muestra lo que midió esa prenda antes de vapor. Se guarda con
-   `vaporRef` (el id de la prueba antes). «Ninguna» deja medir sin enlazar. */
+   `vaporRef` (el id de la prueba antes). Es OPCIONAL (aclaración de Christian, 23/11/2026): a veces
+   solo se mide antes o solo después; sin elegir se mide igual, y tocar la elegida la quita. */
 var MEDS_EST=[], VREF='', VSIN=false, VANTES=null;
 function fechaCorta(f){
   var m=String(f||'').match(/^(\d{4})-(\d{2})-(\d{2})\s*(\d{2}:\d{2})?/), ms=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
@@ -1435,11 +1436,11 @@ function pintarAntes(){
       ' · tallas '+(m.tallas||[]).join(', ')+'</span></div>'+
       (yaTieneDespues(m.id)?'<span class="aTag">ya tiene después</span>':'')+'</button>';
   }).join('')+
-    '<button type="button" class="antOp ninguna'+(VSIN?' on':'')+'" onclick="elegirAntes(\'\')">Ninguna: medir sin enlazar</button>';
-  txt('avisoAntes', (VREF||VSIN) ? '' : 'Elige la prueba antes de vapor de estas mismas prendas: el comparativo saldrá con las dos.');
+    '';
+  txt('avisoAntes', VREF ? 'Toca otra vez la elegida para quitarla.' : 'Opcional: si mediste antes de vapor estas mismas prendas, elígela y el comparativo saldrá con las dos. Si no, sigue sin elegir.');
 }
 function elegirAntes(id){
-  if(!id){ VREF=''; VSIN=true; VANTES=null; pintarAntes(); return; }
+  if(!id || id===VREF){ VREF=''; VSIN=false; VANTES=null; pintarAntes(); return; }   /* tocar la elegida la quita */
   var m=MEDS_EST.filter(function(x){ return x.id===id; })[0]; if(!m) return;
   VREF=id; VSIN=false; VANTES=null;
   /* trae el taller, la línea y el color de la prueba antes */
@@ -1897,10 +1898,6 @@ function textoFrac(txt){
 /* ---------- configuración ---------- */
 
 function empezar(){
-  if(PVAPOR && VAPOR==='DESPUES' && antesDisponibles().length && !VREF && !VSIN){
-    document.getElementById('selAntes').scrollIntoView({behavior:'smooth',block:'center'});
-    alert('Elige la prueba antes de vapor que estás continuando (o «Ninguna: medir sin enlazar»).'); return;
-  }
   if(!F){
     if(listaGrupos().length>1 && !GRUPO){ alert('Elige el grupo de la prenda que vas a medir.'); return; }
     if(PVAPOR && !VAPOR){ alert('Elige si mides ANTES DE VAPOR o DESPUÉS DE VAPOR.'); return; }
@@ -1922,10 +1919,6 @@ function empezar(){
     document.getElementById('selTaller').classList.add('falta');
     alert('Elige el taller donde estás midiendo.');
     return;
-  }
-  if(PVAPOR && VAPOR==='DESPUES' && antesDisponibles().length && !VREF && !VSIN){
-    document.getElementById('selAntes').scrollIntoView({behavior:'smooth',block:'center'});
-    alert('Elige la prueba antes de vapor que estás continuando (o «Ninguna: medir sin enlazar»).'); return;
   }
   var mA=VREF ? MEDS_EST.filter(function(x){ return x.id===VREF; })[0] : null;
   if(mA && mA.color && COLOR!==mA.color &&
