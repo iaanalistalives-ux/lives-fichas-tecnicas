@@ -744,7 +744,6 @@ input.txt:focus,select.txt:focus{outline:none;border-color:var(--sage);}
 #det .top .s{font-size:11.5px;color:#CFE5DE;}
 #det .top .btns{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;}
 /* comparativo antes vs después de vapor (23/11/2026) */
-.fila .btnVs{flex:0 0 auto;background:#fff;border:1.5px solid var(--sage);color:var(--sage);font-family:inherit;font-size:11.5px;font-weight:800;border-radius:20px;padding:5px 11px;cursor:pointer;white-space:nowrap;}
 .vsCab{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 .vsCab .lado{border:1px solid var(--warm);border-radius:8px;padding:10px 12px;font-size:12.5px;}
 .vsCab .lado .q{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;color:var(--sage);margin-bottom:4px;}
@@ -1165,7 +1164,6 @@ function pintarLista(){
          '<br>'+m.nMedidas+' medidas · '+(m.nFuera>0
              ? '<b style="color:var(--rose);">'+m.nFuera+' fuera de tolerancia</b>'
              : 'todas dentro de tolerancia')+'</div>'+
-         (esVapor(m) && parVapor(m,MEDS_TODAS) ? '<button type="button" class="btnVs" onclick="event.stopPropagation();verComparativo(\''+m.id+'\')">Antes vs después</button>' : '')+
          '<div class="res '+(re?'re':'ap')+'">'+(m.resultado||'—')+'</div>'+
          '</div>';
     });
@@ -1179,7 +1177,7 @@ function pintarLista(){
    (`vaporRef`) o, en las guardadas antes de esa opción, la última ANTES del mismo estilo, grupo,
    línea y color medida antes que ella. Enlazar es opcional: una prueba sola no lleva el botón. El comparativo pone las dos lado a lado: medida promedio
    antes, después, cuánto cambió con el vapor y cómo quedó cada una contra la ficha. */
-var MEDS_TODAS=[], VS_ID='', VS_MODO='prom', VS_DAT=null;
+var MEDS_TODAS=[], VS_ID='', VS_EST='', VS_MODO='prom', VS_DAT=null;
 function lineaVs(c){ var m=String(c||'').toUpperCase().match(/^(MISSY|PLUS|PETITE)\b/); return m?m[1]:String(c||'').toUpperCase(); }
 function claveVs(m){ return [m.estilo, String(m.grupo||'').toUpperCase(), lineaVs(m.combo), normNombre(m.color||'')].join('|'); }
 function antesDeDesp(d, lista){
@@ -1239,7 +1237,7 @@ function verComparativo(id){
     });
   }
   /* se busca la pareja entre todas las mediciones del estilo, aunque los filtros de la lista la escondan */
-  var est=m0?m0.estilo:'';
+  var est=m0?m0.estilo:VS_EST;
   jsonp('accion=mediciones&clave='+encodeURIComponent(SES.clave)+(est?'&estilo='+encodeURIComponent(est):''), function(r){
     conLista((r&&r.ok&&r.mediciones)||MEDS_TODAS);
   });
@@ -1395,8 +1393,21 @@ function pintarDetalle(m){
   document.getElementById('dTit').textContent = m.estilo+' · '+(m.grupo||'');
   document.getElementById('dSub').textContent =
     etapaTxt(m)+(m.combo?' · '+m.combo:'')+' · '+m.auditora+' · '+m.taller;
-  VS_ID = esVapor(m) ? m.id : '';
-  document.getElementById('btnVs').style.display = VS_ID ? 'inline-block' : 'none';
+  /* «Antes vs después» (23/11/2026, aclaración de Christian): en la lista el antes y el después van
+     separados, cada uno con su hoja; el botón sale solo DENTRO de la hoja de una prueba de vapor que
+     tiene pareja, sea la de antes o la de después. La pareja se busca entre todas las del estilo. */
+  VS_ID=''; VS_EST=m.estilo||'';
+  document.getElementById('btnVs').style.display='none';
+  if(esVapor(m)){
+    var idH=m.id;
+    jsonp('accion=mediciones&clave='+encodeURIComponent(SES.clave)+'&estilo='+encodeURIComponent(m.estilo||''), function(r){
+      var lista=(r&&r.ok&&r.mediciones)||[];
+      var mm=lista.filter(function(x){ return x.id===idH; })[0];
+      if(!mm || !parVapor(mm, lista)) return;
+      if(document.getElementById('det').style.display!=='block' || document.querySelector('.vsCab')) return;
+      VS_ID=idH; document.getElementById('btnVs').style.display='inline-block';
+    });
+  }
 
   var puntos = (m.espec && m.espec.puntos) ? m.espec.puntos : [];
   var descDe={}, tolDe={}, espDe={};
