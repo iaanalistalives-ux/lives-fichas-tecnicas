@@ -815,7 +815,7 @@ td.nada{color:#C8D3CF;}
       <div><span class="lbl">Auditora</span><select class="txt" id="fAud"><option value="">Todas</option></select></div>
       <div><span class="lbl">Desde</span><input class="txt" type="date" id="fDesde"></div>
       <div><span class="lbl">Hasta</span><input class="txt" type="date" id="fHasta"></div>
-      <div><span class="lbl">Prueba de vapor</span><select class="txt" id="fVapor" onchange="buscar()"><option value="">Todas</option><option value="S">Solo pruebas</option><option value="N">Sin pruebas</option></select></div>
+      <div><span class="lbl">Prueba de vapor</span><select class="txt" id="fVapor" onchange="buscar()"><option value="">Todas</option><option value="S">Solo pruebas</option><option value="VS">Con antes vs después</option><option value="N">Sin pruebas</option></select></div>
     </div>
     </div>
     <div class="acciones">
@@ -1121,7 +1121,10 @@ function buscar(){
     error(''); MEDS=r.mediciones||[]; MEDS_TODAS=MEDS.slice();
     /* prueba de vapor (18/11/2026): el filtro deja solo las pruebas de vapor, o las quita */
     var fv=document.getElementById('fVapor').value;
-    if(fv) MEDS=MEDS.filter(function(m){ return fv==='S' ? esVapor(m) : !esVapor(m); });
+    /* «Con antes vs después» (23/11/2026, pedido de Christian): solo las pruebas que tienen pareja,
+       el antes y el después cada uno en su fila; el comparativo se abre desde la hoja */
+    if(fv==='VS') MEDS=MEDS.filter(function(m){ return esVapor(m) && !!parVapor(m, MEDS_TODAS); });
+    else if(fv) MEDS=MEDS.filter(function(m){ return fv==='S' ? esVapor(m) : !esVapor(m); });
     pintarKpis(); pintarLista();
     document.getElementById('sync').textContent=
       'Actualizado '+new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});
