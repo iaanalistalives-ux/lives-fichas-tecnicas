@@ -1057,8 +1057,20 @@ function leerPagina(page, cm, hered){
       orden.forEach(function(o){ if(o!=='TOL' && vals[o]) llenas++; });
       if(llenas<2) return;
       filas.push({cod:cod, desc:desc.join(' ').replace(/\s+/g,' ').trim(),
-                  vals:vals, vacias:vacias, ilegibles:ilegibles});
+                  vals:vals, vacias:vacias, ilegibles:ilegibles, xCod:(r[0].x0+r[0].x1)/2});
     });
+    /* Rótulo del dibujo leído como fila: en 24784 PAK-158 (25/11/2026) una letra "D"
+       del dibujo, con números sueltos al costado, salía como un punto incompleto y
+       toda la hoja quedaba "para revisión". Una fila incompleta cuyo código NO está
+       en la columna de códigos (a más de 20 puntos de donde están los demás) no es
+       de la tabla: se descarta. Las filas completas no se tocan. */
+    if(filas.length>3){
+      var xsCod=filas.map(function(f){ return f.xCod; }).sort(function(a,b){ return a-b; });
+      var xMed=xsCod[Math.floor(xsCod.length/2)];
+      filas=filas.filter(function(f){
+        return !((f.vacias>0 || f.ilegibles>0) && Math.abs(f.xCod-xMed)>20);
+      });
+    }
     if(filas.length<3) return null;
     return {orden:orden, filas:filas, ref:{cols:cols, xIzq:xIzq}};
   });
