@@ -766,6 +766,21 @@ td.cam .pct{display:block;font-size:10px;font-weight:600;opacity:.85;}
 @media(max-width:600px){ .vsCab{grid-template-columns:1fr;} }
 #det .top button{background:#fff;color:var(--petrol);border:none;font-family:inherit;font-size:12.5px;font-weight:800;border-radius:6px;padding:8px 15px;cursor:pointer;}
 #det .top button.alt{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.45);color:#fff;}
+/* Eliminar una medición (25/11/2026, pedido de Christian): solo él ve el botón; la base decide */
+#elimFondo{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:90;display:none;align-items:center;justify-content:center;padding:16px;}
+#elimCaja{background:#fff;color:#1F2937;border-radius:10px;max-width:440px;width:100%;padding:20px;box-shadow:0 12px 40px rgba(0,0,0,.35);}
+#elimCaja .et{font-size:16px;font-weight:800;margin-bottom:8px;}
+#elimCaja .ed{font-size:13px;line-height:1.5;margin-bottom:6px;}
+#elimCaja .ea{font-size:12px;color:var(--stone);margin-bottom:14px;}
+#elimCaja .ee{font-size:12.5px;color:var(--rose);font-weight:700;margin-bottom:10px;display:none;}
+#elimCaja .eb{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;}
+#elimCaja button{font-family:inherit;font-size:13px;font-weight:800;border-radius:6px;padding:10px 18px;cursor:pointer;border:1px solid #CBD5D1;background:#fff;color:#1F2937;}
+#elimCaja button.si{background:var(--rose);border-color:var(--rose);color:#fff;}
+#elimCaja button:disabled{opacity:.6;cursor:default;}
+html[data-tema="oscuro"] #elimCaja{background:#112A25;color:#E3ECE9;}
+html[data-tema="oscuro"] #elimCaja button{background:#0A1C19;color:#E3ECE9;border-color:#2B4A43;}
+html[data-tema="oscuro"] #elimCaja button.si{background:var(--rose);border-color:var(--rose);color:#fff;}
+@media print{ #elimFondo{display:none!important;} }
 #det .cuerpo{padding:16px 18px 50px;}
 .cab{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:6px 16px;font-size:12.5px;}
 .cab div span{color:var(--stone);}
@@ -851,12 +866,24 @@ td.nada{color:#C8D3CF;}
   <div class="dPie" id="dibPie"></div>
 </div>
 
+<div id="elimFondo"><div id="elimCaja" role="dialog" aria-modal="true">
+  <div class="et">¿Eliminar esta medición?</div>
+  <div class="ed" id="elimDato"></div>
+  <div class="ea">Sale de Medidas Realizadas y del Dashboard. Queda una copia guardada en la base por si hay que reponerla.</div>
+  <div class="ee" id="elimErr"></div>
+  <div class="eb">
+    <button type="button" id="elimNo" onclick="cerrarEliminar()">Cancelar</button>
+    <button type="button" class="si" id="elimSi" onclick="eliminarMedicion()">Eliminar</button>
+  </div>
+</div></div>
+
 <div id="det"><div class="top">
     <div><div class="t" id="dTit">—</div><div class="s" id="dSub">—</div></div>
     <div class="btns">
       <button class="alt" id="btnVs" onclick="verComparativo(VS_ID)" style="display:none;">Antes vs después</button>
       <button class="alt" id="btnFigura" onclick="abrirDibujo()" style="display:none;">Ver figura</button>
       <button class="alt" id="btnFicha" onclick="verFicha()" style="display:none;">Ver ficha</button>
+      <button class="alt" id="btnElim" onclick="pedirEliminar()" style="display:none;">Eliminar</button>
       <button class="alt" onclick="imprimir()">Imprimir</button>
       <button onclick="cerrarDet()">Cerrar</button>
     </div>
@@ -1084,6 +1111,7 @@ function iniciar(){
     }
   });
   buscar();
+  verPermisoEliminar();
   /* el dashboard abre aquí la hoja de una auditoría: historial.html?id=…&hoja=1 */
   if(p.id){ if(p.vs) verComparativo(p.id); else verDetalle(p.id); }   /* &vs=1: el dashboard abre el comparativo */
 }
@@ -1215,6 +1243,7 @@ function verComparativo(id){
   document.getElementById('btnFicha').style.display='none';
   document.getElementById('btnFigura').style.display='none';
   document.getElementById('btnVs').style.display='none';
+  DET_MED=null; botonEliminar();
   document.getElementById('dCuerpo').innerHTML='<div class="cargando">Buscando la otra prueba…</div>';
   document.getElementById('det').style.display='block';
   window.scrollTo(0,0);
@@ -1381,7 +1410,56 @@ function verDetalle(id){
     pintarDetalle(r.medicion);
   });
 }
+/* ---------- eliminar una medición (25/11/2026, pedido de Christian) ----------
+   El botón sale solo si la base dice que quien entra puede eliminar (`fichas_puede_eliminar`).
+   La base vuelve a comprobarlo al borrar y guarda antes una copia de la medición. */
+var PUEDE_ELIM=false, DET_MED=null, ELIM_INTENTOS=0;
+function verPermisoEliminar(){
+  /* el permiso va por la sesión del portal, no por el nombre del link; si la sesión aún no estaba
+     lista al abrir la pantalla, se vuelve a preguntar al abrir una hoja (hasta 3 veces) */
+  if(PUEDE_ELIM || ELIM_INTENTOS>=3) return;
+  ELIM_INTENTOS++;
+  sbRpc('fichas_puede_eliminar', {}, function(err, r){
+    PUEDE_ELIM = !err && r===true;
+    botonEliminar();
+  });
+}
+function botonEliminar(){
+  var b=document.getElementById('btnElim'); if(!b) return;
+  b.style.display = (PUEDE_ELIM && DET_MED) ? 'inline-block' : 'none';
+}
+function pedirEliminar(){
+  if(!PUEDE_ELIM || !DET_MED) return;
+  var m=DET_MED;
+  document.getElementById('elimDato').innerHTML =
+    '<b>'+escTxt(m.estilo)+' · '+escTxt(m.grupo||'—')+'</b><br>'+
+    escTxt(etapaTxt(m))+(m.combo?' · '+escTxt(m.combo):'')+(m.color?' · '+escTxt(m.color):'')+'<br>'+
+    escTxt(m.auditora||'—')+' · '+escTxt(m.taller||'—')+' · '+escTxt(m.fecha||'');
+  var e=document.getElementById('elimErr'); e.style.display='none'; e.textContent='';
+  document.getElementById('elimSi').disabled=false; document.getElementById('elimNo').disabled=false;
+  document.getElementById('elimSi').textContent='Eliminar';
+  document.getElementById('elimFondo').style.display='flex';
+}
+function cerrarEliminar(){ document.getElementById('elimFondo').style.display='none'; }
+function eliminarMedicion(){
+  if(!DET_MED) return;
+  var si=document.getElementById('elimSi'), no=document.getElementById('elimNo'), e=document.getElementById('elimErr');
+  si.disabled=true; no.disabled=true; si.textContent='Eliminando…'; e.style.display='none';
+  sbRpc('fichas_eliminar_medicion', {p_id:DET_MED.id}, function(err, r){
+    if(err || !r || r.ok!==true){
+      si.disabled=false; no.disabled=false; si.textContent='Eliminar';
+      e.textContent = (r && r.error) || 'No se pudo eliminar. Revisa tu señal y vuelve a intentar.';
+      e.style.display='block';
+      return;
+    }
+    cerrarEliminar();
+    DET_MED=null;
+    cerrarDet();
+    buscar();
+  });
+}
 function cerrarDet(){
+  DET_MED=null; botonEliminar();
   document.getElementById('det').style.display='none';
   /* abierta desde el dashboard (dentro de su ventana): al cerrar la hoja se avisa al dashboard para que cierre la ventana */
   if(paramDe('hoja') && window.parent!==window){ try{ window.parent.postMessage({tipo:'lives-medidas-cerrar-hoja'}, location.origin); }catch(e){} }
@@ -1400,6 +1478,7 @@ function pintarDetalle(m){
      separados, cada uno con su hoja; el botón sale solo DENTRO de la hoja de una prueba de vapor que
      tiene pareja, sea la de antes o la de después. La pareja se busca entre todas las del estilo. */
   VS_ID=''; VS_EST=m.estilo||'';
+  DET_MED=m; botonEliminar(); verPermisoEliminar();
   document.getElementById('btnVs').style.display='none';
   if(esVapor(m)){
     var idH=m.id;
