@@ -1141,6 +1141,7 @@ function error(m){
 var MED_PUSH=false;
 function medirVisible(){ var m=document.getElementById('medir'); return !!m && m.style.display==='block'; }
 function marcarHistorialMedir(){
+  midiendoMarca(true);
   if(MED_PUSH) return;
   /* al volver con atrás la lista se queda donde estaba: el navegador no la regresa arriba (18/11/2026) */
   try{ history.scrollRestoration='manual'; }catch(e){}
@@ -1166,6 +1167,7 @@ window.addEventListener('popstate', function(){
   volverBuscador();
 });
 function volverBuscador(){
+  midiendoMarca(false);
   // si venimos del buscador, volver por el historial es instantáneo
   if(document.referrer && document.referrer.indexOf('index.html')>=0) history.back();
   else location.href='index.html';
@@ -1226,7 +1228,10 @@ function arrancar(){
       if(PAR.tipo==='CORTE') ETAPA='CORTE';
       GRUPO=String(PAR.grupo||'').toUpperCase();   /* el grupo de la tarjeta desde donde se entró */
       borradorLeer();
-      pintarEtapas();
+      /* 25/11/2026: se retoma sin preguntar si la pantalla se recargó mientras se medía, o si se entró
+         por «Continuar» del buscador. Entrando por «Medir» sigue saliendo el panel para elegir. */
+      if(BORR && (midiendoEstaba() || PAR.retomar==='1')) borradorContinuar();
+      else{ midiendoMarca(false); pintarEtapas(); }
     });
   });
 }
@@ -1234,19 +1239,59 @@ var PRECARGA=null;
 
 /* ---------- borrador: lo medido sobrevive si se sale de la pantalla (ver un reporte, recargar) ---------- */
 var BORR=null;
-function borradorClave(){ return 'lives_medidas_borrador|'+(SES&&SES.auditora||'')+'|'+(PAR.estilo||''); }
+var BORR_PRE='lives_medidas_borrador|';
+function borradorClave(){ return BORR_PRE+(SES&&SES.auditora||'')+'|'+(PAR.estilo||''); }
+/* 25/11/2026: el borrador se busca por estilo en este equipo. Antes la clave exigía el nombre exacto y,
+   si el nombre llegaba escrito de otra forma (p. ej. cuando el portal no alcanzó a dar la sesión por mala
+   señal), el borrador existía pero no aparecía. Si hay varios del mismo estilo, vale el más reciente. */
+function borradorClaves(){
+  var fin='|'+(PAR.estilo||''), ks=[], k, i;
+  try{ for(i=0;i<window.localStorage.length;i++){ k=window.localStorage.key(i);
+         if(k && k.indexOf(BORR_PRE)===0 && k.slice(-fin.length)===fin && k.slice(BORR_PRE.length,-fin.length).indexOf('|')<0) ks.push(k); } }catch(e){}
+  for(k in __MEM){ if(k.indexOf(BORR_PRE)===0 && k.slice(-fin.length)===fin && ks.indexOf(k)<0) ks.push(k); }
+  return ks;
+}
+/* Marca de «está midiendo» en esta pestaña: si la pantalla se recarga sola (celular bloqueado, aviso de
+   versión nueva, pestaña que el navegador soltó), al volver se retoma la medición sin preguntar. Se quita
+   al salir de la medición a propósito, al descartar y al guardar. */
+function midiendoMarca(on){
+  try{ if(on) window.sessionStorage.setItem('lives_medidas_midiendo', PAR.estilo||'');
+       else window.sessionStorage.removeItem('lives_medidas_midiendo'); }catch(e){}
+}
+function midiendoEstaba(){
+  try{ return !!PAR.estilo && window.sessionStorage.getItem('lives_medidas_midiendo')===PAR.estilo; }catch(e){ return false; }
+}
 function borradorGuardar(){
   if(!F || !Object.keys(DATOS).length) return;
   try{
-    LS.set(borradorClave(), JSON.stringify({ ts:Date.now(), grupo:GRUPO, etapa:ETAPA, combo:COMBO, color:COLOR,
+    var mia=borradorClave();
+    LS.set(mia, JSON.stringify({ ts:Date.now(), grupo:GRUPO, etapa:ETAPA, combo:COMBO, color:COLOR,
       pv:PVAPOR, vapor:VAPOR, obs:OBS, vref:VREF, vsin:VSIN,
+      estilo:PAR.estilo||'', tipo:PAR.tipo||'', cliente:PAR.cliente||'', quien:SES.auditora||'',
       taller:SES.taller, datos:DATOS, prendas:PRENDAS, tact:TACT, pact:PACT, idEnvio:ID_ENVIO }));
+    /* si se continuó un borrador guardado con otro nombre, pasa a ser este; los de otras personas no se tocan */
+    if(BORR_ACT && BORR_ACT!==mia){ LS.del(BORR_ACT); } BORR_ACT=mia;
   }catch(e){}
 }
-function borradorBorrar(){ BORR=null; LS.del(borradorClave()); }
+var BORR_ACT='';   /* clave del borrador que se está continuando */
+/* Solo borra el borrador propio, el que se muestra y el que se continúa: nunca el de otra persona
+   que usó el mismo equipo (equipo compartido). */
+function borradorBorrar(){
+  if(BORR && BORR.__k) LS.del(BORR.__k);
+  if(BORR_ACT) LS.del(BORR_ACT);
+  LS.del(borradorClave()); BORR=null; BORR_ACT='';
+}
+function borradorAjeno(){ return !!(BORR && BORR.__k && BORR.__k!==borradorClave()); }
 function borradorLeer(){
-  var b=null; try{ b=JSON.parse(LS.get(borradorClave())||'null'); }catch(e){}
-  if(!b || !b.datos || !Object.keys(b.datos).length || Date.now()-b.ts>36*3600*1000){ if(b) LS.del(borradorClave()); return; }
+  var b=null, mia=borradorClave(), pedida=PAR.de!=null ? BORR_PRE+PAR.de+'|'+(PAR.estilo||'') : '';
+  var peso=function(x){ return x.__k===mia ? 3 : (x.__k===pedida ? 2 : 1); };   /* primero el propio */
+  borradorClaves().forEach(function(k){
+    var x=null; try{ x=JSON.parse(LS.get(k)||'null'); }catch(e){}
+    if(!x || !x.datos || !Object.keys(x.datos).length || Date.now()-x.ts>36*3600*1000){ LS.del(k); return; }
+    x.__k=k;
+    if(!b || peso(x)>peso(b) || (peso(x)===peso(b) && x.ts>b.ts)) b=x;
+  });
+  if(!b) return;
   BORR=b;   /* la persona decide en pantalla: continuar o descartar (10/11/2026) */
   if(b.taller && !SES.taller){ SES.taller=b.taller; }
 }
@@ -1255,7 +1300,7 @@ function pintarBorrador(){
   var c=document.getElementById('pBorr'); if(!c) return;
   if(!BORR){ c.style.display='none'; return; }
   var n=Object.keys(BORR.datos||{}).length;
-  txt('borrInfo',(BORR.grupo?BORR.grupo+' · ':'')+(BORR.pv ? 'Prueba de vapor · '+(NOM_VAPOR[BORR.vapor]||'') : (NOM_ETAPA[BORR.etapa]||BORR.etapa||''))+(BORR.color?' · '+BORR.color:'')+
+  txt('borrInfo',(borradorAjeno()&&BORR.quien?'De '+BORR.quien+' · ':'')+(BORR.grupo?BORR.grupo+' · ':'')+(BORR.pv ? 'Prueba de vapor · '+(NOM_VAPOR[BORR.vapor]||'') : (NOM_ETAPA[BORR.etapa]||BORR.etapa||''))+(BORR.color?' · '+BORR.color:'')+
       ' · '+n+' medida'+(n===1?'':'s')+' anotada'+(n===1?'':'s')+'. Si vas a medir otro color, descártala primero.');
   c.style.display='block';
 }
@@ -1282,7 +1327,7 @@ function reiniciarElecciones(){
 /* Descartar mientras se mide: borra lo anotado y vuelve a elegir (color, etapa, línea) */
 function descartarMedicion(){
   if(!confirm('¿Descartar esta medición? Se pierden las medidas anotadas y podrás elegir otro color.')) return;
-  borradorBorrar(); DATOS={}; PRENDAS={}; ID_ENVIO=''; PUNTO=null; DIF=null; OBS="";
+  borradorBorrar(); midiendoMarca(false); DATOS={}; PRENDAS={}; ID_ENVIO=''; PUNTO=null; DIF=null; OBS="";
   var capa=document.getElementById('capa'); if(capa) capa.innerHTML='';
   document.body.classList.remove('capAbierta');
   document.getElementById('medir').style.display='none';
@@ -1292,9 +1337,15 @@ function descartarMedicion(){
   if(MED_PUSH){ MED_PUSH=false; window.__descartando=true; history.back(); }
   window.scrollTo(0,0);
 }
+/* El aviso «Hay una versión nueva» espera mientras haya una medición abierta con medidas anotadas. */
+window.lsTrabajoPendiente=function(){ try{ return medirVisible() && Object.keys(DATOS).length>0; }catch(e){ return false; } };
+function borradorAlOcultar(){ try{ if(medirVisible()) borradorGuardar(); }catch(e){} }
+document.addEventListener('visibilitychange', function(){ if(document.hidden) borradorAlOcultar(); });
+window.addEventListener('pagehide', borradorAlOcultar);
 function borradorReanudar(){
   var b=BORR; BORR=null;
   if(!b || !F) return;
+  BORR_ACT=b.__k||'';
   DATOS=b.datos; PRENDAS=b.prendas||{}; ID_ENVIO=b.idEnvio||'';
   F.tallas.forEach(function(t){ if(!PRENDAS[t]) PRENDAS[t]=1; });
   TACT=(F.tallas.indexOf(b.tact)>=0)?b.tact:F.tallas[0]; PACT=b.pact||1; PUNTO=null;
@@ -1923,6 +1974,8 @@ function empezar(){
   var mA=VREF ? MEDS_EST.filter(function(x){ return x.id===VREF; })[0] : null;
   if(mA && mA.color && COLOR!==mA.color &&
      !confirm('La prueba antes de vapor es del color '+mA.color+' y elegiste '+COLOR+'. ¿Seguir así?')) return;
+  /* el borrador de otra persona (equipo compartido) no se pregunta ni se borra: se queda para ella */
+  if(BORR && borradorAjeno()){ BORR=null; }
   if(BORR && !confirm('Hay una medición sin terminar. ¿Descartarla y empezar esta nueva?')) return;
   DATOS={}; PRENDAS={}; ID_ENVIO=''; OBS="";
   F.tallas.forEach(function(t){ PRENDAS[t]=1; });
@@ -2802,7 +2855,7 @@ function decidir(r){
           'vuelve a tocar el botón cuando tengas señal.</div>';
         return;
       }
-      ID_ENVIO=''; borradorBorrar();
+      ID_ENVIO=''; borradorBorrar(); midiendoMarca(false);
       document.getElementById('medir').innerHTML=
         '<div class="wrap"><div class="ok" style="font-size:16px;">'+(PVAPOR?'Prueba de vapor ('+(NOM_VAPOR[VAPOR]||'')+') guardada':'Auditoría guardada')+' como <b>'+r+'</b>'+
         '<span class="codigo">Código: '+(res.id||'—')+'</span></div>'+

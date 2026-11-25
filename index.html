@@ -825,6 +825,11 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 <div class="wrap">
   <div class="err" id="err"></div>
 
+  <div class="panel" id="pBorrIdx" style="display:none;border-left:4px solid #E07B00;">
+    <div class="pt">Medición sin terminar</div>
+    <div id="borrIdxLista"></div>
+  </div>
+
   <div class="panel">
     <div class="pt">Buscar ficha</div>
     <div class="ph lsOculto">Escribe y elige de la lista. Solo aparece lo que ya está cargado.</div>
@@ -1538,6 +1543,53 @@ function tg(i){
   var t=el.previousElementSibling;
   t.textContent=(open?'▸ ':'▾ ')+t.textContent.slice(2);
 }
+
+/* Medición sin terminar (25/11/2026): si el celular se bloqueó o el portal volvió a abrir la herramienta,
+   la auditora cae en este buscador. Aquí se le avisa que lo medido sigue guardado en el equipo y con un
+   toque vuelve a donde estaba. Solo lee lo que dejó medidas.html en el equipo; no consulta la base. */
+function borradoresPendientes(){
+  var pre='lives_medidas_borrador|', porEstilo={}, i, k, x, pz;
+  try{
+    for(i=0;i<window.localStorage.length;i++){
+      k=window.localStorage.key(i);
+      if(!k || k.indexOf(pre)!==0) continue;
+      x=null; try{ x=JSON.parse(window.localStorage.getItem(k)||'null'); }catch(e){}
+      if(!x || !x.datos || !Object.keys(x.datos).length || Date.now()-x.ts>36*3600*1000) continue;
+      pz=k.split('|');
+      x.estilo = x.estilo || pz[2] || '';
+      if(!x.estilo) continue;
+      x.de = pz[1]||'';                 /* de quién es: en un equipo compartido cada una ve su nombre */
+      porEstilo[k]=x;
+    }
+  }catch(e){}
+  return Object.keys(porEstilo).map(function(e){ return porEstilo[e]; }).sort(function(a,b){ return b.ts-a.ts; });
+}
+var BORR_IDX=[];
+function pintarBorradoresIdx(){
+  var c=document.getElementById('pBorrIdx'), l=document.getElementById('borrIdxLista');
+  if(!c || !l) return;
+  BORR_IDX=borradoresPendientes();
+  if(!BORR_IDX.length){ c.style.display='none'; return; }
+  var ET={ TERMINADA:'Prenda terminada', ANTES_VAPOR:'Antes de vapor', CORTE:'Corte' }, VP={ ANTES:'Antes de vapor', DESPUES:'Después de vapor' };
+  var t=function(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  l.innerHTML=BORR_IDX.map(function(b,i){
+    var n=Object.keys(b.datos).length;
+    return '<div class="ph" style="margin-top:8px;font-size:13px;color:#333;">'+(b.de?'<b>'+t(b.de)+'</b> · ':'')+'Estilo <b>'+t(b.estilo)+'</b>'+(b.grupo?' · '+t(b.grupo):'')+
+      ' · '+t(b.pv ? 'Prueba de vapor · '+(VP[b.vapor]||'') : (ET[b.etapa]||b.etapa||''))+(b.color?' · '+t(b.color):'')+
+      ' · '+n+' medida'+(n===1?'':'s')+' anotada'+(n===1?'':'s')+'</div>'+
+      '<button class="btn" style="width:100%;" onclick="continuarBorrador('+i+')">Continuar esa medición</button>';
+  }).join('');
+  c.style.display='block';
+}
+function continuarBorrador(i){
+  var b=BORR_IDX[i]; if(!b) return;
+  location.href='medidas.html?estilo='+encodeURIComponent(b.estilo)+
+    '&tipo='+encodeURIComponent(b.tipo || (b.etapa==='CORTE'?'CORTE':'TECNICA'))+
+    '&grupo='+encodeURIComponent(b.grupo||'')+'&cliente='+encodeURIComponent(b.cliente||'')+
+    '&usuario='+encodeURIComponent((SES&&SES.auditora)||'')+'&retomar=1&de='+encodeURIComponent(b.de||'');
+}
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', pintarBorradoresIdx); else pintarBorradoresIdx();
+window.addEventListener('pageshow', pintarBorradoresIdx);   /* al volver con atrás desde la medición */
 
 function medir(estilo, tipo, grupo, cliente){
   var q='?estilo='+encodeURIComponent(estilo)+'&tipo='+encodeURIComponent(tipo)+
