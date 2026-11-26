@@ -831,7 +831,7 @@ table.pT th{background:#0B815E;color:#fff;font-weight:700;text-align:center;}
 table.pT td.e,table.pT td.c{font-weight:700;}
 table.pT tr.fi td,table.pT tr.to td{background:var(--warm-light);font-weight:700;}
 table.pT td.i{text-align:left;}
-table.pT td.g{font-weight:700;text-align:center;min-width:110px;}
+table.pT td.g{font-weight:700;text-align:center;min-width:120px;}
 table.pT td.g small{display:block;font-weight:400;font-size:12px;color:var(--stone);}
 html[data-tema="oscuro"] .pChip{background:#112A25!important;border-color:#2A3D38!important;color:#E3ECE9!important}
 html[data-tema="oscuro"] .pChip.on{background:#0F7A5A!important;border-color:#0F7A5A!important;color:#fff!important}
@@ -1194,14 +1194,19 @@ function calcular(color){
   lista.sort(function(a,b){ return ordenP[a.pk]-ordenP[b.pk] || (a.tol||0)-(b.tol||0); });
   lista.forEach(function(b){
     b.tallas=tallasOrd.filter(function(t){ return b.esp[t]!==undefined; });
-    b.filas=Object.keys(b.filas).map(function(k){ return b.filas[k]; }).sort(function(x,y){
-      if(x.fuera!==y.fuera) return x.fuera?1:-1;
-      var ax=Math.abs(x.dif), ay=Math.abs(y.dif);
-      if(Math.abs(ax-ay)>1e-9) return ax-ay;
-      return y.dif-x.dif;                       /* a más antes que a menos, como en la hoja */
+    /* orden de regla (pedido de Christian, 26/11/2026: mezcladas por tamaño se veían desordenadas):
+       de la que sale más chica (a menos) a la más grande (a más), con OK al medio */
+    b.filas=Object.keys(b.filas).map(function(k){ return b.filas[k]; }).sort(function(x,y){ return x.dif-y.dif; });
+    b.dentro=0; b.fuera=0;
+    /* tramos seguidos: fuera a menos, dentro, fuera a más; cada uno lleva su % en una celda unida */
+    b.tramos=[];
+    b.filas.forEach(function(f,i){
+      var cl = !f.fuera ? 'dentro' : (f.dif<0 ? 'menos' : 'mas');
+      if(f.fuera) b.fuera+=f.total; else b.dentro+=f.total;
+      var u=b.tramos[b.tramos.length-1];
+      if(!u || u.clase!==cl){ u={clase:cl, desde:i, n:0, total:0}; b.tramos.push(u); }
+      u.n++; u.total+=f.total;
     });
-    b.dentro=0; b.fuera=0; b.nDentro=0; b.nFuera=0;
-    b.filas.forEach(function(f){ if(f.fuera){ b.fuera+=f.total; b.nFuera++; } else { b.dentro+=f.total; b.nDentro++; } });
     b.totTalla={}; b.tallas.forEach(function(t){ var s=0; b.filas.forEach(function(f){ s+=f.cnt[t]||0; }); b.totTalla[t]=s; });
     b.titulo=((b.desc||('Punto '+b.cod))+'  '+txtTol(b.tol,b.cm)).trim();
   });
@@ -1261,6 +1266,7 @@ function pintar(){
   sal.innerHTML=out;
   bx.disabled=false; bx.style.opacity='';
 }
+var ROT_TRAMO={dentro:'dentro', menos:'fuera, a menos', mas:'fuera, a más'};
 function tablaHtml(b){
   var h='<div class="pBloque"><div class="pTit">'+esc(b.titulo)+'</div><div class="pScroll"><table class="pT">';
   h+='<tr><th>Diferencia</th>';
@@ -1270,16 +1276,17 @@ function tablaHtml(b){
   h+='<td></td><td></td><td></td></tr>';
   b.filas.forEach(function(f,i){
     var ok=Math.abs(f.dif)<1e-9;
-    h+='<tr><td class="e'+(ok?' i':'')+'">'+esc(txtDif(f.dif,b.cm))+'</td>';
+    h+='<tr><td class="e">'+esc(txtDif(f.dif,b.cm))+'</td>';
     b.tallas.forEach(function(t){ h+='<td>'+(f.cnt[t]||'')+'</td>'; });
     h+='<td class="c">'+f.total+'</td><td>'+pct(f.total,b.total)+'</td>';
-    if(!f.fuera && i===0) h+='<td class="g" rowspan="'+b.nDentro+'">'+pct(b.dentro,b.total)+'<small>dentro</small></td>';
-    if(f.fuera && i===b.nDentro) h+='<td class="g" rowspan="'+b.nFuera+'">'+pct(b.fuera,b.total)+'<small>fuera</small></td>';
+    b.tramos.forEach(function(u){
+      if(u.desde===i) h+='<td class="g" rowspan="'+u.n+'">'+pct(u.total,b.total)+'<small>'+ROT_TRAMO[u.clase]+'</small></td>';
+    });
     h+='</tr>';
   });
   h+='<tr class="to"><td class="i">Total</td>';
   b.tallas.forEach(function(t){ h+='<td>'+b.totTalla[t]+'</td>'; });
-  h+='<td>'+b.total+'</td><td>100%</td><td></td></tr></table></div></div>';
+  h+='<td>'+b.total+'</td><td>100%</td><td class="g">'+pct(b.fuera,b.total)+'<small>fuera en total</small></td></tr></table></div></div>';
   return h;
 }
 
@@ -1338,7 +1345,7 @@ function hojaExcel(wb,ws,color,bloques){
   ws.getRow(2).height=18;
   ws.mergeCells(3,1,3,nCol);
   var c3=ws.getCell(3,1);
-  c3.value='Cada casilla cuenta las prendas medidas con esa diferencia contra la ficha. % = prendas de la fila ÷ prendas medidas en el punto. Dentro: la diferencia no pasa la tolerancia de la ficha.';
+  c3.value='Cada casilla cuenta las prendas medidas con esa diferencia contra la ficha. % = prendas de la fila ÷ prendas medidas en el punto. Dentro: la diferencia no pasa la tolerancia de la ficha. A menos: la prenda sale más chica que la ficha; a más: más grande.';
   c3.font={name:'Calibri',size:9,italic:true,color:{argb:XL.GRIS}}; c3.alignment={vertical:'middle',horizontal:'left',indent:1,wrapText:true};
   ws.getRow(3).height=27;   /* dos líneas: en una sola se cortaba a la derecha */
 
@@ -1360,7 +1367,7 @@ function hojaExcel(wb,ws,color,bloques){
     enc(2,'Diferencia');
     b.tallas.forEach(function(ta,i){ enc(3+i,String(ta)); });
     enc(cCant,'Cant.'); enc(cPct,'%'); enc(cGru,'Tolerancia');
-    ws.getColumn(cGru).width=Math.max(ws.getColumn(cGru).width||10,16);
+    ws.getColumn(cGru).width=Math.max(ws.getColumn(cGru).width||10,20);
     ws.getRow(r1).height=22;
     celda(r2,2,'Ficha'+(b.cm?' (cm)':''),{bold:true,h:'left',fill:XL.WARM});
     b.tallas.forEach(function(ta,i){ celda(r2,3+i,b.esp[ta],{bold:true,fill:XL.WARM,fmt:fmtM}); });
@@ -1369,21 +1376,20 @@ function hojaExcel(wb,ws,color,bloques){
     var f0=r+3, fT=f0+b.filas.length;      /* fT = fila de totales */
     b.filas.forEach(function(f,i){
       var rr=f0+i, esOk=Math.abs(f.dif)<1e-9;
-      celda(rr,2,esOk?'OK':f.dif,{bold:true,h:esOk?'left':'right',fmt:esOk?undefined:fmtM});
+      celda(rr,2,esOk?'OK':f.dif,{bold:true,h:'right',fmt:esOk?undefined:fmtM});
       b.tallas.forEach(function(ta,j){ celda(rr,3+j,f.cnt[ta]||null,{fmt:'#,##0'}); });
       celda(rr,cCant,{formula:'SUM('+L1+rr+':'+LN+rr+')',result:f.total},{bold:true,fmt:'#,##0'});
       celda(rr,cPct,{formula:LC+rr+'/'+LC+'$'+fT,result:b.total?f.total/b.total:0},{fmt:'0%'});
       celda(rr,cGru,null,{});
     });
-    /* % dentro y % fuera de tolerancia, cada uno en su celda unida y dicho en palabras */
-    function grupo(desde,n,total,rotulo){
-      if(!n) return;
-      var hasta=desde+n-1;
-      celda(desde,cGru,{formula:'SUM('+LC+desde+':'+LC+hasta+')/'+LC+fT,result:b.total?total/b.total:0},{bold:true,h:'center',fmt:'0%" '+rotulo+'"',wrap:true});
-      if(n>1) ws.mergeCells(desde,cGru,hasta,cGru);
-    }
-    grupo(f0,b.nDentro,b.dentro,'dentro');
-    grupo(f0+b.nDentro,b.nFuera,b.fuera,'fuera');
+    /* % de cada tramo (fuera a menos, dentro, fuera a más), en su celda unida y dicho en palabras */
+    var sumFuera=[];
+    b.tramos.forEach(function(u){
+      var desde=f0+u.desde, hasta=desde+u.n-1, rango='SUM('+LC+desde+':'+LC+hasta+')';
+      if(u.clase!=='dentro') sumFuera.push(rango);
+      celda(desde,cGru,{formula:rango+'/'+LC+fT,result:b.total?u.total/b.total:0},{bold:true,h:'center',fmt:'0%" '+ROT_TRAMO[u.clase]+'"',wrap:true});
+      if(u.n>1) ws.mergeCells(desde,cGru,hasta,cGru);
+    });
     /* totales */
     celda(fT,2,'Total',{bold:true,h:'left',fill:XL.WARM});
     b.tallas.forEach(function(ta,j){
@@ -1392,7 +1398,7 @@ function hojaExcel(wb,ws,color,bloques){
     });
     celda(fT,cCant,{formula:'SUM('+L1+fT+':'+LN+fT+')',result:b.total},{bold:true,fill:XL.WARM,fmt:'#,##0'});
     celda(fT,cPct,{formula:LC+fT+'/'+LC+'$'+fT,result:1},{bold:true,fill:XL.WARM,fmt:'0%'});
-    celda(fT,cGru,null,{fill:XL.WARM});
+    celda(fT,cGru,(sumFuera.length ? {formula:'('+sumFuera.join('+')+')/'+LC+fT,result:b.total?b.fuera/b.total:0} : 0),{bold:true,h:'center',fill:XL.WARM,fmt:'0%" fuera en total"'});
     r=fT+3;
   });
   /* pie de trazabilidad */
