@@ -69,7 +69,7 @@ Todo pasa por funciones; las pantallas no leen tablas directo.
   - `fichas_listas` trae talleres, auditoras y la lista de quién verifica.
   - `fichas_mediciones` y `fichas_medicion` leen `fichas_mediciones` y `fichas_mediciones_detalle`.
   - `fichas_dashboard()` (18/11/2026, registro `Fi01`) solo lee: devuelve cada auditoría con sus medidas ya sumadas por punto y por talla (con la descripción del punto, de `fichas_especificaciones`) y el cruce antes de vapor contra terminada. Lectura libre, como el resto. A Sistemas: es una consulta de agregación, sin nada exclusivo de Postgres salvo el jsonb de las tablas.
-  - `fichas_quien` lee `cat_personal`.
+  - `fichas_quien` lee `cat_personal`, `perfiles` y el interruptor `registro_libre` de `fichas_ajustes`.
   - `fichas_colores(p_estilo)` (19/11/2026, registro `Fi03`) solo lee `ops`: devuelve los colores del estilo (`estilo`) y todos los colores de la base de OPs (`todos`), en mayúsculas y sin repetir. Lectura libre.
 - Prueba de vapor (18/11/2026, registro `Fi02`): no hay tablas ni columnas nuevas; `fichas_guardar_medicion` guarda dentro de `dato` las claves `pruebaVapor` y `vapor`, y `fichas_dashboard()` devuelve `pv` y `vapor` en cada medición y el cruce separado en `vapor` (normales) y `vaporPrueba` (pruebas). Las mediciones anteriores no tienen la clave y cuentan como normales. Respaldo de las dos funciones: `respaldo_fichas_funciones_20261118`. A Sistemas: en SQL Server son dos columnas (un bit y un código ANTES/DESPUES).
 - Después de vapor enlazado (23/11/2026, registro `Fi04`): `fichas_guardar_medicion` guarda además `vaporRef` dentro de `dato`, solo en una prueba DESPUÉS y si el id existe como prueba ANTES del mismo estilo (si no, vacío). Respaldo: `respaldo_fichas_funciones_20261123`. A Sistemas: una columna que apunta a la medición antes (llave foránea).
@@ -85,7 +85,12 @@ Todo pasa por funciones; las pantallas no leen tablas directo.
 Según las entradas por el portal de los últimos 30 días al 21/10/2026: 23 personas. Son sobre todo auditoras de calidad (18); también entran las supervisoras de calidad, la supervisora de Top Sample y la digitadora de Calidad Manufactura.
 
 ## Quién puede guardar
-- Medir: quien figura como auditora activa en `cat_personal`. Lo comprueba `fichas_guardar_medicion`, que corre con permisos propios (security definer).
+- Medir: registro libre desde el 26/11/2026 (registro `Fi06`; decisión de Christian tras dos guardados rechazados, María Lino el 25/11 y Pamella Carlos el 26/11: «no debería pasar con ninguna auditora»). Mide cualquiera que llegue con nombre: el de su sesión del portal o, si no hay sesión, el del link. La medición se firma con ese nombre; si la persona está en `cat_personal` como auditora activa, con la escritura del catálogo. Solo se rechaza si no llega ningún nombre. Lo decide `fichas_guardar_medicion` (security definer), y `fichas_quien` responde `mide` = sí para que no salga el aviso amarillo.
+  - Interruptor: `fichas_ajustes`, clave `registro_libre` = `si`. Con `no` vuelve a exigir estar activo en `cat_personal` con rol AUDITOR. Se cierra solo cuando Christian lo diga.
+  - Rodrigo (`rcamogliano`) sigue en supervisión: la base le rechaza el guardado.
+  - Respaldo de las dos funciones anteriores: tabla `respaldo_fichas_funciones_20261126`.
+  - A Sistemas: esta comprobación es la pieza que reemplazan con su seguridad (en SQL Server, usuario obligatorio).
+  - Guardar exige sesión de la base (la función solo se ejecuta con usuario autenticado). Quien no tiene perfil con cuenta en la base no puede guardar aunque el registro sea libre (al 26/11/2026: María Palacios sin cuenta; Athina Vargas, Estrella Díaz, Edgar Flores y Frida Espinoza sin perfil). Por revisar con Christian.
   - Christian (usuario `ctalepcio`) siempre puede medir y probar (desde el 28/10/2026), sin estar en `cat_personal`: lo permiten `fichas_guardar_medicion` y `fichas_quien`. Rodrigo no guarda. Respaldo de las versiones anteriores: tabla `respaldo_fichas_funciones_20261028`.
   - Sin modo demostración desde el 21/10/2026: la lista `DEMO` está vacía, así que todos ven la pantalla tal como es.
 - Eliminar mediciones: solo Christian, con su sesión del portal (`fichas_puede_eliminar`). Nadie más ve el botón y la base rechaza a cualquier otro.
