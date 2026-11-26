@@ -995,10 +995,10 @@ function leerPagina(page, cm, hered){
 
     var reCod = /^([A-Z]|[A-Z]\d{1,2})$/;
     var filas=[];
-    renglones(pal, 5).forEach(function(r){
-      if(!r.length || r[0].y >= yCab-2) return;   // solo debajo del encabezado
+    function armarFila(r){
+      if(!r.length || r[0].y >= yCab-2) return null;   // solo debajo del encabezado
       var cod = r[0].t.trim().toUpperCase();
-      if(!reCod.test(cod)) return;
+      if(!reCod.test(cod)) return null;
       var u = unir(r.slice(1));
       // margen: la mitad de la separación entre columnas (formatos con
       // columnas vacías intercaladas tienen las tallas muy separadas)
@@ -1055,9 +1055,39 @@ function leerPagina(page, cm, hered){
       // un renglón con menos de dos tallas llenas es texto suelto, no una fila
       var llenas=0;
       orden.forEach(function(o){ if(o!=='TOL' && vals[o]) llenas++; });
-      if(llenas<2) return;
-      filas.push({cod:cod, desc:desc.join(' ').replace(/\s+/g,' ').trim(),
-                  vals:vals, vacias:vacias, ilegibles:ilegibles, xCod:(r[0].x0+r[0].x1)/2});
+      if(llenas<2) return null;
+      return {cod:cod, desc:desc.join(' ').replace(/\s+/g,' ').trim(),
+              vals:vals, vacias:vacias, ilegibles:ilegibles, xCod:(r[0].x0+r[0].x1)/2,
+              yCod:r[0].y, x1Cod:r[0].x1, xDesc:cols[orden[0]]-sep*0.6};
+    }
+    renglones(pal, 5).forEach(function(r){ var f=armarFila(r); if(f) filas.push(f); });
+    /* Descripción en dos renglones (26/11/2026, 25379-2A EFI-151-156): la descripción
+       del punto E venía partida, un renglón arriba y otro abajo de la fila. El renglón
+       se armaba desde la palabra más alta (la descripción) y las medidas que quedaban
+       a más de 5 puntos se iban al renglón siguiente: la fila salía sin la talla S ni
+       la tolerancia, y toda la ficha quedaba "para revisión" estando bien escrita.
+       Una fila incompleta se vuelve a leer tomando como altura la de su CÓDIGO; solo
+       se acepta si así sale completa. Las filas completas no se tocan. */
+    filas = filas.map(function(f){
+      if(!(f.vacias>0 || f.ilegibles>0)) return f;
+      var r2 = pal.filter(function(w){ return Math.abs(w.y-f.yCod)<=3; })
+                  .sort(function(a,b){ return a.x0-b.x0; });
+      var g = armarFila(r2);
+      if(!g || g.cod!==f.cod || g.vacias>0 || g.ilegibles>0) return f;
+      // la descripción: los renglones pegados a la fila, sin llegar a las filas vecinas
+      var dMin=1e9;
+      filas.forEach(function(o){ if(o!==f){ var d=Math.abs(o.yCod-f.yCod); if(d<dMin) dMin=d; } });
+      var lim = Math.min(8, dMin*0.45);
+      var ds = pal.filter(function(w){
+        return Math.abs(w.y-f.yCod)<=lim && w.x0>f.x1Cod && (w.x0+w.x1)/2 < g.xDesc;
+      });
+      var txt = renglones(ds, 1.5).map(function(l){
+        // desde la primera palabra con letras: lo anterior es la columna N°
+        var k=0; while(k<l.length && !/[A-ZÁÉÍÓÚÑ]/i.test(l[k].t)) k++;
+        return l.slice(k).map(function(w){ return w.t; }).join(' ');
+      }).join(' ').replace(/\s+/g,' ').trim();
+      g.desc = txt || g.desc || f.desc;
+      return g;
     });
     /* Rótulo del dibujo leído como fila: en 24784 PAK-158 (25/11/2026) una letra "D"
        del dibujo, con números sueltos al costado, salía como un punto incompleto y
