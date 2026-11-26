@@ -814,6 +814,7 @@ td.nada{color:#C8D3CF;}
 .pMini{font-family:inherit;font-size:12px;font-weight:700;border:1px solid var(--warm);background:#fff;color:var(--sage);border-radius:6px;padding:5px 10px;cursor:pointer;}
 .pFila{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
 .pFila .lbl{margin:0;}
+.pUnidad{font-size:13px;font-weight:700;color:#fff;background:var(--slate);border-radius:6px;padding:5px 12px;margin-right:6px;}
 nav.pColores{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px;}
 nav.pColores button{font-family:inherit;font-size:13px;font-weight:700;border:1px solid var(--warm);background:#fff;color:var(--stone);border-radius:6px 6px 0 0;padding:8px 14px;cursor:pointer;border-bottom:3px solid transparent;}
 nav.pColores button.on{color:var(--sage);border-bottom-color:var(--sage);}
@@ -872,7 +873,7 @@ html[data-tema="oscuro"] table.pT td.g small{color:#9DB3AC!important}
     </div>
 
     <div id="cajaPuntos" style="display:none;margin-top:14px;">
-      <div class="pFila"><span class="lbl">Puntos de medida</span>
+      <div class="pFila"><span class="pUnidad" id="unidad" style="display:none;"></span><span class="lbl">Puntos de medida</span>
         <button class="pMini" onclick="marcarTodos(true)">Todos</button>
         <button class="pMini" onclick="marcarTodos(false)">Ninguno</button></div>
       <div class="pChips" id="chips"></div>
@@ -961,6 +962,13 @@ function etapaDe(m){
   if(m.pruebaVapor===true || m.pruebaVapor==='true') return may(m.vapor)==='ANTES' ? 'PV_ANTES' : 'PV_DESPUES';
   return may(m.etapa).replace(/ /g,'_');
 }
+/* Unidad de las medidas (pedido de Christian, 26/11/2026: saberlo antes de ver las tablas).
+   Cada medición guarda la unidad de su ficha; las antiguas no la traen y son pulgadas. */
+function unidadDe(meds){
+  var cm=false, pulg=false;
+  meds.forEach(function(m){ if(String(m.unidad||'').toLowerCase()==='cm') cm=true; else pulg=true; });
+  return cm&&pulg ? 'pulgadas y centímetros' : cm ? 'centímetros' : pulg ? 'pulgadas' : '';
+}
 function nPrendas(m){ var n=0, p=m.prendas||{}; for(var k in p){ n+=Number(p[k])||0; } return n; }
 
 /* ---------- fracciones (pulgadas en 16avos) y centímetros ---------- */
@@ -1019,7 +1027,8 @@ function llenarEstilos(){
   var dl=$('dlEstilos'), h='';
   estilos().forEach(function(e){
     var g={}; MEDS.forEach(function(m){ if(m._estilo===e && m._grupo) g[m._grupo]=1; });
-    h+='<option value="'+esc(e)+'" label="'+esc(Object.keys(g).sort().join(', '))+'"></option>';
+    var u=unidadDe(MEDS.filter(function(m){ return m._estilo===e; }));
+    h+='<option value="'+esc(e)+'" label="'+esc(Object.keys(g).sort().join(', ')+(u?' · en '+u:''))+'"></option>';
   });
   dl.innerHTML=h;
 }
@@ -1243,6 +1252,9 @@ function pintar(){
   });
   $('meds').innerHTML=hm;
   $('medsTit').textContent='Mediciones incluidas: '+nIn+' de '+lista.length;
+  var uni=unidadDe(base());
+  $('unidad').textContent = uni ? 'Medidas en '+uni : '';
+  $('unidad').style.display = uni ? '' : 'none';
   $('cajaPuntos').style.display=PUNTOS.length?'':'none';
 
   if(!PUNTOS.length){ sinExcel(); sal.innerHTML='<div class="vacio">Este estilo no tiene medidas guardadas para esa elección.</div>'; return; }
@@ -1340,7 +1352,7 @@ function hojaExcel(wb,ws,color,bloques){
   var cli=EST_CLI[SEL.estilo+'|'+SEL.grupo];
   ws.mergeCells(2,1,2,nCol);
   var c2=ws.getCell(2,1);
-  c2.value=['Grupo '+SEL.grupo,'Estilo '+SEL.estilo,(cli?'Estilo cliente '+cli:''),'Color '+color,(NOM_ETAPA[SEL.etapa]||SEL.etapa),(SEL.combo?'Línea '+SEL.combo:'')].filter(Boolean).join(' · ');
+  c2.value=['Grupo '+SEL.grupo,'Estilo '+SEL.estilo,(cli?'Estilo cliente '+cli:''),'Color '+color,(NOM_ETAPA[SEL.etapa]||SEL.etapa),(SEL.combo?'Línea '+SEL.combo:''),'Medidas en '+unidadDe(activas().filter(function(m){ return m._color===color; }))].filter(Boolean).join(' · ');
   c2.fill=rel(XL.SLATE); c2.font={name:'Calibri',size:10,bold:true,color:BLANCO}; c2.alignment={vertical:'middle',horizontal:'left',indent:1};
   ws.getRow(2).height=18;
   ws.mergeCells(3,1,3,nCol);
