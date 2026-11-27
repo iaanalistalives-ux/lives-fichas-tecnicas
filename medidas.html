@@ -1732,7 +1732,9 @@ function pintarFichas(){
   var vistaVer={};
   document.getElementById('pFicha').innerHTML = fs.map(function(v,i){
     var cols=coloresDeFicha(v), kv=String(v.version||'').toUpperCase();
-    var rec = porVer[kv]>1 && !vistaVer[kv]; vistaVer[kv]=1;
+    /* «más reciente» solo si de verdad lo es: con la misma fecha y minuto no se marca ninguna */
+    var sig=fs[i+1], fch=function(x){ return String(x.fechaFicha||'')+'|'+String(x.fecha||''); };
+    var rec = porVer[kv]>1 && !vistaVer[kv] && !!sig && String(sig.version||'').toUpperCase()===kv && fch(v)>fch(sig); vistaVer[kv]=1;
     return '<button type="button" class="antOp'+(String(v.archivo||'')===FICHA?' on':'')+'" onclick="elegirFicha('+i+')">'+
       '<div class="aInf"><b>'+(v.version?'Versión '+hEsc(v.version)+' · ':'')+hEsc(nomFicha(v))+'</b>'+
       (cols.length?'<br><span>Hoja de corte: '+hEsc(cols.join(', '))+'</span>':'')+
