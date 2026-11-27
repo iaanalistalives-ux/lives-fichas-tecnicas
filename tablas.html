@@ -1442,6 +1442,10 @@ function parsear_(texto, nombreArchivo){
   if(/REQUERIMIENTOS\s+DE\s+MATERIALES/i.test(cab))                     out.tipo='RM';
   else if(/CONTROL\s+DE\s+MEDIDAS\s*:?\s*CORTE/i.test(cab))             out.tipo='CORTE';
   else if(/ESPECIFICACIONES\s+TECNICAS\s+PARA\s+ACABADOS/i.test(cab))   out.tipo='ACABADOS';
+  /* Una hoja de doblado es de Acabados: no trae tabla de medidas (27/11/2026). Antes un archivo
+     "Doblado VIN-598 …" quedaba como Técnica, salía en "no se pudieron leer completas" y tapaba
+     a la ficha técnica real en el buscador. Manda el nombre del archivo.                        */
+  else if(/(^|[^A-Za-z])DOBLAD[OA]/i.test(nombreArchivo))                out.tipo='ACABADOS';
   else if(/ESPECIFICACIONES\s+TECNICAS\s+PARA\s+PRODUCCION/i.test(cab)) out.tipo='TECNICA';
   else if(/\bRM[_\s-]|REQUERIMIENTO/i.test(nombreArchivo))               out.tipo='RM';
   else if(/HOJA\s*DE\s*CORTE|CORTE/i.test(nombreArchivo))                out.tipo='CORTE';
