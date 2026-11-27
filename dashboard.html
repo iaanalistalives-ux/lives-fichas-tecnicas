@@ -679,6 +679,13 @@ nav.tabs button.active{color:var(--sage-dark);border-bottom-color:var(--sage)}
 .cwrap canvas{position:absolute;inset:0}
 .donutpie{font-size:12px;color:var(--stone);text-align:center;margin-top:8px}
 .vacioP{font-size:13px;color:var(--stone);padding:14px 4px}
+.minis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}
+.mini{background:var(--warm-light);border-radius:8px;padding:10px 12px}
+.mini .ml{font-size:10.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--stone)}
+.mini .mv{font-size:20px;font-weight:700;color:var(--slate);margin-top:3px;line-height:1.15}
+.mini .ms{font-size:11px;color:var(--stone);margin-top:2px}
+@media(max-width:1300px){.minis{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.mini .mv{font-size:17px}}
 .vacio{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);padding:28px 18px;text-align:center;color:var(--stone);font-size:14.5px;display:none}
 .errBox{background:#FBE9E9;border:1px solid var(--rose);border-radius:8px;padding:12px 16px;color:var(--rose);font-size:13px;margin-bottom:14px;display:none}
 .tw{overflow-x:auto}
@@ -828,7 +835,6 @@ body.sinScroll{overflow:hidden}
         <div class="panel col6" id="pPtFuera"><span class="tira riesgo"></span><div class="pt">Puntos de medida que más fallan</div><div class="ph" id="phPtFuera"></div><div class="cwrap tall"><canvas id="cPtFuera"></canvas></div></div>
         <div class="panel col6" id="pPtDesv"><span class="tira volumen"></span><div class="pt">Puntos que más se alejan de la ficha</div><div class="ph" id="phPtDesv"></div><div class="cwrap tall"><canvas id="cPtDesv"></canvas></div></div>
         <div class="panel col6" id="pTalla"><span class="tira riesgo"></span><div class="pt">Medidas fuera de tolerancia por talla</div><div class="ph" id="phTalla"></div><div class="cwrap"><canvas id="cTalla"></canvas></div></div>
-        <div class="panel col6" id="pTallaDesv"><span class="tira volumen"></span><div class="pt">Desviación contra la ficha por talla</div><div class="ph">Suma de diferencias ÷ suma de medidas de ficha de cada talla. Hacia la izquierda la prenda sale más chica que la ficha; hacia la derecha, más grande.</div><div class="cwrap"><canvas id="cTallaDesv"></canvas></div></div>
         <div class="panel col12" id="pPtTab"><span class="tira volumen"></span><div class="pt">Todos los puntos de medida</div><div class="ph">Los puntos se juntan por su descripción en la ficha. Las hojas de corte no traen descripción: ahí cada punto se muestra con su estilo y su código.</div><div class="tw" id="tPt"></div></div>
       </div>
     </div>
@@ -924,6 +930,10 @@ function preparar(r){
     m.P=(m.pts||[]).map(a=>{ const d=String(a[1]||'').replace(/\s+/g,' ').replace(/[.\s]+$/,'').trim();
       return Object.assign({cod:a[0], key:d?quitaTildes(d):('§'+m.estilo+'·'+a[0]), label:d?d.toUpperCase():('Estilo '+m.estilo+' · punto '+a[0]+' ('+(NOM_ETAPA[m.etapa]||m.etapa).toLowerCase()+')')}, sumar(a.slice(2)), {ncm:m.unidad==='cm'?a[2]:0}); });
     m.T=(m.tl||[]).map(a=>Object.assign({t:a[0]}, sumar(a.slice(1)), {ncm:m.unidad==='cm'?a[1]:0}));
+    /* conteo de medidas por diferencia y tolerancia, en la unidad de la medición (27/11/2026) */
+    m.cm=m.unidad==='cm'; const kc={}; m.P.forEach(p=>{ kc[p.cod]=p.key; });
+    const hh=a=>({k:a[0],d:+a[1],t:a[2]==null?null:+a[2],n:+a[3],f:+a[4]});
+    m.HP=(m.hp||[]).map(a=>Object.assign(hh(a),{key:kc[a[0]]})); m.HT=(m.ht||[]).map(hh);
     return m;
   }).sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));
   VAP_N=r.vapor||[]; VAP_P=r.vaporPrueba||[];
@@ -1181,6 +1191,82 @@ function tabla(cols,rows,onRow){   /* cols: [{t, r(derecha), h(fila)->html}] */
 const C_MED=[{t:'Medidas',r:1,h:g=>num(g.s.n)},{t:'Fuera',r:1,h:g=>num(g.s.f)},{t:'% fuera',r:1,h:g=>g.s.n<MIN_MED?p1(g.s.f,g.s.n)+' <span class="st low">muestra baja</span>':'<b>'+p1(g.s.f,g.s.n)+'</b>'},
   {t:'Desviación',r:1,h:g=>'<span class="'+clsDesv(desv(g.s))+'">'+sig(desv(g.s))+'</span>'},{t:'Hacia menos / hacia más',h:g=>splitHtml(g.s)}];
 const C_AUD=[{t:'Mediciones',r:1,h:g=>num(g.s.aud)},{t:'Rechazadas',r:1,h:g=>num(g.s.rech)}];
+/* ---------- Por cuánto se alejan de la ficha (27/11/2026, pedido de Christian: llevar al tablero lo que cuenta la hoja de Puntuación) ----------
+   El tablero decía cuántas medidas salen fuera y hacia qué lado, no por cuánto. Aquí se cuentan las medidas por diferencia contra la ficha,
+   en orden de regla (a menos · OK · a más). Pulgadas y centímetros no se mezclan: se ve una unidad a la vez.
+   b = tope de cada tramo de diferencia; e = tope de cada tramo de exceso sobre la tolerancia (diferencia − tolerancia). */
+const DB={pulg:{b:[.125,.25,.375,.5],n:['1/8"','1/4"','3/8"','1/2"'],e:[.125,.25,.5],en:['1/8"','1/4"','1/2"'],nom:'pulgadas'},
+          cm:{b:[.3,.6,1,1.3],n:['0,3 cm','0,6 cm','1 cm','1,3 cm'],e:[.3,.6,1.3],en:['0,3 cm','0,6 cm','1,3 cm'],nom:'centímetros'}};
+let DU='';
+function txtDif(d,u){ if(!d) return '0'; const sg=d>0?'+':'−', a=Math.abs(d);
+  if(u==='cm') return sg+num(a,1)+' cm';
+  const n=Math.round(a*16), e=Math.floor(n/16), r=n%16; let x=r,y=16; while(x&&x%2===0){ x/=2; y/=2; }
+  return sg+(e?e+(r?' ':''):'')+(r?x+'/'+y:'')+'"'; }
+function tramo(a,B){ for(let i=0;i<B.length;i++) if(a<=B[i]+1e-9) return i; return B.length; }
+function calcDist(list,sel,uni){
+  const rows=[]; list.forEach(m=>{ (sel&&sel.punto?m.HP.filter(h=>h.key===sel.punto):sel&&sel.talla?m.HT.filter(h=>h.k===sel.talla):m.HT).forEach(h=>rows.push({m:m,h:h})); });
+  const nU={pulg:0,cm:0}; rows.forEach(r=>{ nU[r.m.cm?'cm':'pulg']+=r.h.n; });
+  const u=uni&&nU[uni]?uni:(nU.cm>nU.pulg?'cm':'pulg'), C=DB[u], nb=C.b.length, bins=[];
+  for(let k=-(nb+1);k<=nb+1;k++){ const a=Math.abs(k), sg=k<0?'−':'+';
+    bins.push({k:k,lab:k===0?'OK':a>nb?[MOVIL()?'Más':'Más de',sg+C.n[nb-1]]:sg+C.n[a-1],txt:k===0?'OK (igual a la ficha)':a>nb?'Más de '+sg+C.n[nb-1]:(a>1?'De más de '+sg+C.n[a-2]+' hasta ':'Hasta ')+sg+C.n[a-1],n:0,f:0,ids:new Set()}); }
+  const exc=C.e.concat([0]).map((x,i)=>({lab:i<C.e.length?'Hasta '+C.en[i]:'Más de '+C.en[C.e.length-1],neg:0,pos:0,ids:new Set()}));
+  const R={u:u,C:C,nU:nU,bins:bins,exc:exc,n:0,f:0,ex:0,lim:0,sinTol:0,p5:null,p95:null}, vals=new Map();
+  rows.forEach(r=>{ if((r.m.cm?'cm':'pulg')!==u) return; const h=r.h, a=Math.abs(h.d);
+    const b=bins[(h.d===0?0:(tramo(a,C.b)+1)*(h.d<0?-1:1))+nb+1]; b.n+=h.n; b.f+=h.f; b.ids.add(r.m.id);
+    R.n+=h.n; R.f+=h.f; if(h.d===0) R.ex+=h.n; vals.set(h.d,(vals.get(h.d)||0)+h.n);
+    if(h.t>0&&Math.abs(a-h.t)<1e-9) R.lim+=h.n-h.f;                      /* aceptadas con la diferencia máxima permitida */
+    if(h.f){ if(h.t==null) R.sinTol+=h.f; else { const e=exc[tramo(Math.max(a-h.t,0),C.e)]; e[h.d<0?'neg':'pos']+=h.f; e.ids.add(r.m.id); } } });
+  /* tramo central: entre qué diferencias queda el 90 % de las medidas (percentiles 5 y 95) */
+  let ac=0; [...vals.entries()].sort((x,y)=>x[0]-y[0]).forEach(v=>{ ac+=v[1]; if(R.p5==null&&ac>=R.n*.05) R.p5=v[0]; if(R.p95==null&&ac>=R.n*.95) R.p95=v[0]; });
+  return R;
+}
+function htmlDist(p){
+  return '<div class="panel col8" id="'+p+'Dist"><span class="tira resultado"></span><div class="pcab"><div><div class="pt">Por cuánto se alejan de la ficha</div><div class="ph" id="'+p+'DistPh"></div></div>'+
+    '<div class="seg" id="'+p+'DistU" style="display:none"><button type="button" data-u="pulg">Pulgadas</button><button type="button" data-u="cm">Centímetros</button></div></div>'+
+    '<div class="cwrap tall"><canvas id="'+p+'cDist"></canvas></div><div class="minis" id="'+p+'DistM"></div></div>'+
+    '<div class="panel col4" id="'+p+'Exc"><span class="tira riesgo"></span><div class="pt">Fuera de tolerancia: por cuánto se pasan</div><div class="ph" id="'+p+'ExcPh"></div><div class="cwrap tall"><canvas id="'+p+'cExc"></canvas></div></div>';
+}
+function pintarDist(p,list,sel,uni,alCambiar){
+  const R=calcDist(list,sel,uni), C=R.C;
+  if(!R.n){ mostrar(p+'Dist',false); mostrar(p+'Exc',false); return; }
+  mostrar(p+'Dist',true);
+  const seg=$(p+'DistU'), dos=R.nU.pulg>0&&R.nU.cm>0, otra=R.u==='cm'?'pulg':'cm'; seg.style.display=dos?'':'none';
+  [...seg.children].forEach(b=>b.classList.toggle('active',b.dataset.u===R.u)); seg.onclick=e=>{ const b=e.target.closest('button'); if(b&&b.dataset.u!==R.u) alCambiar(b.dataset.u); };
+  $(p+'DistPh').textContent='Medidas por su diferencia contra la ficha, en orden de regla: a la izquierda salen más chicas (a menos), al medio iguales (OK) y a la derecha más grandes (a más). '+
+    'Cada barra junta hasta esa medida (la de '+C.n[1]+': más de '+C.n[0]+' y hasta '+C.n[1]+'). Verde: dentro de tolerancia; rojo: fuera. '+
+    '% sobre las '+num(R.n)+' medidas tomadas en '+C.nom+(dos?' (las '+num(R.nU[otra])+' en '+DB[otra].nom+' se ven con el botón)':'')+(R.n<MIN_MED?' · muestra baja ('+R.n+' de '+MIN_MED+')':'')+'. Toca una barra para ver sus mediciones.';
+  const ir=(t,ids)=>{ if(ids.size) abrirFicha({tipo:'lista',titulo:t,ids:[...ids]}); }, mano=(e,els)=>{ e.native.target.style.cursor=els.length?'pointer':'default'; };
+  mk(p+'cDist',{type:'bar',data:{labels:R.bins.map(b=>b.lab),datasets:[
+      {label:'Dentro de tolerancia',data:R.bins.map(b=>b.n-b.f),backgroundColor:SAGE,borderRadius:3,maxBarThickness:64},
+      {label:'Fuera de tolerancia',data:R.bins.map(b=>b.f),backgroundColor:ROSE,borderRadius:3,maxBarThickness:64,
+       txt:R.bins.map(b=>{ if(!b.n) return ''; const q=pct(b.n,R.n); return MOVIL()?(q>=.5?num(q,0)+'%':''):num(q,1)+'%'; })}]},
+    options:{animation:ANIM,layout:{padding:{top:24}},interaction:{mode:'index',intersect:false},
+      onClick:(e,els)=>{ if(els.length){ const b=R.bins[els[0].index]; ir('Mediciones con medidas '+(b.k===0?'iguales a la ficha':'a '+(b.k<0?'menos':'más')+' · '+b.txt.toLowerCase()),b.ids); } }, onHover:mano,
+      plugins:{legend:LEYENDA,tooltip:{callbacks:{title:it=>R.bins[it[0].dataIndex].txt,label:it=>' '+it.dataset.label+': '+num(it.raw)+' medidas',
+        footer:it=>{ const b=R.bins[it[0].dataIndex]; return num(b.n)+' de '+num(R.n)+' medidas ('+p1(b.n,R.n)+') · '+b.ids.size+' medición(es)'; }}}},
+      scales:{x:{stacked:true,grid:{display:false},ticks:{autoSkip:false,maxRotation:0,font:{size:MOVIL()?9.5:12}}},y:{stacked:true,beginAtZero:true,grace:'10%',ticks:{precision:0,callback:v=>num(v)}}}},
+    plugins:[valBarras]});
+  const dd=R.n-R.f-R.ex;
+  $(p+'DistM').innerHTML=[
+    ['Exactas (OK)',p1(R.ex,R.n),num(R.ex)+' de '+num(R.n)+' medidas iguales a la ficha'],
+    ['Dentro de tolerancia, con diferencia',p1(dd,R.n),num(dd)+' medidas con diferencia que la tolerancia acepta'],
+    ['Justo en el límite',p1(R.lim,R.n),num(R.lim)+' medidas aceptadas con la diferencia máxima permitida (son parte de las dentro de tolerancia)'],
+    ['9 de cada 10 medidas quedan entre',txtDif(R.p5,R.u)+' y '+txtDif(R.p95,R.u),'sin contar el 5 % más chico ni el 5 % más grande']
+  ].map(x=>'<div class="mini"><div class="ml">'+x[0]+'</div><div class="mv">'+esc(x[1])+'</div><div class="ms">'+x[2]+'</div></div>').join('');
+  const fx=R.f-R.sinTol; mostrar(p+'Exc',fx>0);
+  if(fx>0){
+    $(p+'ExcPh').textContent='Cuánto pasó el límite cada medida fuera de tolerancia (diferencia − tolerancia de su punto). % sobre las '+num(fx)+' medidas fuera de tolerancia en '+C.nom+'. Gris azulado: salió más chica; café: más grande.'+(R.sinTol?' '+num(R.sinTol)+' sin tolerancia guardada no entran.':'')+' Toca una barra para ver sus mediciones.';
+    mk(p+'cExc',{type:'bar',data:{labels:R.exc.map(e=>e.lab),datasets:[
+        {label:'A menos',data:R.exc.map(e=>e.neg),backgroundColor:SLATE,borderRadius:3,maxBarThickness:26},
+        {label:'A más',data:R.exc.map(e=>e.pos),backgroundColor:TAUPE,borderRadius:3,maxBarThickness:26,txt:R.exc.map(e=>{ const t=e.neg+e.pos; return t?num(t)+' · '+num(pct(t,fx),1)+'%':''; })}]},
+      options:{indexAxis:'y',animation:ANIM,layout:{padding:{right:84}},interaction:{mode:'index',intersect:false,axis:'y'},
+        onClick:(e,els)=>{ if(els.length){ const x=R.exc[els[0].index]; ir('Mediciones con medidas que pasan la tolerancia · '+x.lab.toLowerCase(),x.ids); } }, onHover:mano,
+        plugins:{legend:LEYENDA,tooltip:{callbacks:{title:it=>'Pasan la tolerancia · '+R.exc[it[0].dataIndex].lab.toLowerCase(),label:it=>' '+it.dataset.label+': '+num(it.raw)+' medidas ('+p1(it.raw,fx)+' de las fuera de tolerancia)'}}},
+        scales:{x:{stacked:true,beginAtZero:true,ticks:{precision:0,callback:v=>num(v)}},y:{stacked:true,grid:{display:false}}}},
+      plugins:[valBarras]});
+  }
+}
+function distTablero(){ pintarDist('d',VIS,null,DU,u=>{ DU=u; distTablero(); reajustarGrids(); }); }
 function pintarEstilos(S){
   const est=grupos(VIS,m=>m.estilo,m=>m.estilo); est.forEach(g=>{ g.cli=g.items[0].cliente; g.grp=[...new Set(g.items.map(m=>m.grupo))].join(', '); });
   const go=g=>abrirFicha({tipo:'estilo',clave:g.k,titulo:'Estilo '+g.k+' · '+g.cli});
@@ -1203,11 +1289,11 @@ function pintarPuntos(S){
   if(dv.length){ barrasH('cPtDesv',dv.map(g=>filaDesv(g,()=>go(g),1)),{div:1,dec:1,largo:34,amp:MOVIL()?1.6:2.1});
     $('phPtDesv').textContent='Cuánto sale cada punto contra la ficha: diferencia promedio por medida, en pulgadas o cm, y entre paréntesis la desviación en % (suma de diferencias ÷ suma de medidas de ficha). Los '+dv.length+' que más se alejan con '+MIN_MED+' medidas o más. Izquierda: más chico; derecha: más grande.'; }
   const tl=gruposSub(VIS,'T').sort(ordTalla), goT=g=>abrirFicha({tipo:'talla',clave:g.k,titulo:'Talla '+g.k});
-  mostrar('pTalla',tl.length>1); mostrar('pTallaDesv',tl.length>1);
+  mostrar('pTalla',tl.length>1);
   if(tl.length>1){ const rt=refDe(tl,pct(S.f,S.n));
-    barrasH('cTalla',tl.map(g=>Object.assign(filaFuera(g,rt,()=>goT(g)),{label:'Talla '+g.k})),{min:200});
-    $('phTalla').textContent='% de medidas fuera de tolerancia sobre las medidas tomadas en cada talla.'+txtRef(rt,'tallas');
-    barrasH('cTallaDesv',tl.map(g=>Object.assign(filaDesv(g,()=>goT(g)),{label:'Talla '+g.k})),{div:1,dec:1,min:200}); }
+    barrasH('cTalla',tl.map(g=>{ const r=Object.assign(filaFuera(g,rt,()=>goT(g)),{label:'Talla '+g.k}); r.tip=r.tip.concat(['Desviación contra la ficha: '+sig(desv(g.s))+' (sale '+sentido(desv(g.s))+')']); return r; }),{min:200});
+    $('phTalla').textContent='% de medidas fuera de tolerancia sobre las medidas tomadas en cada talla; la desviación contra la ficha sale al pasar o tocar.'+txtRef(rt,'tallas'); }
+  distTablero();
   const colsP=[{t:'Punto de medida',nm:1,h:g=>esc(g.label)},{t:'Estilos',r:1,h:g=>g.est.size}].concat(C_AUD.slice(0,1),C_MED.slice(0,3),[{t:'Diferencia promedio',r:1,h:g=>'<span class="'+clsDesv(desv(g.s))+'">'+difU(g.s)+'</span>'}],C_MED.slice(3)), ord=ordenFuera(pts), pocos=ord.filter(g=>g.s.n<MIN_MED);
   /* los puntos con menos de 30 medidas (sobre todo de hojas de corte) quedan plegados para no alargar la pantalla */
   $('tPt').innerHTML=tabla(colsP,ord.filter(g=>g.s.n>=MIN_MED),go)+(pocos.length?'<div style="text-align:center;padding:10px 0"><button type="button" class="lnk" id="btnPocos">Ver también los '+pocos.length+' puntos con menos de '+MIN_MED+' medidas</button></div><div id="tPocos" style="display:none"></div>':'');
@@ -1374,7 +1460,7 @@ function abrirFicha(o){
   sel.style.display=o.tipo==='lista'?'none':'';
   $('ficha').style.display='flex'; document.body.classList.add('sinScroll'); renderFicha(); $('fBody').scrollTop=0;
 }
-function cerrarFicha(){ $('ficha').style.display='none'; document.body.classList.remove('sinScroll'); ['fcPt','fcTl','fcEs','fcT1','fcT2'].forEach(k=>{ if(CH[k]){ try{CH[k].destroy();}catch(e){} delete CH[k]; } }); FI=null; }
+function cerrarFicha(){ $('ficha').style.display='none'; document.body.classList.remove('sinScroll'); ['fcPt','fcTl','fcEs','fcT1','fcT2','fcDist','fcExc'].forEach(k=>{ if(CH[k]){ try{CH[k].destroy();}catch(e){} delete CH[k]; } }); FI=null; }
 function renderFicha(){
   const base=baseFicha(), list=base.filter(m=>enPer(m,FI.per));
   const sel=FI.tipo==='punto'?{punto:FI.clave}:FI.tipo==='talla'?{talla:FI.clave}:null, S=stat(list,sel), chip='<span class="chipPer">'+esc(perLbl(FI.per))+'</span>';
@@ -1386,7 +1472,7 @@ function renderFicha(){
     '<div class="kpi neutro"><span class="banda"></span><div class="cuerpo"><div class="l">'+(enU?'Diferencia promedio contra la ficha':'Desviación contra la ficha')+'</div><div class="row"><span class="v">'+(enU?difU(S):sig(dv))+'</span></div><div class="s">'+(enU?sig(dv,1)+' · ':'')+'Sale '+sentido(dv)+' · '+num(S.nNeg)+' medidas hacia menos y '+num(S.nPos)+' hacia más</div></div></div>'+
     '<div class="kpi neutro"><span class="banda"></span><div class="cuerpo"><div class="l">Fuera de tolerancia hacia menos</div><div class="row"><span class="v">'+(fs?p1(S.fNeg,fs):'—')+'</span></div><div class="s">'+(fs?num(S.fNeg)+' más chicas y '+num(S.fPos)+' más grandes':'Sin medidas fuera de tolerancia')+'</div></div></div></div>';
   if(!list.length){ $('fBody').innerHTML=h+'<div class="vacioP">No hay mediciones en este período.</div>'; return; }
-  h+='<div class="grid">';
+  h+='<div class="grid">'+htmlDist('f');
   const pts=FI.tipo==='punto'?[]:gruposSub(list,'P').filter(g=>!sel||true), tls=FI.tipo==='talla'||FI.tipo==='punto'?[]:gruposSub(list,'T').sort(ordTalla);
   const ptsTalla=FI.tipo==='talla'?[]:pts;   /* por talla no hay desglose de puntos */
   const ests=FI.tipo==='estilo'?[]:(sel?grupos(list,m=>m.estilo,m=>m.estilo).map(g=>Object.assign(g,{s:stat(g.items,sel)})):grupos(list,m=>m.estilo,m=>m.estilo));
@@ -1401,6 +1487,7 @@ function renderFicha(){
   else if(FI.tipo!=='lista') h+='<div class="panel col12"><span class="tira"></span><div class="vacioP">Solo hay un día con mediciones: hace falta más de uno para dibujar su tendencia.</div></div>';
   h+='<div class="panel col12"><span class="tira volumen"></span><div class="pt">Mediciones</div><div class="ph">La más reciente arriba. «Ver hoja» abre la hoja de medidas completa.</div><div class="tw">'+filasAud(list)+'</div></div></div>';
   $('fBody').innerHTML=h;
+  pintarDist('f',list,sel,FI.du,u=>{ FI.du=u; renderFicha(); });
   if(ptV.length) barrasH('fcPt',ptV.map(g=>{ const r=filaDesv(g,null,1); r.color=r.val<0?SLATE:TAUPE; r.baja=false; r.tip=[num(g.s.f)+' fuera de '+num(g.s.n)+' medidas ('+p1(g.s.f,g.s.n)+')'].concat(r.tip); r.label=g.label.replace(/^Estilo \S+ · /,''); return r; }),{div:1,dec:1,largo:34,amp:MOVIL()?1.6:2.1});
   if(tls.length>1) barrasH('fcTl',tls.map(g=>{ const r=filaFuera(g,null,null); r.label='Talla '+g.k; r.color=ROSE; r.baja=false; r.tip=r.tip.slice(0,1).concat(['Sale '+sentido(desv(g.s))+' ('+sig(desv(g.s))+')']); return r; }),{min:200});
   if(ests.length>1){ const ev=ests.slice().sort((a,b)=>b.s.n-a.s.n).slice(0,14).sort((a,b)=>desv(a.s)-desv(b.s));
@@ -1469,6 +1556,13 @@ window.LS_XLS={
       {titulo:'Por color',nota:'Cada color se mira dentro de su estilo.',columnas:[k('Color'),{campo:'e',titulo:'Estilo',tipo:'alfanumerico'},{campo:'c',titulo:'Cliente',tipo:'texto'}].concat(ca,cm),filas:ordenFuera(grupos(VIS,m=>m.colKey,m=>m.colLbl)).map(g=>Object.assign(fila(g),{e:g.items[0].estilo,c:g.items[0].cliente}))},
       {titulo:'Por punto de medida',nota:'Diferencia promedio = suma de diferencias ÷ medidas, en pulgadas (16avos) o en cm si todas sus fichas son en cm.',columnas:[k('Punto de medida')].concat(ca.slice(0,1),cmU),filas:ordenFuera(gruposSub(VIS,'P')).map(g=>Object.assign(fila(g),{du:difU(g.s)}))},
       {titulo:'Por talla',columnas:[k('Talla')].concat(cm),filas:gruposSub(VIS,'T').sort(ordTalla).map(fila)},
+      ...['pulg','cm'].map(u=>calcDist(VIS,null,u)).filter((R,i)=>R.n&&R.u===['pulg','cm'][i]).reduce((o,R)=>o.concat([
+        {titulo:'Por cuánto se alejan de la ficha ('+R.C.nom+')',nota:'Medidas por diferencia contra la ficha, de a menos a a más. % sobre las '+num(R.n)+' medidas tomadas en '+R.C.nom+'.',
+         columnas:[k('Diferencia'),{campo:'de',titulo:'Dentro de tolerancia',tipo:'entero'},{campo:'f',titulo:'Fuera de tolerancia',tipo:'entero'},{campo:'n',titulo:'Medidas',tipo:'entero'},{campo:'p',titulo:'% de las medidas',tipo:'porcentaje'}],
+         filas:R.bins.map(b=>({k:b.txt,de:b.n-b.f,f:b.f,n:b.n,p:pc(b.n,R.n)}))},
+        {titulo:'Fuera de tolerancia: por cuánto se pasan ('+R.C.nom+')',nota:'Exceso = diferencia − tolerancia del punto. % sobre las '+num(R.f-R.sinTol)+' medidas fuera de tolerancia en '+R.C.nom+'.',
+         columnas:[k('Pasan la tolerancia'),{campo:'ng',titulo:'A menos',tipo:'entero'},{campo:'ps',titulo:'A más',tipo:'entero'},{campo:'n',titulo:'Medidas',tipo:'entero'},{campo:'p',titulo:'% de las fuera de tolerancia',tipo:'porcentaje'}],
+         filas:R.exc.map(e=>({k:e.lab,ng:e.neg,ps:e.pos,n:e.neg+e.pos,p:pc(e.neg+e.pos,R.f-R.sinTol)}))}]),[]),
       {titulo:'Por etapa',columnas:[k('Etapa')].concat(ca,cm),filas:grupos(VIS,m=>m.etapa,m=>NOM_ETAPA[m.etapa]||m.etapa).map(fila)},
       {titulo:'Por cliente',columnas:[k('Cliente')].concat(ca,cm),filas:ordenFuera(grupos(VIS,m=>m.cliente)).map(fila)},
       {titulo:'Por taller',nota:'% rechazadas solo con '+MIN_AUD+' mediciones o más.',columnas:[k('Taller')].concat(ca,[{campo:'pr',titulo:'% rechazadas',tipo:'porcentaje'}],cm),filas:ordenFuera(grupos(VIS,m=>m.talKey,m=>m.taller)).map(fila)},
@@ -1489,6 +1583,7 @@ window.LS_XLS={
 };
 
 /* ---------- arranque ---------- */
+$('pTalla').insertAdjacentHTML('beforebegin',htmlDist('d'));
 ['fPer','fCli','fTal','fAud','fEta'].forEach(i=>$(i).addEventListener('change',()=>{ if(i==='fPer') GRAN=''; render(); }));
 $('fPV').addEventListener('change',()=>{ PV=$('fPV').checked; GRAN=''; if(FI) cerrarFicha(); aplicarPV(); llenarFiltros(); render(); });
 let tEst=null; $('fEst').addEventListener('input',()=>{ clearTimeout(tEst); tEst=setTimeout(render,250); });
