@@ -653,6 +653,7 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 .alerta .aItem b{color:#333;}
 .alerta .aItem .aTx{min-width:0;overflow-wrap:anywhere;}
 .alerta .aItem small{display:block;color:var(--stone);font-size:11px;margin-top:2px;}
+.resT{font-size:12.5px;color:var(--stone);margin:10px 0 0;padding:6px 4px 0;border-top:1px solid var(--warm);}
 .sectit{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--stone);margin:14px 0 4px;}
 .vacioOk{font-size:12.5px;color:var(--sage);font-weight:700;padding:10px 4px;}
 details.yaListas{margin-top:14px;border-top:1px solid var(--warm);padding-top:8px;}
@@ -1690,8 +1691,75 @@ function cargarEspecs(){
         ARCHIVOS_CON_TABLA[String(x.archivo)] = x;
       });
       pintarPendientes();
+      cargarResolver();
       if(PRIMERA){ PRIMERA=false; setTimeout(procesarPendientes, 400); }
     });
+  });
+}
+/* ---------- Dos fichas para lo mismo (27/11/2026, decisión de Christian) ----------
+   Una ficha ya no reemplaza sola a otra del mismo estilo, grupo y versión cuando sus medidas son
+   distintas: las dos se ofrecen al medir y la auditora elige. Aquí la verificadora ve esos casos y
+   retira la que ya no vale. Retirar no borra nada: la ficha deja de ofrecerse para medir, lo ya
+   medido con ella no cambia y se puede volver a usar. Si la base no responde, la sección no sale. */
+var RESOLVER=null;
+function cargarResolver(){
+  sbRpc('fichas_por_resolver', {}, function(err, r){
+    RESOLVER = (!err && r && r.ok) ? r : null;
+    pintarPendientes();
+  });
+}
+function hResolver(){
+  if(!RESOLVER) return '';
+  var NE={ CORTE:'Corte', ANTES_VAPOR:'Antes de vapor', TERMINADA:'Prenda terminada' };
+  var t=function(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  var q=function(v){ return String(v||'').replace(/\\/g,'').replace(/'/g,"\\'").replace(/"/g,'&quot;'); };
+  var gs=RESOLVER.grupos||[], h='';
+  if(gs.length){
+    h+='<div class="sectit" style="color:#991B1B;">Dos fichas para lo mismo: retira la que ya no vale ('+gs.length+')</div>';
+    gs.forEach(function(g){
+      var fs=(g.fichas||[]).slice().sort(function(a,b){ return String(b.fecha||'').localeCompare(String(a.fecha||'')); });
+      h+='<div class="resT"><b>'+t(g.estilo)+'</b> · '+t(g.grupo||'—')+' · '+
+         (g.etapas||[]).map(function(e){ return NE[e]||e; }).join(' y ')+(g.combo?' · '+t(g.combo):'')+
+         (g.version?' · versión '+t(g.version):'')+'</div>';
+      fs.forEach(function(f){
+        var n=+f.mediciones||0;
+        h+='<div class="pend" onclick="abrirDeDrive(\''+q(f.id)+'\',\''+q(f.archivo)+'\')">'+
+           '<div class="inf">'+t(f.archivo)+'<br>Tabla guardada: '+t(f.fecha||'—')+' · '+n+' medici'+(n===1?'ón':'ones')+'</div>'+
+           '<button class="quitar" title="Deja de ofrecerse para medir. No se borra." onclick="retirarFicha(\''+q(f.id)+'\',\''+q(f.archivo)+'\', event)">retirar</button></div>';
+      });
+    });
+  }
+  var rs=RESOLVER.retiradas||[];
+  if(rs.length){
+    h+='<details class="yaListas"><summary>Fichas retiradas ('+rs.length+') — tócalo para verlas</summary>'+
+       rs.map(function(f){
+         return '<div class="pend" onclick="abrirDeDrive(\''+q(f.id)+'\',\''+q(f.archivo)+'\')">'+
+           '<div class="est">'+t(f.estilo||'—')+'</div>'+
+           '<div class="inf">'+t(f.archivo)+'<br>Retirada: '+t(f.fecha||'')+(f.por?' · '+t(f.por):'')+'</div>'+
+           '<button class="quitar" title="Vuelve a ofrecerse para medir" onclick="restituirFicha(\''+q(f.id)+'\',\''+q(f.archivo)+'\', event)">volver a usar</button></div>';
+       }).join('')+'</details>';
+  }
+  return h;
+}
+function retirarFicha(id, archivo, ev){
+  if(ev && ev.stopPropagation) ev.stopPropagation();
+  if(!confirm('¿Retirar esta ficha?\n\n'+archivo+
+     '\n\nDeja de ofrecerse para medir. No se borra, lo ya medido con ella no cambia y se puede volver a usar.')) return;
+  avisoAuto('Retirando '+archivo+'…');
+  sbEscribir('fichas_retirar', { p_file_id:id }).then(function(r){
+    if(!r || !r.ok){ avisoAuto('No se pudo retirar: '+((r&&r.error)||'el servidor no respondió')); return; }
+    avisoAuto('Ficha retirada: '+archivo, true);
+    cargarEspecs();
+  });
+}
+function restituirFicha(id, archivo, ev){
+  if(ev && ev.stopPropagation) ev.stopPropagation();
+  if(!confirm('¿Volver a usar esta ficha?\n\n'+archivo+'\n\nVuelve a ofrecerse para medir.')) return;
+  avisoAuto('Activando '+archivo+'…');
+  sbEscribir('fichas_restituir', { p_file_id:id }).then(function(r){
+    if(!r || !r.ok){ avisoAuto('No se pudo: '+((r&&r.error)||'el servidor no respondió')); return; }
+    avisoAuto('Ficha en uso otra vez: '+archivo, true);
+    cargarEspecs();
   });
 }
 function yaConfirmada(estilo, tipo){
@@ -1904,9 +1972,9 @@ function pintarPendientes(){
       '<button class="quitar" title="Quitar esta ficha del sistema" onclick="quitarFicha(\''+d.id+'\',\''+
       String(d.archivo).replace(/'/g,"\\'")+'\', event)">quitar</button></div>';
   }
-  var h = faltan.length
+  var h = hResolver() + (faltan.length
     ? '<div class="sectit">Sin procesar ('+faltan.length+')</div>'+faltan.map(fila).join('')
-    : '<div class="vacioOk">No hay fichas sin procesar.</div>';
+    : '<div class="vacioOk">No hay fichas sin procesar.</div>');
   if(listas.length){
     h+='<details class="yaListas"'+(VER_LISTAS?' open':'')+' ontoggle="VER_LISTAS=this.open">'+
        '<summary>Ya procesadas ('+listas.length+') — tócalo para verlas</summary>'+

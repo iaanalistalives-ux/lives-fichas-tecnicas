@@ -1720,14 +1720,23 @@ function pintarFichas(){
       if(m.length===1) FICHA=String(m[0].archivo||'');
     }
   }
+  /* por versión; dentro de la misma versión la más reciente va primero y lo dice (27/11/2026: una
+     ficha ya no reemplaza sola a otra de la misma versión con medidas distintas) */
+  var porVer={};
+  fs.forEach(function(v,i){ v.__o=i; var k=String(v.version||'').toUpperCase(); porVer[k]=(porVer[k]||0)+1; });
+  fs=fs.slice().sort(function(a,b){
+    return String(a.version||'').toUpperCase().localeCompare(String(b.version||'').toUpperCase()) || (a.__o-b.__o);
+  });
   FICHAS_OP=fs;
   caja.style.display='block';
+  var vistaVer={};
   document.getElementById('pFicha').innerHTML = fs.map(function(v,i){
-    var cols=coloresDeFicha(v);
+    var cols=coloresDeFicha(v), kv=String(v.version||'').toUpperCase();
+    var rec = porVer[kv]>1 && !vistaVer[kv]; vistaVer[kv]=1;
     return '<button type="button" class="antOp'+(String(v.archivo||'')===FICHA?' on':'')+'" onclick="elegirFicha('+i+')">'+
       '<div class="aInf"><b>'+(v.version?'Versión '+hEsc(v.version)+' · ':'')+hEsc(nomFicha(v))+'</b>'+
       (cols.length?'<br><span>Hoja de corte: '+hEsc(cols.join(', '))+'</span>':'')+
-      '<br><span>'+hEsc(v.archivo||'')+'</span></div></button>';
+      '<br><span>'+hEsc(v.archivo||'')+'</span></div>'+(rec?'<span class="aTag">más reciente</span>':'')+'</button>';
   }).join('');
   document.getElementById('avisoFicha').textContent = FICHA ? '' :
     'Este grupo tiene '+fs.length+' fichas con medidas distintas. Elige la de la prenda que vas a medir.';

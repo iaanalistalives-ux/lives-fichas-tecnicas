@@ -1485,12 +1485,22 @@ function buscar(){
   claves.forEach(function(k){ var b=k.split('|').slice(0,4).join('|'); herm[b]=(herm[b]||0)+1; });
   claves.forEach(function(k){ g[k].forEach(function(d){ d.__herm = herm[k.split('|').slice(0,4).join('|')]>1; }); });
   var html='<div class="sectitle">'+res.length+' resultado(s) · '+claves.length+' estilo(s)</div>';
-  claves.forEach(function(k,i){
+  /* 27/11/2026: dos fichas de la misma versión con tablas de medidas vigentes las dos (medidas distintas,
+     la verificadora aún no retiró ninguna) salen cada una en su tarjeta: al medir se ofrecen las dos.
+     Como «anteriores» quedan solo las que ya no tienen tabla vigente. */
+  var conTabla={}; ESPECS.forEach(function(e){ if(e && e.archivo) conTabla[String(e.archivo)]=1; });
+  var nTar=0;
+  claves.forEach(function(k){
     var lista=g[k].slice().sort(function(a,b){
       if(a.fechaFicha!==b.fechaFicha) return a.fechaFicha<b.fechaFicha?1:-1;
       return a.fechaSubida<b.fechaSubida?1:-1;
     });
-    html+=tarjeta(lista,i);
+    var vivas=lista.filter(function(d){ return conTabla[String(d.archivo)]; });
+    if(vivas.length>1){
+      var resto=lista.filter(function(d){ return vivas.indexOf(d)<0; });
+      vivas.forEach(function(d,j){ d.__herm=true; html+=tarjeta([d].concat(j===0?resto:[]), nTar++); });
+    }
+    else html+=tarjeta(lista, nTar++);
   });
   out.innerHTML=html;
 }
