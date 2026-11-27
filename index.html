@@ -1470,12 +1470,20 @@ function buscar(){
     return;
   }
   var g={};
-  res.forEach(function(d){ var k=d.tipo+'|'+d.grupo+'|'+d.estilo+'|'+lineaDe(d); (g[k]=g[k]||[]).push(d); });
+  /* 27/11/2026: una tarjeta por versión. Un grupo puede tener varias fichas a la vez, una por color
+     (25264 PAK-161: 3d, 3e, 3f); antes salían como «versiones anteriores» de la más reciente. Solo
+     quedan como anteriores las subidas de la MISMA versión. */
+  res.forEach(function(d){ var k=d.tipo+'|'+d.grupo+'|'+d.estilo+'|'+lineaDe(d)+'|'+String(d.version||'').toUpperCase(); (g[k]=g[k]||[]).push(d); });
   var claves=Object.keys(g).sort(function(a,b){
     var A=g[a][0],B=g[b][0];
     return (B.estilo>A.estilo?1:B.estilo<A.estilo?-1:0)||A.tipo.localeCompare(B.tipo)||
-           lineaDe(A).localeCompare(lineaDe(B));
+           String(A.grupo||'').localeCompare(String(B.grupo||''))||
+           lineaDe(A).localeCompare(lineaDe(B))||String(A.version||'').localeCompare(String(B.version||''));
   });
+  /* varias fichas del mismo estilo, tipo, grupo y línea (una por color): cada tarjeta dice su archivo */
+  var herm={};
+  claves.forEach(function(k){ var b=k.split('|').slice(0,4).join('|'); herm[b]=(herm[b]||0)+1; });
+  claves.forEach(function(k){ g[k].forEach(function(d){ d.__herm = herm[k.split('|').slice(0,4).join('|')]>1; }); });
   var html='<div class="sectitle">'+res.length+' resultado(s) · '+claves.length+' estilo(s)</div>';
   claves.forEach(function(k,i){
     var lista=g[k].slice().sort(function(a,b){
@@ -1508,6 +1516,7 @@ function tarjeta(lista,i){
      '<div><span>Estilo cliente:</span> <b>'+(d.estiloCliente||'—')+'</b></div>'+
      '<div><span>Temporada:</span> <b>'+(d.temporada||'—')+'</b></div>'+
      '<div><span>Fecha de ficha:</span> <b>'+fmt(d.fechaFicha)+'</b></div>'+
+     (d.__herm && d.archivo?'<div style="grid-column:1/-1;"><span>Archivo:</span> <b>'+String(d.archivo).replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</b></div>':'')+
      (d.tela?'<div style="grid-column:1/-1;"><span>Tela:</span> <b>'+d.tela+'</b></div>':'')+
      '<div style="grid-column:1/-1;"><span>Subido:</span> '+(d.fechaSubida||'—')+
        (d.kb?' · '+(d.kb>1024?(d.kb/1024).toFixed(1)+' MB':d.kb+' KB'):'')+'</div>'+
@@ -1522,7 +1531,7 @@ function tarjeta(lista,i){
       ? d.tipo : (d.tipo==='CORTE' ? 'TECNICA' : 'CORTE');
     h+= lista
       ? '<button class="btn medir" onclick="medir(\''+esc(base)+'\',\''+esc(tipoMedir)+'\',\''+
-        esc(d.grupo)+'\',\''+esc(d.cliente)+'\')">Medir</button>'
+        esc(d.grupo)+'\',\''+esc(d.cliente)+'\',\''+esc(d.archivo)+'\',\''+esc(d.version)+'\')">Medir</button>'
       : '<button class="btn ghost" disabled title="Tabla de medidas aún no disponible">Medir</button>';
   }
   h+='</div>';
@@ -1592,9 +1601,10 @@ function continuarBorrador(i){
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', pintarBorradoresIdx); else pintarBorradoresIdx();
 window.addEventListener('pageshow', pintarBorradoresIdx);   /* al volver con atrás desde la medición */
 
-function medir(estilo, tipo, grupo, cliente){
+function medir(estilo, tipo, grupo, cliente, archivo, version){
   var q='?estilo='+encodeURIComponent(estilo)+'&tipo='+encodeURIComponent(tipo)+
         '&grupo='+encodeURIComponent(grupo||'')+'&cliente='+encodeURIComponent(cliente||'')+
+        '&archivo='+encodeURIComponent(archivo||'')+'&version='+encodeURIComponent(version||'')+
         '&usuario='+encodeURIComponent((SES&&SES.auditora)||'');
   location.href='medidas.html'+q;
 }

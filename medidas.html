@@ -939,6 +939,11 @@ body.capAbierta #btnDib{display:none!important;}
       <div class="pills" id="pCombo"></div>
       <div class="avisoCombo" id="avisoCombo"></div>
     </div>
+    <div id="selFicha" style="display:none;">
+      <span class="lbl">Ficha de la prenda</span>
+      <div id="pFicha"></div>
+      <div class="avisoCombo" id="avisoFicha"></div>
+    </div>
 
     <span class="lbl">Color de la prenda</span>
     <div class="pills" id="pColores" style="margin-bottom:8px;"></div>
@@ -1284,7 +1289,7 @@ function borradorGuardar(){
       pv:PVAPOR, vapor:VAPOR, obs:OBS, vref:VREF, vsin:VSIN,
       estilo:PAR.estilo||'', tipo:PAR.tipo||'', cliente:PAR.cliente||'', quien:SES.auditora||'',
       archivo:(ESPEC&&ESPEC.archivo)||'',   /* la tabla con la que se midió: al continuar se abre esa misma */
-      taller:SES.taller, datos:DATOS, prendas:PRENDAS, tact:TACT, pact:PACT, idEnvio:ID_ENVIO }));
+      taller:SES.taller, ficha:FICHA, datos:DATOS, prendas:PRENDAS, tact:TACT, pact:PACT, idEnvio:ID_ENVIO }));
     /* si se continuó un borrador guardado con otro nombre, pasa a ser este; los de otras personas no se tocan */
     if(BORR_ACT && BORR_ACT!==mia){ LS.del(BORR_ACT); } BORR_ACT=mia;
   }catch(e){}
@@ -1330,6 +1335,7 @@ function borradorContinuar(){
   VREF=(PVAPOR&&VAPOR==='DESPUES')?(BORR.vref||''):''; VSIN=!!(PVAPOR&&BORR.vsin); VANTES=null;
   if(VREF) cargarAntes(VREF);
   ETAPA=BORR.etapa||ETAPA; COMBO=BORR.combo||''; COLOR=BORR.color||''; LINEA_OK=true;
+  FICHA=BORR.ficha||'';   /* la ficha con la que se midió (27/11/2026) */
   RETOMAR=true; pintarEtapas();
 }
 function borradorDescartar(){
@@ -1656,8 +1662,81 @@ function varsDeEtapa(e){
   var g0=String(vs[0].grupo||'');
   return vs.filter(function(v){ return String(v.grupo||'')===g0; });
 }
+/* ---------- ficha de la prenda (27/11/2026) ----------
+   Un mismo estilo y grupo puede tener VARIAS fichas a la vez, una por color o por proceso, cada una
+   con su versión (25264 PAK-161: 3d, 3e y 3f) y con medidas distintas. Sus tablas no declaran el
+   color, así que antes se tomaban como versiones de una sola ficha: solo se ofrecía la más reciente
+   y las otras quedaban tapadas (se podía medir un color con la tabla de otro). Ahora, si para lo
+   elegido hay más de una ficha, la auditora TIENE que elegirla; no se asume ninguna. Llega elegida
+   la de la tarjeta del buscador desde donde se entró. */
+var FICHA='';
+function fichasDe(e,c){
+  var vistos={}, out=[];
+  varsDeEtapa(e).forEach(function(v){
+    if(String(v.combo||'')!==String(c||'')) return;
+    var a=String(v.archivo||''); if(vistos[a]) return; vistos[a]=1; out.push(v);
+  });
+  return out;
+}
 function varDe(e,c){
-  return varsDeEtapa(e).filter(function(v){ return String(v.combo||'')===String(c||''); })[0] || null;
+  var fs=fichasDe(e,c);
+  if(fs.length<=1) return fs[0]||null;
+  return fs.filter(function(v){ return String(v.archivo||'')===FICHA; })[0] || null;
+}
+function hEsc(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+/* Lo que distingue a la ficha, sacado del nombre del archivo: sin estilo, versión ni grupo */
+function nomFicha(v){
+  var t=String(v.archivo||'').replace(/\.pdf$/i,''), ver=String(v.version||''), est=String(PAR.estilo||'');
+  var limpio=t.replace(/\b[A-Z]{2,5}\s*[-–—]?\s*\d{3,4}(?:\s*[-–—\/]\s*\d{3,4})*\b/gi,' - ')
+              .replace(/\(?\bPROD\w*\)?/gi,' - ').replace(/\bHOJA\s+(DE\s+)?CORTE\b/gi,' - ');
+  var partes=limpio.split(/\s*[-–—()]+\s*/).map(function(x){ return x.replace(/\s+/g,' ').trim(); })
+    .filter(function(x){ return x && x!==est && x.toUpperCase()!==ver.toUpperCase(); });
+  return partes.join(' · ').toUpperCase() || t;
+}
+/* Colores de la hoja de corte de la misma versión y grupo: ayudan a reconocer la ficha */
+function coloresDeFicha(v){
+  var ver=String(v.version||'').toUpperCase(), out=[];
+  if(!ver) return out;
+  VARIANTES.forEach(function(x){
+    if(x.tipo!=='CORTE' || String(x.version||'').toUpperCase()!==ver) return;
+    if(GRUPO && gruposDeVar(x).length && gruposDeVar(x).indexOf(GRUPO)<0) return;
+    coloresDeCombo(x.combo).forEach(function(c){ if(out.indexOf(c)<0) out.push(c); });
+  });
+  return out;
+}
+var FICHAS_OP=[];
+function pintarFichas(){
+  /* devuelve true si ya se puede cargar la tabla; false si falta elegir la ficha */
+  var caja=document.getElementById('selFicha'); if(!caja) return true;
+  var fs=fichasDe(ETAPA,COMBO);
+  if(fs.length<=1){ caja.style.display='none'; return true; }
+  var archs=fs.map(function(v){ return String(v.archivo||''); });
+  if(archs.indexOf(FICHA)<0){
+    FICHA='';
+    var pa=String(PAR.archivo||''), pv=String(PAR.version||'').toUpperCase();
+    if(pa && archs.indexOf(pa)>=0) FICHA=pa;
+    else if(pv){
+      var m=fs.filter(function(v){ return String(v.version||'').toUpperCase()===pv; });
+      if(m.length===1) FICHA=String(m[0].archivo||'');
+    }
+  }
+  FICHAS_OP=fs;
+  caja.style.display='block';
+  document.getElementById('pFicha').innerHTML = fs.map(function(v,i){
+    var cols=coloresDeFicha(v);
+    return '<button type="button" class="antOp'+(String(v.archivo||'')===FICHA?' on':'')+'" onclick="elegirFicha('+i+')">'+
+      '<div class="aInf"><b>'+(v.version?'Versión '+hEsc(v.version)+' · ':'')+hEsc(nomFicha(v))+'</b>'+
+      (cols.length?'<br><span>Hoja de corte: '+hEsc(cols.join(', '))+'</span>':'')+
+      '<br><span>'+hEsc(v.archivo||'')+'</span></div></button>';
+  }).join('');
+  document.getElementById('avisoFicha').textContent = FICHA ? '' :
+    'Este grupo tiene '+fs.length+' fichas con medidas distintas. Elige la de la prenda que vas a medir.';
+  return !!FICHA;
+}
+function elegirFicha(i){
+  var v=FICHAS_OP[i]; if(!v) return;
+  RETOMAR=false; FICHA=String(v.archivo||'');
+  cargarEspec();
 }
 function ponerSub(){ var g=grupoMed(); txt('hsub', PAR.estilo+(g?' · '+g:'')); }
 function pintarGrupos(){
@@ -1676,11 +1755,12 @@ function pintarGrupos(){
 }
 function elegirGrupo(g){
   if(g===GRUPO) return;
-  RETOMAR=false; GRUPO=g; COMBO=''; LINEA_OK=false; pintarEtapas();
+  RETOMAR=false; GRUPO=g; COMBO=''; LINEA_OK=false; FICHA=''; pintarEtapas();
 }
 
 var ORDEN_ETAPA=['CORTE','ANTES_VAPOR','TERMINADA'];   // orden del trabajo; cualquier otra etapa va al final
 function pintarEtapas(){
+  var _sf=document.getElementById('selFicha'); if(_sf) _sf.style.display='none';
   if(!pintarGrupos()){
     /* varios grupos y ninguno elegido: no se asume ninguno */
     document.getElementById('selEtapa').style.display='none';
@@ -1750,6 +1830,7 @@ function rangoTallas(v){
 }
 
 function pintarCombos(){
+  var _sf=document.getElementById('selFicha'); if(_sf) _sf.style.display='none';
   var vars=varsDeEtapa(ETAPA);
   var combos=vars.map(function(v){ return v.combo||''; });
   combos=combos.filter(function(v,i,s){ return s.indexOf(v)===i; });
@@ -1808,16 +1889,32 @@ function pintarCombos(){
     return;
   }
   document.querySelector('#selCombo .lbl').textContent='Combo de la ficha';
-  if(!COMBO || combos.indexOf(COMBO)<0) COMBO = combos[0]||'';
   if(combos.length>1 && combos.some(function(c){ return c; })){
+    /* 27/11/2026: varios combos (colores) con tablas distintas: la auditora TIENE que elegir. Antes llegaba
+       elegido el primero sin preguntar y se podía medir un color con la tabla de otro. Solo llega elegido
+       el de la ficha de la tarjeta del buscador desde donde se entró. */
+    if(!LINEA_OK || combos.indexOf(COMBO)<0){
+      var pa=String(PAR.archivo||''), pv=String(PAR.version||'').toUpperCase();
+      var m=pa ? vars.filter(function(v){ return String(v.archivo||'')===pa; }) : [];
+      if(!m.length && pv) m=vars.filter(function(v){ return String(v.version||'').toUpperCase()===pv; });
+      var cs=m.map(function(v){ return v.combo||''; }).filter(function(v,i,a){ return a.indexOf(v)===i; });
+      if(cs.length===1){ COMBO=cs[0]; LINEA_OK=true; } else { COMBO=''; LINEA_OK=false; }
+    }
     document.getElementById('selCombo').style.display='block';
     document.getElementById('pCombo').innerHTML = combos.map(function(c){
-      return '<button class="pill'+(c===COMBO?' on':'')+'" onclick="elegirCombo(\''+
+      return '<button class="pill'+(LINEA_OK && c===COMBO?' on':'')+'" onclick="elegirCombo(\''+
              String(c).replace(/'/g,"\\'")+'\')">'+(c||'Todos los colores')+'</button>';
     }).join('');
     document.getElementById('avisoCombo').textContent =
       'Las medidas cambian según el combo. Elige el que corresponde a la prenda.';
+    if(!LINEA_OK){
+      F=null; ESPEC=null; PRECARGA=null; ESPEC_SEQ++;
+      txt('fichaTit','Elige el combo de la prenda'); txt('fichaInfo','');
+      pintarColores(); pintarBorrador();
+      return;
+    }
   }else{
+    COMBO = combos[0]||'';
     document.getElementById('selCombo').style.display='none';
   }
   cargarEspec();
@@ -1937,6 +2034,16 @@ function colorCerrar(){ var c=document.getElementById('colLista'); if(c){ c.styl
 
 var ESPEC_SEQ=0;   /* si se cambia de grupo o etapa antes de que llegue la tabla, la respuesta vieja se descarta */
 function cargarEspec(){
+  /* al continuar una medición manda la ficha (archivo) con la que se midió: no se vuelve a preguntar */
+  var _cont=RETOMAR && !!BORR && !!(BORR.ficha||BORR.archivo);
+  if(_cont) FICHA=String(BORR.ficha||BORR.archivo);
+  if(!pintarFichas() && !_cont){
+    /* varias fichas para lo elegido y ninguna elegida: no se asume ninguna */
+    F=null; ESPEC=null; PRECARGA=null; ESPEC_SEQ++;
+    txt('fichaTit','Elige la ficha de la prenda'); txt('fichaInfo','');
+    pintarColores(); pintarBorrador();
+    return;
+  }
   var v=varDe(ETAPA,COMBO), arch=v ? String(v.archivo||'') : '';   /* la ficha del grupo elegido */
   var seq=++ESPEC_SEQ;
   var ret=RETOMAR && !!BORR;
@@ -2044,8 +2151,11 @@ function empezar(forzar){
   if(!F){
     if(listaGrupos().length>1 && !GRUPO){ alert('Elige el grupo de la prenda que vas a medir.'); return; }
     if(PVAPOR && !VAPOR){ alert('Elige si mides ANTES DE VAPOR o DESPUÉS DE VAPOR.'); return; }
-    alert(document.getElementById('selCombo').style.display==='block' && !COMBO
-      ? 'Elige la línea de tallas de la prenda (Missy o Plus).'
+    if(document.getElementById('selFicha').style.display==='block' && !FICHA){ alert('Elige la ficha de la prenda que vas a medir.'); return; }
+    alert(document.getElementById('selCombo').style.display==='block' && !LINEA_OK
+      ? (document.querySelector('#selCombo .lbl').textContent.indexOf('Línea')>=0
+          ? 'Elige la línea de tallas de la prenda (Missy o Plus).'
+          : 'Elige el combo (color) de la prenda que vas a medir.')
       : 'Todavía no se cargó la tabla de medidas.');
     return;
   }
@@ -2062,6 +2172,14 @@ function empezar(forzar){
     document.getElementById('selTaller').classList.add('falta');
     alert('Elige el taller donde estás midiendo.');
     return;
+  }
+  /* el color elegido es de la hoja de corte de OTRA ficha del grupo: se avisa antes de medir */
+  var _fs=fichasDe(ETAPA,COMBO);
+  if(_fs.length>1){
+    var _act=_fs.filter(function(x){ return String(x.archivo||'')===FICHA; })[0];
+    var _otra=_fs.filter(function(x){ return String(x.archivo||'')!==FICHA && coloresDeFicha(x).indexOf(COLOR)>=0; })[0];
+    if(_act && _otra && coloresDeFicha(_act).indexOf(COLOR)<0 &&
+       !confirm('El color '+COLOR+' es de la ficha versión '+(_otra.version||'')+' y elegiste la versión '+(_act.version||'')+'. ¿Seguir así?')) return;
   }
   var mA=VREF ? MEDS_EST.filter(function(x){ return x.id===VREF; })[0] : null;
   if(mA && mA.color && COLOR!==mA.color &&
