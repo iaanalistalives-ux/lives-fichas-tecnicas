@@ -897,6 +897,7 @@ body.capAbierta #btnDib{display:none!important;}
   <div class="panel" id="pBorr" style="display:none;">
     <div class="pt">Medición sin terminar</div>
     <div class="ph" id="borrInfo"></div>
+    <div id="borrAviso" style="display:none;margin:0 0 10px;padding:9px 11px;border-radius:6px;background:#FDECEC;border:1px solid #E5A3A3;color:#8A1C1C;font-size:13px;font-weight:700;"></div>
     <button class="btn full" onclick="borradorContinuar()">Continuar esa medición</button>
     <button class="btn ghost full" style="margin-top:8px;" onclick="borradorDescartar()">Descartar y empezar otra</button>
   </div>
@@ -973,6 +974,17 @@ body.capAbierta #btnDib{display:none!important;}
 </div>
 
 <!-- ================= MEDICIÓN ================= -->
+<!-- Medición sin terminar al tocar «Empezar a medir» (27/11/2026): botones que dicen lo que hacen -->
+<div id="borrVent" role="dialog" style="display:none;position:fixed;inset:0;z-index:90;background:rgba(14,59,54,.72);align-items:center;justify-content:center;padding:14px;">
+  <div class="panel" style="max-width:440px;width:100%;margin:0;">
+    <div class="pt">Tienes una medición sin terminar</div>
+    <div class="ph" id="borrVentInfo" style="font-size:13px;"></div>
+    <button class="btn full" onclick="borradorContinuar()">Continuar esa medición</button>
+    <button class="btn ghost full" style="margin-top:8px;color:#B42318;border-color:#E5A3A3;" onclick="borrVentanaNueva()">Borrar esas medidas y empezar una nueva</button>
+    <button class="btn ghost full" style="margin-top:8px;" onclick="borrVentanaCerrar()">Volver sin cambiar nada</button>
+  </div>
+</div>
+
 <div id="medir" style="display:none;">
   <div class="avance">
     <div class="avFila">
@@ -1231,7 +1243,10 @@ function arrancar(){
       /* 25/11/2026: se retoma sin preguntar si la pantalla se recargó mientras se medía, o si se entró
          por «Continuar» del buscador. Entrando por «Medir» sigue saliendo el panel para elegir. */
       if(BORR && (midiendoEstaba() || PAR.retomar==='1')) borradorContinuar();
-      else{ midiendoMarca(false); pintarEtapas(); }
+      /* el panel «Medición sin terminar» sale de frente, también cuando la ficha pide antes elegir la
+         línea de tallas, el grupo o antes/después de vapor (27/11/2026: ahí no salía y solo se veía
+         el aviso del navegador al tocar «Empezar a medir») */
+      else{ midiendoMarca(false); pintarEtapas(); pintarBorrador(); }
     });
   });
 }
@@ -1268,6 +1283,7 @@ function borradorGuardar(){
     LS.set(mia, JSON.stringify({ ts:Date.now(), grupo:GRUPO, etapa:ETAPA, combo:COMBO, color:COLOR,
       pv:PVAPOR, vapor:VAPOR, obs:OBS, vref:VREF, vsin:VSIN,
       estilo:PAR.estilo||'', tipo:PAR.tipo||'', cliente:PAR.cliente||'', quien:SES.auditora||'',
+      archivo:(ESPEC&&ESPEC.archivo)||'',   /* la tabla con la que se midió: al continuar se abre esa misma */
       taller:SES.taller, datos:DATOS, prendas:PRENDAS, tact:TACT, pact:PACT, idEnvio:ID_ENVIO }));
     /* si se continuó un borrador guardado con otro nombre, pasa a ser este; los de otras personas no se tocan */
     if(BORR_ACT && BORR_ACT!==mia){ LS.del(BORR_ACT); } BORR_ACT=mia;
@@ -1306,6 +1322,7 @@ function pintarBorrador(){
 }
 function borradorContinuar(){
   if(!BORR) return;
+  borrVentanaCerrar(); borrAviso('');
   /* el borrador vuelve con su grupo; los de antes del 17/11/2026 no lo traen: eran de la ficha más reciente */
   if(BORR.grupo) GRUPO=BORR.grupo;
   else if(!GRUPO){ var _vs=VARIANTES.slice().sort(recienteVar); GRUPO=_vs.length ? (gruposDeVar(_vs[0])[0]||'') : ''; }
@@ -1317,8 +1334,35 @@ function borradorContinuar(){
 }
 function borradorDescartar(){
   if(!confirm('¿Descartar la medición sin terminar? Se pierden las medidas anotadas.')) return;
+  RETOMAR=false; borrAviso('');
   borradorBorrar(); reiniciarElecciones(); pintarBorrador();
 }
+/* 27/11/2026: una medición sin terminar nunca se abre vacía ni se borra por un botón que no se entiende.
+   (1) «Continuar» abre la misma tabla con la que se midió (su archivo, etapa y línea), aunque la ficha
+       tenga ahora otra línea u otro grupo elegidos. Antes, si la línea guardada no coincidía, la pantalla
+       pedía elegirla de nuevo y, con otra línea (Missy por Plus), abría la hoja con todo en blanco.
+   (2) Si aun así ninguna medida anotada calza con la tabla que llegó, no se entra: el borrador se queda
+       guardado y se avisa.
+   (3) «Empezar a medir» con una medición sin terminar ya no usa el aviso del navegador (Aceptar /
+       Cancelar, donde Aceptar la borraba): abre una ventana con botones que dicen lo que hacen. */
+function borrAviso(m){
+  var a=document.getElementById('borrAviso'); if(!a) return;
+  a.textContent=m||''; a.style.display=m?'block':'none';
+}
+function borrCalzan(b){
+  if(!b || !b.datos || !F) return 0;
+  var cods={}; F.puntos.forEach(function(p){ cods[p[0]]=1; });
+  return Object.keys(b.datos).filter(function(k){
+    var z=k.split('|'); return F.tallas.indexOf(z[0])>=0 && cods[z.slice(2).join('|')];
+  }).length;
+}
+function borrVentana(){
+  var v=document.getElementById('borrVent'); if(!v || !BORR) return;
+  txt('borrVentInfo', document.getElementById('borrInfo').textContent.replace(/ Si vas a medir otro color.*$/,''));
+  v.style.display='flex';
+}
+function borrVentanaCerrar(){ var v=document.getElementById('borrVent'); if(v) v.style.display='none'; }
+function borrVentanaNueva(){ borrVentanaCerrar(); empezar(true); }
 function reiniciarElecciones(){
   COLOR=''; var o=document.getElementById('colorOtro'); if(o){ o.value=''; o.classList.remove('colOk'); }
   COLOR_LISTA=''; colorCerrar();
@@ -1343,8 +1387,17 @@ function borradorAlOcultar(){ try{ if(medirVisible()) borradorGuardar(); }catch(
 document.addEventListener('visibilitychange', function(){ if(document.hidden) borradorAlOcultar(); });
 window.addEventListener('pagehide', borradorAlOcultar);
 function borradorReanudar(){
-  var b=BORR; BORR=null;
+  var b=BORR;
   if(!b || !F) return;
+  var nTot=Object.keys(b.datos||{}).length;
+  if(nTot && !borrCalzan(b)){
+    /* la tabla que llegó no es la de esas medidas: no se abre en blanco y el borrador no se toca */
+    borrAviso('No se pudo abrir esa medición: la tabla que cargó no es la misma con la que se midió. '+
+      'Tus '+nTot+' medida'+(nTot===1?'':'s')+' anotada'+(nTot===1?'':'s')+' siguen guardadas en este equipo. '+
+      'No la descartes: avisa para que la revisen.');
+    pintarBorrador(); return;
+  }
+  BORR=null; borrAviso('');
   BORR_ACT=b.__k||'';
   DATOS=b.datos; PRENDAS=b.prendas||{}; ID_ENVIO=b.idEnvio||'';
   F.tallas.forEach(function(t){ if(!PRENDAS[t]) PRENDAS[t]=1; });
@@ -1530,11 +1583,11 @@ function etapaDespues(etapas){
 }
 function nomEtapaAct(e){ return PVAPOR ? 'Prueba de vapor · '+(NOM_VAPOR[VAPOR]||'') : (NOM_ETAPA[e]||e||''); }
 function cambiarVapor(on){
-  PVAPOR=!!on; VAPOR=''; COMBO=''; LINEA_OK=false; VREF=''; VSIN=false; VANTES=null;
+  RETOMAR=false; PVAPOR=!!on; VAPOR=''; COMBO=''; LINEA_OK=false; VREF=''; VSIN=false; VANTES=null;
   if(!PVAPOR){ ETAPA=''; OBS=''; }
   pintarEtapas();
 }
-function elegirVapor(v){ if(v===VAPOR) return; VAPOR=v; COMBO=''; LINEA_OK=false; VREF=''; VSIN=false; VANTES=null; pintarEtapas(); }
+function elegirVapor(v){ if(v===VAPOR) return; RETOMAR=false; VAPOR=v; COMBO=''; LINEA_OK=false; VREF=''; VSIN=false; VANTES=null; pintarEtapas(); }
 function pintarVapor(etapas){
   /* devuelve true si ya se puede seguir (hay etapa); false si falta elegir antes o después */
   var hayAntes=etapas.indexOf('ANTES_VAPOR')>=0, eDesp=etapaDespues(etapas);
@@ -1609,8 +1662,9 @@ function varDe(e,c){
 function ponerSub(){ var g=grupoMed(); txt('hsub', PAR.estilo+(g?' · '+g:'')); }
 function pintarGrupos(){
   var gs=listaGrupos(), caja=document.getElementById('selGrupo');
-  if(gs.length<=1){ GRUPO=gs[0]||''; caja.style.display='none'; ponerSub(); return true; }
-  if(gs.indexOf(GRUPO)<0) GRUPO='';
+  var ret=RETOMAR && !!GRUPO;   /* al continuar una medición manda el grupo con el que se midió */
+  if(gs.length<=1){ if(!ret) GRUPO=gs[0]||''; caja.style.display='none'; ponerSub(); return true; }
+  if(gs.indexOf(GRUPO)<0 && !ret) GRUPO='';
   caja.style.display='block';
   document.getElementById('pGrupo').innerHTML = gs.map(function(g){
     return '<button class="pill'+(g===GRUPO?' on':'')+'" onclick="elegirGrupo(\''+g.replace(/'/g,"\\'")+'\')">'+g+'</button>';
@@ -1622,7 +1676,7 @@ function pintarGrupos(){
 }
 function elegirGrupo(g){
   if(g===GRUPO) return;
-  GRUPO=g; COMBO=''; LINEA_OK=false; pintarEtapas();
+  RETOMAR=false; GRUPO=g; COMBO=''; LINEA_OK=false; pintarEtapas();
 }
 
 var ORDEN_ETAPA=['CORTE','ANTES_VAPOR','TERMINADA'];   // orden del trabajo; cualquier otra etapa va al final
@@ -1663,7 +1717,7 @@ function pintarEtapas(){
   txt('lblEtapa','¿Qué estás midiendo?');
   document.getElementById('selEtapa').style.display='none';
   document.getElementById('selAntes').style.display='none';
-  if(!ETAPA || etapas.indexOf(ETAPA)<0)
+  if(!ETAPA || (etapas.indexOf(ETAPA)<0 && !RETOMAR))
     ETAPA = etapas.indexOf('TERMINADA')>=0 ? 'TERMINADA' : etapas[0];
   if(etapas.length>1){
     document.getElementById('selEtapa').style.display='block';
@@ -1675,7 +1729,7 @@ function pintarEtapas(){
   }
   pintarCombos();
 }
-function elegirEtapa(e){ ETAPA=e; COMBO=''; LINEA_OK=false; pintarEtapas(); }
+function elegirEtapa(e){ RETOMAR=false; ETAPA=e; COMBO=''; LINEA_OK=false; pintarEtapas(); }
 
 /* Línea de tallas de EFI: Missy (XXS–XL), Plus (1X–3X), Petite.
    Sale del nombre del archivo o del encabezado ("... – Missy").
@@ -1700,6 +1754,34 @@ function pintarCombos(){
   var combos=vars.map(function(v){ return v.combo||''; });
   combos=combos.filter(function(v,i,s){ return s.indexOf(v)===i; });
   var conLinea = combos.filter(lineaDeCombo);
+  if(RETOMAR && BORR){
+    /* continuar una medición: se abre con su misma línea o combo, sin volver a preguntar */
+    LINEA_OK=true;
+    var cs=conLinea.length ? conLinea : combos;
+    if(combos.indexOf(COMBO)<0 && !BORR.archivo){
+      /* borrador sin archivo cuya línea ya no figura igual: vale la única tabla de la etapa que tiene
+         todas las tallas medidas; si hay más de una posible no se adivina (lo frena borradorReanudar) */
+      var ts=[]; Object.keys(BORR.datos||{}).forEach(function(k){ var t=k.split('|')[0]; if(ts.indexOf(t)<0) ts.push(t); });
+      var cc=[]; vars.forEach(function(v){
+        var c=v.combo||'';
+        if(ts.every(function(t){ return (v.tallas||[]).indexOf(t)>=0; }) && cc.indexOf(c)<0) cc.push(c);
+      });
+      if(cc.length===1) COMBO=cc[0];
+    }
+    if(cs.length>1 && cs.some(function(c){ return c; })){
+      document.getElementById('selCombo').style.display='block';
+      document.getElementById('pCombo').innerHTML = cs.map(function(c){
+        var v=vars.filter(function(x){ return (x.combo||'')===c; })[0];
+        var resto=String(c).split(' · ').slice(1).join(' · ');
+        var nom=lineaDeCombo(c) ? NOM_LINEA[lineaDeCombo(c)]+(rangoTallas(v)?' ('+rangoTallas(v)+')':'')+(resto?' · '+resto:'') : (c||'Todos los colores');
+        return '<button class="pill'+(c===COMBO?' on':'')+'" onclick="elegirCombo(\''+
+               String(c).replace(/'/g,"\\'")+'\')">'+nom+'</button>';
+      }).join('');
+      document.getElementById('avisoCombo').textContent='';
+    }
+    cargarEspec();
+    return;
+  }
   if(conLinea.length){
     // Missy / Plus: la auditora TIENE que elegir; no se asume ninguna
     combos = conLinea;
@@ -1740,7 +1822,7 @@ function pintarCombos(){
   }
   cargarEspec();
 }
-function elegirCombo(c){ COMBO=c; LINEA_OK=true; pintarCombos(); }
+function elegirCombo(c){ RETOMAR=false; COMBO=c; LINEA_OK=true; pintarCombos(); }
 
 /* De "OLYMPIC (PARTIDA: 25-721628 ) // ECLIPSE (PARTIDA: 25-721629 )"
    se sacan los nombres de color para ofrecerlos como opciones.        */
@@ -1857,6 +1939,8 @@ var ESPEC_SEQ=0;   /* si se cambia de grupo o etapa antes de que llegue la tabla
 function cargarEspec(){
   var v=varDe(ETAPA,COMBO), arch=v ? String(v.archivo||'') : '';   /* la ficha del grupo elegido */
   var seq=++ESPEC_SEQ;
+  var ret=RETOMAR && !!BORR;
+  if(ret && BORR.archivo) arch=String(BORR.archivo);   /* la misma tabla con la que se midió */
   if(PRECARGA && PRECARGA.etapa===ETAPA && String(PRECARGA.combo||'')===String(COMBO||'') &&
      (!arch || String(PRECARGA.archivo||'')===arch)){
     var p=PRECARGA; PRECARGA=null;
@@ -1869,7 +1953,15 @@ function cargarEspec(){
         '&etapa='+encodeURIComponent(ETAPA)+'&combo='+encodeURIComponent(COMBO)+
         '&archivo='+encodeURIComponent(arch), function(r){
     if(seq!==ESPEC_SEQ) return;
-    if(!r || !r.ok || !r.espec){ error('No se pudo cargar la tabla.'); return; }
+    if(!r || !r.ok || !r.espec){
+      error('No se pudo cargar la tabla.');
+      if(ret){   /* no se pudo continuar: lo medido sigue guardado y se puede volver a intentar */
+        RETOMAR=false;
+        borrAviso('No se pudo cargar la tabla de esa medición (revisa la señal). Tus medidas siguen guardadas en este equipo: toca «Continuar esa medición» otra vez.');
+        pintarBorrador();
+      }
+      return;
+    }
     aplicarEspec(r.espec);
   });
 }
@@ -1948,7 +2040,7 @@ function textoFrac(txt){
 
 /* ---------- configuración ---------- */
 
-function empezar(){
+function empezar(forzar){
   if(!F){
     if(listaGrupos().length>1 && !GRUPO){ alert('Elige el grupo de la prenda que vas a medir.'); return; }
     if(PVAPOR && !VAPOR){ alert('Elige si mides ANTES DE VAPOR o DESPUÉS DE VAPOR.'); return; }
@@ -1976,7 +2068,7 @@ function empezar(){
      !confirm('La prueba antes de vapor es del color '+mA.color+' y elegiste '+COLOR+'. ¿Seguir así?')) return;
   /* el borrador de otra persona (equipo compartido) no se pregunta ni se borra: se queda para ella */
   if(BORR && borradorAjeno()){ BORR=null; }
-  if(BORR && !confirm('Hay una medición sin terminar. ¿Descartarla y empezar esta nueva?')) return;
+  if(BORR && forzar!==true){ borrVentana(); return; }   /* ventana propia: cada botón dice lo que hace */
   DATOS={}; PRENDAS={}; ID_ENVIO=''; OBS="";
   F.tallas.forEach(function(t){ PRENDAS[t]=1; });
   TACT=F.tallas[0]; PACT=1;

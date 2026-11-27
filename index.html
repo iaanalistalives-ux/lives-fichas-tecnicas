@@ -791,7 +791,7 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
 <style id="lsLimpCss">/* lives-limpieza v1 · sin enlaces repetidos (cada pantalla tiene su entrada en el portal), sin "Cambiar archivo" y sin títulos que ya pone el portal */#quien button{display:none!important}</style>
 <style id="lsLimp2Css">/* lives-limpieza v2 · sin notas, veredictos ni paneles de título arriba */.wrap>.note{display:none!important}.lsOculto{display:none!important}#vdrive{display:none!important}</style>
 <style id="lsSinActCss">/* 12/10/2026: sin botón Actualizar propio; se usa el actualizar del portal */#btnSync{display:none!important}</style>
-<style id="fichasSoloPC">/* el botón Dashboard del buscador solo se ve en PC (pedido de Christian, 18/11/2026) */@media(max-width:700px){.soloPC{display:none!important}}</style>
+<style id="fichasSoloPC">/* los botones Dashboard (18/11/2026) y Puntuación (27/11/2026) del buscador solo se ven en PC (pedido de Christian) */@media(max-width:700px){.soloPC{display:none!important}}</style>
 <style id="fichasSinExcel">/* sin botón Descargar Excel en esta pantalla (pedido de Christian, 18/11/2026); el Excel queda solo en el Dashboard */#lsXlsBtn{display:none!important}</style>
 </head>
 <body>
@@ -859,7 +859,7 @@ body{margin:0;background:var(--warm-light);color:#333;font-family:Calibri,Arial,
       <button class="btn ghost" id="btnSync" onclick="refrescar()">Actualizar</button>
       <button class="btn ghost" onclick="location.href='historial.html'">Medidas Realizadas</button>
       <button class="btn ghost soloPC" onclick="location.href='dashboard.html'">Dashboard</button>
-      <button class="btn ghost" onclick="location.href='puntuacion.html'">Puntuación</button>
+      <button class="btn ghost soloPC" onclick="location.href='puntuacion.html'">Puntuación</button>
       <span class="sync" id="sync"></span>
     </div>
   </div>
